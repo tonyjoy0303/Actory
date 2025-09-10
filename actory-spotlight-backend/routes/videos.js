@@ -5,6 +5,12 @@ const router = express.Router({ mergeParams: true });
 
 const { protect, authorize } = require('../middleware/auth');
 
+// Actor's own submissions
+router.get('/mine', protect, authorize('Actor'), videosController.getMyVideos);
+
+// Update submission status (Accept/Reject/Pending)
+router.patch('/:id/status', protect, authorize('Producer'), videosController.updateStatus);
+
 router
   .route('/')
   .get(protect, authorize('Producer'), videosController.getVideos)

@@ -1,5 +1,8 @@
 const User = require('../models/User');
 const jwt = require('jsonwebtoken');
+const { OAuth2Client } = require('google-auth-library');
+
+const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
 // @desc    Register user
 // @route   POST /api/v1/auth/register
@@ -85,7 +88,8 @@ const sendTokenResponse = (user, statusCode, res) => {
     name: user.name,
     email: user.email,
     role: user.role,
-    phone: user.phone
+    phone: user.phone,
+    photo: user.photo || ''
   };
 
   res
@@ -144,11 +148,131 @@ exports.getMe = async (req, res, next) => {
       email: user.email,
       role: user.role,
       phone: user.phone,
-      createdAt: user.createdAt
+      createdAt: user.createdAt,
+      photo: user.photo || ''
     };
 
     res.status(200).json({ success: true, user: userResponse });
   } catch (err) {
     res.status(500).json({ success: false, message: 'Server Error' });
+  }
+};
+
+// @desc    Update current logged-in user profile
+// @route   PUT /api/v1/auth/me
+// @access  Private
+exports.updateMe = async (req, res) => {
+  try {
+    const updates = {};
+    if (typeof req.body.name === 'string') updates.name = req.body.name;
+    if (typeof req.body.phone === 'string') updates.phone = req.body.phone;
+
+    // Validate at least one field
+    if (Object.keys(updates).length === 0) {
+      return res.status(400).json({ success: false, message: 'No valid fields provided' });
+    }
+
+    const user = await User.findByIdAndUpdate(req.user.id, updates, {
+      new: true,
+      runValidators: true
+    });
+
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    const userResponse = {
+      id: user._id,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+      phone: user.phone,
+      createdAt: user.createdAt,
+      photo: user.photo || ''
+    };
+
+    return res.status(200).json({ success: true, user: userResponse });
+  } catch (err) {
+    return res.status(400).json({ success: false, message: err.message });
+  }
+};
+
+// @desc    Upload/Update profile photo
+// @route   PUT /api/v1/auth/me/photo
+// @access  Private
+exports.uploadPhoto = async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ success: false, message: 'No file uploaded' });
+    }
+
+    const filePath = `/uploads/${req.file.filename}`;
+
+    const user = await User.findByIdAndUpdate(
+      req.user.id,
+      { photo: filePath },
+      { new: true }
+    );
+
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    const userResponse = {
+      id: user._id,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+      phone: user.phone,
+      createdAt: user.createdAt,
+      photo: user.photo || ''
+    };
+
+    return res.status(200).json({ success: true, user: userResponse });
+  } catch (err) {
+    return res.status(400).json({ success: false, message: err.message });
+  }
+};
+
+// @desc    Login/Register with Google ID token
+// @route   POST /api/v1/auth/google
+// @access  Public
+exports.googleLogin = async (req, res) => {
+  try {
+    const { credential, role } = req.body;
+    if (!credential) {
+      return res.status(400).json({ success: false, message: 'Missing Google credential' });
+    }
+
+    // Verify the ID token
+    const ticket = await googleClient.verifyIdToken({
+      idToken: credential,
+      audience: process.env.GOOGLE_CLIENT_ID,
+    });
+    const payload = ticket.getPayload();
+    const email = payload.email;
+    const name = payload.name || payload.given_name || 'User';
+
+    // Validate desired role if provided
+    const allowedRoles = ['Actor', 'Producer', 'Admin'];
+    const desiredRole = allowedRoles.includes(role) ? role : 'Actor';
+
+    // Find or create user
+    let user = await User.findOne({ email });
+    if (!user) {
+      user = await User.create({
+        name,
+        email,
+        // Generate a random password since not used for Google auth
+        password: Math.random().toString(36).slice(-12),
+        role: desiredRole,
+      });
+    }
+
+    // Issue our JWT and return standard payload
+    sendTokenResponse(user, 200, res);
+  } catch (err) {
+    console.error('Google login error:', err);
+    res.status(401).json({ success: false, message: 'Google authentication failed' });
   }
 };

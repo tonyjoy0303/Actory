@@ -47,6 +47,11 @@ const VideoSchema = new mongoose.Schema({
     required: [true, 'Please provide your skintone'],
     trim: true,
   },
+  status: {
+    type: String,
+    enum: ['Pending', 'Accepted', 'Rejected'],
+    default: 'Pending',
+  },
   createdAt: {
     type: Date,
     default: Date.now,

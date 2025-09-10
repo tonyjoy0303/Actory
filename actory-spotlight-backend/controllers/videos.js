@@ -45,6 +45,49 @@ exports.addVideo = async (req, res, next) => {
   }
 };
 
+// @desc    Get current actor's submissions
+// @route   GET /api/v1/videos/mine
+// @access  Private (Actor)
+exports.getMyVideos = async (req, res, next) => {
+  try {
+    const videos = await Video.find({ actor: req.user.id })
+      .sort({ createdAt: -1 })
+      .populate('castingCall', 'roleName');
+    res.status(200).json({ success: true, count: videos.length, data: videos });
+  } catch (err) {
+    res.status(400).json({ success: false, message: err.message });
+  }
+};
+
+// @desc    Update submission status (Accept/Reject)
+// @route   PATCH /api/v1/videos/:id/status
+// @access  Private (Producer owner of the casting call)
+exports.updateStatus = async (req, res, next) => {
+  try {
+    const { status } = req.body; // 'Accepted' | 'Rejected' | 'Pending'
+    if (!['Accepted', 'Rejected', 'Pending'].includes(status)) {
+      return res.status(400).json({ success: false, message: 'Invalid status value' });
+    }
+
+    const video = await Video.findById(req.params.id).populate('castingCall', 'producer');
+    if (!video) {
+      return res.status(404).json({ success: false, message: 'Submission not found' });
+    }
+
+    // Ensure current user is the producer who owns the casting call
+    if (video.castingCall.producer.toString() !== req.user.id) {
+      return res.status(401).json({ success: false, message: 'Not authorized to update this submission' });
+    }
+
+    video.status = status;
+    await video.save();
+
+    res.status(200).json({ success: true, data: video });
+  } catch (err) {
+    res.status(400).json({ success: false, message: err.message });
+  }
+};
+
 // @desc    Delete a video
 // @route   DELETE /api/v1/videos/:id
 // @access  Private (Owner of video only)
