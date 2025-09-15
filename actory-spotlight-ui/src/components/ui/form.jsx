@@ -1,41 +1,21 @@
-import React from 'react'
-const _jsxFileName = ""; function _optionalChain(ops) { let lastAccessLHS = undefined; let value = ops[0]; let i = 1; while (i < ops.length) { const op = ops[i]; const fn = ops[i + 1]; i += 2; if ((op === 'optionalAccess' || op === 'optionalCall') && value == null) { return undefined; } if (op === 'access' || op === 'optionalAccess') { lastAccessLHS = value; value = fn(value); } else if (op === 'call' || op === 'optionalCall') { value = fn((...args) => value.call(lastAccessLHS, ...args)); lastAccessLHS = undefined; } } return value; }import * as React from "react"
-
+import * as React from "react"
+import * as LabelPrimitive from "@radix-ui/react-label"
 import { Slot } from "@radix-ui/react-slot"
-import {
-  Controller,
-
-
-
-  FormProvider,
-  useFormContext,
-} from "react-hook-form"
+import { Controller, FormProvider, useFormContext } from "react-hook-form"
 
 import { cn } from "@/lib/utils"
 import { Label } from "@/components/ui/label"
 
 const Form = FormProvider
 
+const FormFieldContext = React.createContext({})
 
-
-
-
-
-
-
-const FormFieldContext = React.createContext(
-  {} 
-)
-
-const FormField = 
-
-
-({
+const FormField = ({
   ...props
 }) => {
   return (
-    React.createElement(FormFieldContext.Provider, { value: { name: props.name }, __self: this, __source: {fileName: _jsxFileName, lineNumber: 36}}
-      , React.createElement(Controller, { ...props, __self: this, __source: {fileName: _jsxFileName, lineNumber: 37}} )
+    React.createElement(FormFieldContext.Provider, { value: { name: props.name }}, 
+      React.createElement(Controller, { ...props })
     )
   )
 }
@@ -63,32 +43,20 @@ const useFormField = () => {
   }
 }
 
+const FormItemContext = React.createContext({})
 
-
-
-
-const FormItemContext = React.createContext(
-  {} 
-)
-
-const FormItem = React.forwardRef
-
-
-(({ className, ...props }, ref) => {
+const FormItem = React.forwardRef(({ className, ...props }, ref) => {
   const id = React.useId()
 
   return (
-    React.createElement(FormItemContext.Provider, { value: { id }, __self: this, __source: {fileName: _jsxFileName, lineNumber: 80}}
-      , React.createElement('div', { ref: ref, className: cn("space-y-2", className), ...props, __self: this, __source: {fileName: _jsxFileName, lineNumber: 81}} )
+    React.createElement(FormItemContext.Provider, { value: { id }}, 
+      React.createElement('div', { ref: ref, className: cn("space-y-2", className), ...props })
     )
   )
 })
 FormItem.displayName = "FormItem"
 
-const FormLabel = React.forwardRef
-
-
-(({ className, ...props }, ref) => {
+const FormLabel = React.forwardRef(({ className, ...props }, ref) => {
   const { error, formItemId } = useFormField()
 
   return (
@@ -96,16 +64,13 @@ const FormLabel = React.forwardRef
       ref: ref,
       className: cn(error && "text-destructive", className),
       htmlFor: formItemId,
-      ...props, __self: this, __source: {fileName: _jsxFileName, lineNumber: 94}}
-    )
+      ...props
+    })
   )
 })
 FormLabel.displayName = "FormLabel"
 
-const FormControl = React.forwardRef
-
-
-(({ ...props }, ref) => {
+const FormControl = React.forwardRef(({ ...props }, ref) => {
   const { error, formItemId, formDescriptionId, formMessageId } = useFormField()
 
   return (
@@ -118,16 +83,13 @@ const FormControl = React.forwardRef
           : `${formDescriptionId} ${formMessageId}`
       ,
       'aria-invalid': !!error,
-      ...props, __self: this, __source: {fileName: _jsxFileName, lineNumber: 111}}
-    )
+      ...props
+    })
   )
 })
 FormControl.displayName = "FormControl"
 
-const FormDescription = React.forwardRef
-
-
-(({ className, ...props }, ref) => {
+const FormDescription = React.forwardRef(({ className, ...props }, ref) => {
   const { formDescriptionId } = useFormField()
 
   return (
@@ -135,18 +97,15 @@ const FormDescription = React.forwardRef
       ref: ref,
       id: formDescriptionId,
       className: cn("text-sm text-muted-foreground", className),
-      ...props, __self: this, __source: {fileName: _jsxFileName, lineNumber: 133}}
-    )
+      ...props
+    })
   )
 })
 FormDescription.displayName = "FormDescription"
 
-const FormMessage = React.forwardRef
-
-
-(({ className, children, ...props }, ref) => {
+const FormMessage = React.forwardRef(({ className, children, ...props }, ref) => {
   const { error, formMessageId } = useFormField()
-  const body = error ? String(_optionalChain([error, 'optionalAccess', _ => _.message])) : children
+  const body = error ? String(error.message) : children
 
   if (!body) {
     return null
@@ -157,8 +116,7 @@ const FormMessage = React.forwardRef
       ref: ref,
       id: formMessageId,
       className: cn("text-sm font-medium text-destructive", className),
-      ...props, __self: this, __source: {fileName: _jsxFileName, lineNumber: 155}}
-
+      ...props}
       , body
     )
   )

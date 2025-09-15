@@ -1,25 +1,48 @@
 import React from 'react';
+
+// UI Components
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
+
+// Third-party Libraries
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { HelmetProvider } from "react-helmet-async";
 import { ThemeProvider } from "next-themes";
+
+// Layout
 import MainLayout from "./layouts/MainLayout";
+
+// Pages - Main
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
+
+// Pages - Dashboards
 import ActorDashboard from "./pages/ActorDashboard";
 import ProducerDashboard from "./pages/ProducerDashboard";
 import AdminDashboard from "./pages/AdminDashboard";
+
+// Pages - Casting
 import CastingList from "./pages/CastingList";
+import CastingDetails from "./pages/casting/CastingDetails";
+import CreateCastingCall from "./pages/casting/CreateCastingCall";
+import EditCastingCall from "./pages/casting/EditCastingCall";
+
+// Pages - Profiles & Submissions
 import ActorProfile from "./pages/ActorProfile";
 import AuditionSubmit from "./pages/AuditionSubmit";
+
+// Pages - Messaging
 import Messages from "./pages/Messages";
+
+// Pages - Auth
 import Login from "./pages/auth/Login";
 import Register from "./pages/auth/Register";
 import RegisterActor from "./pages/auth/RegisterActor";
 import RegisterProducer from "./pages/auth/RegisterProducer";
+
+// Pages - Marketing
 import KnowMore from "./pages/KnowMore";
 import Features from "./pages/Features";
 
@@ -71,6 +94,30 @@ const App = () => (
                 element: 
                   React.createElement(MainLayout, null
                     , React.createElement(CastingList, null )
+                  )
+                })
+
+              , React.createElement(Route, {
+                path: "/casting/:id",
+                element: 
+                  React.createElement(MainLayout, null
+                    , React.createElement(CastingDetails, null )
+                  )
+                })
+
+              , React.createElement(Route, {
+                path: "/casting/new",
+                element: 
+                  React.createElement(MainLayout, null
+                    , React.createElement(CreateCastingCall, null )
+                  )
+                })
+
+              , React.createElement(Route, {
+                path: "/casting/:id/edit",
+                element: 
+                  React.createElement(MainLayout, null
+                    , React.createElement(EditCastingCall, null )
                   )
                 })
               
@@ -131,6 +178,14 @@ const App = () => (
                 })
               
               , React.createElement(Route, {
+                path: "/know-more",
+                element: 
+                  React.createElement(MainLayout, null
+                    , React.createElement(KnowMore, null )
+                  )
+                })
+              
+              , React.createElement(Route, {
                 path: "/features",
                 element: 
                   React.createElement(MainLayout, null
@@ -139,15 +194,12 @@ const App = () => (
                 })
               
               , React.createElement(Route, {
-                path: "/know-more",
+                path: "*",
                 element: 
                   React.createElement(MainLayout, null
-                    , React.createElement(KnowMore, null )
+                    , React.createElement(NotFound, null )
                   )
                 })
-              
-              /* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */
-              , React.createElement(Route, { path: "*", element: React.createElement(NotFound, null ) })
             )
           )
         )

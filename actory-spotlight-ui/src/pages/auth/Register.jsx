@@ -1,5 +1,5 @@
 import React from 'react'
-const _jsxFileName = ""; function _optionalChain(ops) { let lastAccessLHS = undefined; let value = ops[0]; let i = 1; while (i < ops.length) { const op = ops[i]; const fn = ops[i + 1]; i += 2; if ((op === 'optionalAccess' || op === 'optionalCall') && value == null) { return undefined; } if (op === 'access' || op === 'optionalAccess') { lastAccessLHS = value; value = fn(value); } else if (op === 'call' || op === 'optionalCall') { value = fn((...args) => value.call(lastAccessLHS, ...args)); lastAccessLHS = undefined; } } return value; }import { useState } from "react";
+const _jsxFileName = ""; function _optionalChain(ops) { let lastAccessLHS = undefined; let value = ops[0]; let i = 1; while (i < ops.length) { const op = ops[i]; const fn = ops[i + 1]; i += 2; if ((op === 'optionalAccess' || op === 'optionalCall') && value == null) { return undefined; } if (op === 'access' || op === 'optionalAccess') { lastAccessLHS = value; value = fn(value); } else if (op === 'call' || op === 'optionalCall') { value = fn((...args) => value.call(lastAccessLHS, ...args)); lastAccessLHS = undefined; } } return value; }import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import API from "@/lib/api";
@@ -16,6 +16,13 @@ export default function Register() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+
+  // Clear fields on mount to avoid showing stale values from previous sessions
+  useEffect(() => {
+    setName("");
+    setEmail("");
+    setPassword("");
+  }, []);
 
   const handleRegister = async (role) => {
     setLoading(true);
@@ -81,6 +88,8 @@ export default function Register() {
               placeholder: "Full name" , 
               value: name,
               onChange: (e) => setName(e.target.value),
+              autoComplete: "off",
+              name: "new-name",
               disabled: loading, __self: this, __source: {fileName: _jsxFileName, lineNumber: 79}}
             )
             , React.createElement(Input, { 
@@ -88,6 +97,8 @@ export default function Register() {
               type: "email", 
               value: email,
               onChange: (e) => setEmail(e.target.value),
+              autoComplete: "off",
+              name: "new-email",
               disabled: loading, __self: this, __source: {fileName: _jsxFileName, lineNumber: 85}}
             )
             , React.createElement(Input, { 
@@ -95,6 +106,8 @@ export default function Register() {
               type: "password", 
               value: password,
               onChange: (e) => setPassword(e.target.value),
+              autoComplete: "new-password",
+              name: "new-password",
               disabled: loading, __self: this, __source: {fileName: _jsxFileName, lineNumber: 92}}
             )
             , error && React.createElement('p', { className: "text-sm text-red-500 text-center"  , __self: this, __source: {fileName: _jsxFileName, lineNumber: 99}}, error)

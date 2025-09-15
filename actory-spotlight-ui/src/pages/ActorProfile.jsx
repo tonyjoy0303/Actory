@@ -1,5 +1,5 @@
 import React from 'react'
-const _jsxFileName = ""; function _optionalChain(ops) { let lastAccessLHS = undefined; let value = ops[0]; let i = 1; while (i < ops.length) { const op = ops[i]; const fn = ops[i + 1]; i += 2; if ((op === 'optionalAccess' || op === 'optionalCall') && value == null) { return undefined; } if (op === 'access' || op === 'optionalAccess') { lastAccessLHS = value; value = fn(value); } else if (op === 'call' || op === 'optionalCall') { value = fn((...args) => value.call(lastAccessLHS, ...args)); lastAccessLHS = undefined; } } return value; }import { useEffect, useState } from "react";
+const _jsxFileName = ""; function _optionalChain(ops) { let lastAccessLHS = undefined; let value = ops[0]; let i = 1; while (i < ops.length) { const op = ops[i]; const fn = ops[i + 1]; i += 2; if ((op === 'optionalAccess' || op === 'optionalCall') && value == null) { return undefined; } if (op === 'access' || op === 'optionalAccess') { lastAccessLHS = value; value = fn(value); } else if (op === 'call' || op === 'optionalCall') { value = fn((...args) => value.call(lastAccessLHS, ...args)); lastAccessLHS = undefined; } } return value; }import { useEffect, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import SEO from "@/components/SEO";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Slider } from "@/components/ui/slider";
 import Cropper from "react-easy-crop";
+import "react-easy-crop/react-easy-crop.css";
 
 export default function ActorProfile() {
   const navigate = useNavigate();
@@ -29,6 +30,8 @@ export default function ActorProfile() {
   const [zoom, setZoom] = useState(1);
   const [croppedAreaPixels, setCroppedAreaPixels] = useState(null);
   const [previewUrl, setPreviewUrl] = useState(null);
+  const [minZoom, setMinZoom] = useState(1);
+  const cropContainerRef = useRef(null);
 
   // Compute backend origin (without /api/v1) to serve static uploads
   const API_ORIGIN = API.defaults.baseURL.replace(/\/api\/v1$/, "");
@@ -63,6 +66,10 @@ export default function ActorProfile() {
       const url = URL.createObjectURL(file);
       setPreviewUrl(url);
       setIsCropOpen(true);
+      // reset crop/zoom for new image
+      setCrop({ x: 0, y: 0 });
+      setZoom(1);
+      setMinZoom(1);
     }
   };
 
@@ -145,6 +152,14 @@ export default function ActorProfile() {
     setUploading(false);
     if (previewUrl) URL.revokeObjectURL(previewUrl);
     setPreviewUrl(null);
+  };
+
+  const handleMediaLoaded = ({ naturalWidth, naturalHeight }) => {
+    if (!cropContainerRef.current) return;
+    const { offsetWidth: cw, offsetHeight: ch } = cropContainerRef.current;
+    const computedMin = Math.max(cw / naturalWidth, ch / naturalHeight);
+    setMinZoom(computedMin);
+    setZoom((z) => Math.max(z, computedMin));
   };
 
   return (
@@ -283,12 +298,12 @@ export default function ActorProfile() {
           , React.createElement(DialogHeader, {__self: this, __source: {fileName: _jsxFileName, lineNumber: 202}}
             , React.createElement(DialogTitle, {__self: this, __source: {fileName: _jsxFileName, lineNumber: 203}}, "Adjust your photo")
           )
-          , React.createElement('div', { className: "relative w-full aspect-square rounded-md bg-muted overflow-hidden", __self: this, __source: {fileName: _jsxFileName, lineNumber: 205}}
-            , previewUrl && React.createElement(Cropper, { image: previewUrl, crop: crop, zoom: zoom, aspect: 1, onCropChange: setCrop, onZoomChange: setZoom, onCropComplete: onCropComplete, restrictPosition: false, cropShape: "round", showGrid: false , __self: this, __source: {fileName: _jsxFileName, lineNumber: 206}} )
+          , React.createElement('div', { className: "relative w-full aspect-square rounded-md bg-muted overflow-hidden", ref: cropContainerRef, __self: this, __source: {fileName: _jsxFileName, lineNumber: 205}}
+            , previewUrl && React.createElement(Cropper, { image: previewUrl, crop: crop, zoom: zoom, minZoom: minZoom, aspect: 1, onCropChange: setCrop, onZoomChange: setZoom, onCropComplete: onCropComplete, onMediaLoaded: handleMediaLoaded, restrictPosition: true, cropShape: "round", showGrid: false , __self: this, __source: {fileName: _jsxFileName, lineNumber: 206}} )
           )
           , React.createElement('div', { className: "mt-4 space-y-2", __self: this, __source: {fileName: _jsxFileName, lineNumber: 210}}
             , React.createElement('label', { className: "text-xs text-muted-foreground", __self: this, __source: {fileName: _jsxFileName, lineNumber: 211}}, "Zoom")
-            , React.createElement(Slider, { value: [zoom], min: 1, max: 3, step: 0.01, onValueChange: (v) => setZoom(v[0]), __self: this, __source: {fileName: _jsxFileName, lineNumber: 212}} )
+            , React.createElement(Slider, { value: [zoom], min: minZoom, max: 3, step: 0.01, onValueChange: (v) => setZoom(v[0]), __self: this, __source: {fileName: _jsxFileName, lineNumber: 212}} )
           )
           , React.createElement(DialogFooter, { className: "mt-4", __self: this, __source: {fileName: _jsxFileName, lineNumber: 214}}
             , React.createElement(Button, { variant: "ghost", onClick: handleCloseCrop, disabled: uploading, __self: this, __source: {fileName: _jsxFileName, lineNumber: 215}}, "Cancel" )

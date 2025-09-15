@@ -151,7 +151,9 @@ export default function AuditionSubmit() {
                   React.createElement('div', {__self: this, __source: {fileName: _jsxFileName, lineNumber: 150}}, React.createElement('span', { className: "font-medium text-foreground" , __self: this, __source: {fileName: _jsxFileName, lineNumber: 150}}, "Location:"), " " , castingCall.location)
                 )
                 , castingCall.ageRange && (
-                  React.createElement('div', {__self: this, __source: {fileName: _jsxFileName, lineNumber: 153}}, React.createElement('span', { className: "font-medium text-foreground" , __self: this, __source: {fileName: _jsxFileName, lineNumber: 153}}, "Age Range:" ), " " , castingCall.ageRange)
+                  React.createElement('div', {__self: this, __source: {fileName: _jsxFileName, lineNumber: 153}}, 
+                    React.createElement('span', { className: "font-medium text-foreground" , __self: this, __source: {fileName: _jsxFileName, lineNumber: 153}}, "Age Range:" ), " " , castingCall.ageRange.min, " - ", castingCall.ageRange.max, " years"
+                  )
                 )
                 , (castingCall.auditionDate || castingCall.shootingStartDate || castingCall.shootingEndDate) && (
                   React.createElement('div', { className: "grid grid-cols-1 sm:grid-cols-3 gap-2"   , __self: this, __source: {fileName: _jsxFileName, lineNumber: 156}}

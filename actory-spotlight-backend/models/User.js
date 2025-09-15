@@ -5,11 +5,13 @@ const UserSchema = new mongoose.Schema({
   name: {
     type: String,
     required: [true, 'Please add a name'],
+    minlength: [2, 'Name must be at least 2 characters'],
+    maxlength: [50, 'Name must be at most 50 characters'],
     validate: {
       validator: function(v) {
-        return /\S/.test(v) && v.trim().length >= 3;
+        return /\S/.test(v);
       },
-      message: props => `${props.value} is not a valid name! It must contain at least 3 non-space characters.`
+      message: 'Name cannot be blank'
     }
   },
   email: {
@@ -17,13 +19,21 @@ const UserSchema = new mongoose.Schema({
     required: [true, 'Please add an email'],
     unique: true,
     match: [
-      /^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,3})+$/,
+      /^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,})+$/,
       'Please add a valid email',
     ],
   },
   phone: {
     type: String,
-    required: false, // Optional field
+    required: false, // Will be conditionally required below using custom validator
+    validate: {
+      validator: function(v) {
+        if (!v) return true; // optional unless role mandates
+        // Accepts international formats with + and spaces/dashes
+        return /^\+?[0-9\-\s]{7,15}$/.test(v);
+      },
+      message: 'Please provide a valid phone number'
+    }
   },
   role: {
     type: String,
@@ -36,24 +46,79 @@ const UserSchema = new mongoose.Schema({
     minlength: 6,
     select: false, // Do not return password by default
   },
-  photo: {
-    type: String,
-    default: '',
-  },
+  // Common optional fields
+  photo: { type: String, default: '' },
+  location: { type: String },
+
+  // Actor-specific
+  age: { type: Number, min: 1, max: 120 },
+  gender: { type: String, enum: ['male', 'female', 'other', 'prefer-not-to-say'] },
+  experienceLevel: { type: String, enum: ['beginner', 'intermediate', 'experienced', 'professional'] },
+  bio: { type: String, maxlength: 500 },
+  profileImage: { type: String },
+
+  // Producer-specific
+  companyName: { type: String },
+  website: { type: String },
+
   createdAt: {
     type: Date,
     default: Date.now,
   },
 });
 
+// Conditional required validations by role
+UserSchema.path('phone').validate(function(value) {
+  if (this.role === 'Actor' || this.role === 'Producer') {
+    return !!value; // required for both actor and producer
+  }
+  return true;
+}, 'Phone number is required');
+
+UserSchema.path('location').validate(function(value) {
+  if (this.role === 'Actor' || this.role === 'Producer') {
+    return !!value; // required for both actor and producer
+  }
+  return true;
+}, 'Location is required');
+
+UserSchema.path('companyName').validate(function(value) {
+  if (this.role === 'Producer') {
+    return !!value;
+  }
+  return true;
+}, 'Company name is required');
+
+UserSchema.path('age').validate(function(value) {
+  if (this.role === 'Actor') {
+    return typeof value === 'number' && value >= 1 && value <= 120;
+  }
+  return true;
+}, 'Age is required and must be between 1 and 120');
+
+UserSchema.path('gender').validate(function(value) {
+  if (this.role === 'Actor') {
+    return !!value;
+  }
+  return true;
+}, 'Gender is required');
+
+UserSchema.path('experienceLevel').validate(function(value) {
+  if (this.role === 'Actor') {
+    return !!value;
+  }
+  return true;
+}, 'Experience level is required');
+
 // Encrypt password using bcrypt
 UserSchema.pre('save', async function (next) {
   if (!this.isModified('password')) {
-    next();
+    return next();
   }
 
   const salt = await bcrypt.genSalt(10);
   this.password = await bcrypt.hash(this.password, salt);
+  next();
 });
 
 // Match user entered password to hashed password in database

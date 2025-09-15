@@ -1,5 +1,5 @@
 import React from 'react'
-const _jsxFileName = ""; function _optionalChain(ops) { let lastAccessLHS = undefined; let value = ops[0]; let i = 1; while (i < ops.length) { const op = ops[i]; const fn = ops[i + 1]; i += 2; if ((op === 'optionalAccess' || op === 'optionalCall') && value == null) { return undefined; } if (op === 'access' || op === 'optionalAccess') { lastAccessLHS = value; value = fn(value); } else if (op === 'call' || op === 'optionalCall') { value = fn((...args) => value.call(lastAccessLHS, ...args)); lastAccessLHS = undefined; } } return value; }import { useState } from "react";
+const _jsxFileName = ""; function _optionalChain(ops) { let lastAccessLHS = undefined; let value = ops[0]; let i = 1; while (i < ops.length) { const op = ops[i]; const fn = ops[i + 1]; i += 2; if ((op === 'optionalAccess' || op === 'optionalCall') && value == null) { return undefined; } if (op === 'access' || op === 'optionalAccess') { lastAccessLHS = value; value = fn(value); } else if (op === 'call' || op === 'optionalCall') { value = fn((...args) => value.call(lastAccessLHS, ...args)); lastAccessLHS = undefined; } } return value; }import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import API from "@/lib/api";
@@ -15,6 +15,12 @@ export default function Login() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+
+  // Ensure fields are cleared on page load and discourage autofill persistence
+  useEffect(() => {
+    setEmail("");
+    setPassword("");
+  }, []);
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -68,12 +74,14 @@ export default function Login() {
         , React.createElement('div', { className: "relative w-full max-w-md p-8 rounded-xl border bg-card shadow-xl"       , __self: this, __source: {fileName: _jsxFileName, lineNumber: 67}}
           , React.createElement('h1', { className: "font-display text-3xl text-center"  , __self: this, __source: {fileName: _jsxFileName, lineNumber: 68}}, "Welcome back" )
           , React.createElement('p', { className: "text-center text-muted-foreground mt-1"  , __self: this, __source: {fileName: _jsxFileName, lineNumber: 69}}, "Log into Actory"  )
-          , React.createElement('form', { onSubmit: handleLogin, className: "mt-6 space-y-4" , __self: this, __source: {fileName: _jsxFileName, lineNumber: 70}}
+          , React.createElement('form', { onSubmit: handleLogin, className: "mt-6 space-y-4", autoComplete: "off" , __self: this, __source: {fileName: _jsxFileName, lineNumber: 70}}
             , React.createElement(Input, { 
               placeholder: "Email", 
               type: "email", 
               value: email,
               onChange: (e) => setEmail(e.target.value),
+              autoComplete: "off",
+              name: "new-email",
               disabled: loading, __self: this, __source: {fileName: _jsxFileName, lineNumber: 71}}
             )
             , React.createElement(Input, { 
@@ -81,6 +89,8 @@ export default function Login() {
               type: "password", 
               value: password,
               onChange: (e) => setPassword(e.target.value),
+              autoComplete: "new-password",
+              name: "new-password",
               disabled: loading, __self: this, __source: {fileName: _jsxFileName, lineNumber: 78}}
             )
             , error && React.createElement('p', { className: "text-sm text-red-500 text-center"  , __self: this, __source: {fileName: _jsxFileName, lineNumber: 85}}, error)

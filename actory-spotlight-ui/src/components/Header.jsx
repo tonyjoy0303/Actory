@@ -20,13 +20,23 @@ export default function Header() {
   const [user, setUser] = useState(null);
   const [registerOpen, setRegisterOpen] = useState(false);
 
+  const dashboardPathFor = (role) => {
+    if (role === 'Actor') return '/dashboard/actor';
+    if (role === 'Producer') return '/dashboard/producer';
+    if (role === 'Admin') return '/dashboard/admin';
+    return '/';
+  };
+
   // Check for user session on component mount and when storage changes
   useEffect(() => {
     const checkUser = () => {
       const userData = localStorage.getItem("user");
-      if (userData) {
+      const token = localStorage.getItem("token");
+      if (token && userData) {
         setUser(JSON.parse(userData));
       } else {
+        // If token is missing, treat as logged out and clean up stale data
+        if (!token && userData) localStorage.removeItem('user');
         setUser(null);
       }
     };
@@ -41,6 +51,24 @@ export default function Header() {
       window.removeEventListener('authChange', checkUser);
     };
   }, []);
+
+  // On initial load or path change, if authenticated and on a public page, redirect to dashboard
+  useEffect(() => {
+    const token = localStorage.getItem('token');
+    if (!user || !token) return;
+    const publicPaths = new Set([
+      '/',
+      '/features',
+      '/know-more',
+      '/auth/login',
+      '/auth/register',
+      '/auth/register/actor',
+      '/auth/register/producer',
+    ]);
+    if (publicPaths.has(location.pathname)) {
+      navigate(dashboardPathFor(user.role), { replace: true });
+    }
+  }, [user, location.pathname, navigate]);
 
   const handleLogout = () => {
     localStorage.removeItem("token");
@@ -103,8 +131,7 @@ export default function Header() {
               , React.createElement(NavLink, { to: "/auth/login", className: "hidden sm:inline-block" , __self: this, __source: {fileName: _jsxFileName, lineNumber: 82}}
                 , React.createElement(Button, { variant: "ghost", __self: this, __source: {fileName: _jsxFileName, lineNumber: 83}}, "Log in" )
               )
-              , onHome ? (
-                React.createElement(React.Fragment, null
+              , React.createElement(React.Fragment, null
                   , React.createElement(Button, { variant: "hero", className: "hover-scale", onClick: () => setRegisterOpen(true), __self: this, __source: {fileName: _jsxFileName, lineNumber: 86}}, "Get Started" )
                   , React.createElement(Dialog, { open: registerOpen, onOpenChange: setRegisterOpen, __self: this, __source: {fileName: _jsxFileName, lineNumber: 87}}
                     , React.createElement(DialogContent, { className: "max-w-5xl p-0 overflow-hidden", __self: this, __source: {fileName: _jsxFileName, lineNumber: 88}}
@@ -131,11 +158,6 @@ export default function Header() {
                     )
                   )
                 )
-              ) : (
-                React.createElement(NavLink, { to: "/auth/register", __self: this, __source: {fileName: _jsxFileName, lineNumber: 105}}
-                  , React.createElement(Button, { variant: "hero", className: "hover-scale", __self: this, __source: {fileName: _jsxFileName, lineNumber: 106}}, "Get Started" )
-                )
-              )
             )
           )
           , React.createElement(ThemeToggle, {__self: this, __source: {fileName: _jsxFileName, lineNumber: 110}} )

@@ -9,25 +9,98 @@ const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 // @access  Public
 exports.register = async (req, res, next) => {
   try {
-    const { name, email, password, role, phone } = req.body;
+    const {
+      name,
+      email,
+      password,
+      role = 'Actor',
+      phone,
+      // Common
+      location,
+      // Actor
+      age,
+      gender,
+      experienceLevel,
+      bio,
+      profileImage,
+      // Producer
+      companyName,
+      website
+    } = req.body;
 
-    // Validate username
-    if (!name || name.trim().length < 3) {
-      return res.status(400).json({ success: false, message: 'Username must be at least 3' });
+    // Basic validations
+    if (!name || name.trim().length < 2 || name.trim().length > 50) {
+      return res.status(400).json({ success: false, message: 'Full Name must be 2–50 characters' });
+    }
+    if (!email) {
+      return res.status(400).json({ success: false, message: 'Email is required' });
+    }
+    if (!password || String(password).length < 6) {
+      return res.status(400).json({ success: false, message: 'Password must be at least 6 characters' });
     }
 
-    // Create user
-    const user = await User.create({
+    const existing = await User.findOne({ email });
+    if (existing) {
+      return res.status(409).json({ success: false, message: 'Email already in use' });
+    }
+
+    const payload = {
       name,
       email,
       password,
       role,
-      phone
-    });
+      phone,
+      location,
+      profileImage,
+      website,
+      companyName,
+      age,
+      gender,
+      experienceLevel,
+      bio
+    };
 
-    sendTokenResponse(user, 200, res);
+    // Role-specific required checks
+    if (role === 'Actor') {
+      if (age === undefined || age === null || Number(age) < 1 || Number(age) > 120) {
+        return res.status(400).json({ success: false, message: 'Age must be between 1 and 120' });
+      }
+      const allowedGender = ['male', 'female', 'other', 'prefer-not-to-say'];
+      if (!allowedGender.includes(String(gender))) {
+        return res.status(400).json({ success: false, message: 'Gender must be one of male, female, other, prefer-not-to-say' });
+      }
+      const allowedExp = ['beginner', 'intermediate', 'experienced', 'professional'];
+      if (!allowedExp.includes(String(experienceLevel))) {
+        return res.status(400).json({ success: false, message: 'Experience level must be one of beginner, intermediate, experienced, professional' });
+      }
+      if (!phone) {
+        return res.status(400).json({ success: false, message: 'Phone is required' });
+      }
+      if (!location) {
+        return res.status(400).json({ success: false, message: 'Location is required' });
+      }
+      if (bio && String(bio).length > 500) {
+        return res.status(400).json({ success: false, message: 'Bio must be at most 500 characters' });
+      }
+    }
+
+    if (role === 'Producer') {
+      if (!companyName) {
+        return res.status(400).json({ success: false, message: 'Production House / Company Name is required' });
+      }
+      if (!phone) {
+        return res.status(400).json({ success: false, message: 'Phone is required' });
+      }
+      if (!location) {
+        return res.status(400).json({ success: false, message: 'Location is required' });
+      }
+    }
+
+    const user = await User.create(payload);
+
+    sendTokenResponse(user, 201, res);
   } catch (err) {
-    console.error(err); // Add this line to see the full error in the terminal
+    console.error(err);
     res.status(400).json({ success: false, message: err.message });
   }
 };
@@ -89,7 +162,15 @@ const sendTokenResponse = (user, statusCode, res) => {
     email: user.email,
     role: user.role,
     phone: user.phone,
-    photo: user.photo || ''
+    photo: user.photo || '',
+    location: user.location,
+    age: user.age,
+    gender: user.gender,
+    experienceLevel: user.experienceLevel,
+    bio: user.bio,
+    profileImage: user.profileImage,
+    companyName: user.companyName,
+    website: user.website
   };
 
   res
@@ -149,7 +230,15 @@ exports.getMe = async (req, res, next) => {
       role: user.role,
       phone: user.phone,
       createdAt: user.createdAt,
-      photo: user.photo || ''
+      photo: user.photo || '',
+      location: user.location,
+      age: user.age,
+      gender: user.gender,
+      experienceLevel: user.experienceLevel,
+      bio: user.bio,
+      profileImage: user.profileImage,
+      companyName: user.companyName,
+      website: user.website
     };
 
     res.status(200).json({ success: true, user: userResponse });
@@ -166,6 +255,14 @@ exports.updateMe = async (req, res) => {
     const updates = {};
     if (typeof req.body.name === 'string') updates.name = req.body.name;
     if (typeof req.body.phone === 'string') updates.phone = req.body.phone;
+    if (typeof req.body.location === 'string') updates.location = req.body.location;
+    if (typeof req.body.age === 'number') updates.age = req.body.age;
+    if (typeof req.body.gender === 'string') updates.gender = req.body.gender;
+    if (typeof req.body.experienceLevel === 'string') updates.experienceLevel = req.body.experienceLevel;
+    if (typeof req.body.bio === 'string') updates.bio = req.body.bio;
+    if (typeof req.body.profileImage === 'string') updates.profileImage = req.body.profileImage;
+    if (typeof req.body.companyName === 'string') updates.companyName = req.body.companyName;
+    if (typeof req.body.website === 'string') updates.website = req.body.website;
 
     // Validate at least one field
     if (Object.keys(updates).length === 0) {
@@ -188,7 +285,15 @@ exports.updateMe = async (req, res) => {
       role: user.role,
       phone: user.phone,
       createdAt: user.createdAt,
-      photo: user.photo || ''
+      photo: user.photo || '',
+      location: user.location,
+      age: user.age,
+      gender: user.gender,
+      experienceLevel: user.experienceLevel,
+      bio: user.bio,
+      profileImage: user.profileImage,
+      companyName: user.companyName,
+      website: user.website
     };
 
     return res.status(200).json({ success: true, user: userResponse });
@@ -225,7 +330,15 @@ exports.uploadPhoto = async (req, res) => {
       role: user.role,
       phone: user.phone,
       createdAt: user.createdAt,
-      photo: user.photo || ''
+      photo: user.photo || '',
+      location: user.location,
+      age: user.age,
+      gender: user.gender,
+      experienceLevel: user.experienceLevel,
+      bio: user.bio,
+      profileImage: user.profileImage,
+      companyName: user.companyName,
+      website: user.website
     };
 
     return res.status(200).json({ success: true, user: userResponse });
