@@ -97,6 +97,18 @@ export default function Login() {
             , React.createElement(Button, { type: "submit", className: "w-full hover-scale" , variant: "hero", disabled: loading, __self: this, __source: {fileName: _jsxFileName, lineNumber: 86}}
               , loading ? 'Logging in...' : 'Log in'
             )
+            , React.createElement('div', { className: "text-center mt-2"  , __self: this, __source: {fileName: _jsxFileName, lineNumber: 87}}
+              , React.createElement('a', { 
+                  href: "/forgot-password", 
+                  onClick: (e) => {
+                    e.preventDefault();
+                    navigate('/forgot-password');
+                  },
+                  className: "text-sm text-muted-foreground hover:text-primary hover:underline"  ,
+                  __self: this, 
+                  __source: {fileName: _jsxFileName, lineNumber: 88}
+                }, "Forgot password?")
+            )
           )
           , React.createElement('div', { className: "my-4 flex items-center gap-3"   , __self: this, __source: {fileName: _jsxFileName, lineNumber: 90}}
             , React.createElement('div', { className: "h-px flex-1 bg-border"  , __self: this, __source: {fileName: _jsxFileName, lineNumber: 91}} )

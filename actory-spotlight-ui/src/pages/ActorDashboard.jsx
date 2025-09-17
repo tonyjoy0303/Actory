@@ -143,7 +143,7 @@ export default function ActorDashboard() {
                     , React.createElement('div', {__self: this, __source: {fileName: _jsxFileName, lineNumber: 110}}
                       , React.createElement('p', { className: "font-medium text-brand" , __self: this, __source: {fileName: _jsxFileName, lineNumber: 111}}, call.roleName)
                       , React.createElement('p', { className: "text-sm text-muted-foreground" , __self: this, __source: {fileName: _jsxFileName, lineNumber: 112}}, call.description.substring(0, 50), "...")
-                      , React.createElement('p', { className: "text-xs text-muted-foreground mt-1"  , __self: this, __source: {fileName: _jsxFileName, lineNumber: 113}}, "Posted by: "  , call.producer.name)
+                      , React.createElement('p', { className: "text-xs text-muted-foreground mt-1"  , __self: this, __source: {fileName: _jsxFileName, lineNumber: 113}}, "Posted by: "  , call.producer?.name || 'Unknown Producer')
                     )
                     , React.createElement(Button, { variant: "hero", onClick: () => navigate(`/audition/submit/${call._id}`), __self: this, __source: {fileName: _jsxFileName, lineNumber: 115}}, "View & Apply"  )
                   )

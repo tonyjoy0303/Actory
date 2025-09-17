@@ -7,7 +7,10 @@ const {
   googleLogin, 
   updateMe, 
   uploadPhoto,
-  checkEmail  
+  checkEmail,
+  forgotPassword,
+  resetPassword,
+  checkResetToken
 } = require('../controllers/auth');
 const { protect } = require('../middleware/auth');
 const multer = require('multer');
@@ -53,13 +56,16 @@ const upload = multer({
 router.post('/register', register);
 router.post('/login', login);
 router.post('/google', googleLogin);
-router.get('/check-email', checkEmail);  
+router.get('/check-email', checkEmail);
+router.post('/forgotpassword', forgotPassword);
+router.get('/check-reset-token/:resettoken', checkResetToken);
+router.put('/resetpassword/:resettoken', resetPassword);
 
 // Protected routes (require authentication)
 router.use(protect);
 router.get('/me', getMe);
 router.put('/me', updateMe);
-router.put('/me/photo', upload.single('photo'), uploadPhoto);
 router.put('/updatepassword', updatePassword);
+router.put('/me/photo', upload.single('photo'), uploadPhoto);
 
 module.exports = router;

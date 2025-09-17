@@ -219,9 +219,9 @@ export default function AdminDashboard() {
                     , React.createElement(TableBody, {__self: this, __source: {fileName: _jsxFileName, lineNumber: 218}}
                       , switchRequests.filter(req => req.status === 'Pending').map(req => (
                         React.createElement(TableRow, { key: req._id, __self: this, __source: {fileName: _jsxFileName, lineNumber: 220}}
-                          , React.createElement(TableCell, {__self: this, __source: {fileName: _jsxFileName, lineNumber: 221}}, req.actorId.name)
-                          , React.createElement(TableCell, {__self: this, __source: {fileName: _jsxFileName, lineNumber: 222}}, req.actorId.email)
-                          , React.createElement(TableCell, { className: "max-w-xs truncate" , __self: this, __source: {fileName: _jsxFileName, lineNumber: 223}}, req.reason)
+                          , React.createElement(TableCell, {__self: this, __source: {fileName: _jsxFileName, lineNumber: 221}}, req.actorId?.name || 'User')
+                          , React.createElement(TableCell, {__self: this, __source: {fileName: _jsxFileName, lineNumber: 222}}, req.actorId?.email || 'No email')
+                          , React.createElement(TableCell, { className: "max-w-xs truncate" , __self: this, __source: {fileName: _jsxFileName, lineNumber: 223}}, req.reason || 'No reason provided')
                           , React.createElement(TableCell, {__self: this, __source: {fileName: _jsxFileName, lineNumber: 224}}, new Date(req.createdAt).toLocaleDateString())
                           , React.createElement(TableCell, { className: "space-x-2", __self: this, __source: {fileName: _jsxFileName, lineNumber: 225}}
                             , React.createElement(Button, { size: "sm", variant: "success", onClick: () => handleRequestUpdate(req._id, 'approve'), __self: this, __source: {fileName: _jsxFileName, lineNumber: 226}}, "Approve")
@@ -300,8 +300,8 @@ export default function AdminDashboard() {
                     , React.createElement(TableBody, {__self: this, __source: {fileName: _jsxFileName, lineNumber: 299}}
                       , castingCalls.map(c => (
                         React.createElement(TableRow, { key: c._id, __self: this, __source: {fileName: _jsxFileName, lineNumber: 301}}
-                          , React.createElement(TableCell, {__self: this, __source: {fileName: _jsxFileName, lineNumber: 302}}, c.title || c.roleName || '—')
-                          , React.createElement(TableCell, {__self: this, __source: {fileName: _jsxFileName, lineNumber: 303}}, typeof c.producer === 'object' ? _optionalChain([c, 'access', _19 => _19.producer, 'optionalAccess', _20 => _20.name]) : '')
+                          , React.createElement(TableCell, {__self: this, __source: {fileName: _jsxFileName, lineNumber: 302}}, c.roleTitle || c.roleName || c.title || 'Untitled Casting Call')
+                          , React.createElement(TableCell, {__self: this, __source: {fileName: _jsxFileName, lineNumber: 303}}, _optionalChain([c, 'access', _19 => _19.producer, 'optionalAccess', _20 => _20.name]) || '—')
                           , React.createElement(TableCell, { className: "space-x-2", __self: this, __source: {fileName: _jsxFileName, lineNumber: 304}}
                             , React.createElement(Button, { size: "sm", variant: "secondary", onClick: () => openDetails(c), __self: this, __source: {fileName: _jsxFileName, lineNumber: 305}}, "View details" )
                             , React.createElement(Button, { size: "sm", variant: "destructive", onClick: () => handleDelete('casting', c._id), __self: this, __source: {fileName: _jsxFileName, lineNumber: 306}}, "Delete")
@@ -330,17 +330,25 @@ export default function AdminDashboard() {
                       , selectedCasting.location && (
                         React.createElement('div', {__self: this, __source: {fileName: _jsxFileName, lineNumber: 330}}, React.createElement('span', { className: "text-muted-foreground", __self: this, __source: {fileName: _jsxFileName, lineNumber: 330}}, "Location:"), " " , selectedCasting.location)
                       )
-                      , selectedCasting.ageRange && (
-                        React.createElement('div', {__self: this, __source: {fileName: _jsxFileName, lineNumber: 333}}, React.createElement('span', { className: "text-muted-foreground", __self: this, __source: {fileName: _jsxFileName, lineNumber: 333}}, "Age Range:" ), " " , selectedCasting.ageRange)
+                      , selectedCasting.ageRange ? (
+                        React.createElement('div', {__self: this, __source: {fileName: _jsxFileName, lineNumber: 333}}, 
+                          React.createElement('span', { className: "text-muted-foreground", __self: this, __source: {fileName: _jsxFileName, lineNumber: 333}}, "Age Range:"), " ",
+                          `${selectedCasting.ageRange.min || 'N/A'} - ${selectedCasting.ageRange.max || 'N/A'} years`
+                        )
+                      ) : (
+                        React.createElement('div', {__self: this, __source: {fileName: _jsxFileName, lineNumber: 337}}, 
+                          React.createElement('span', { className: "text-muted-foreground", __self: this, __source: {fileName: _jsxFileName, lineNumber: 337}}, "Age Range:"), " ",
+                          "Not specified"
+                        )
                       )
                       , selectedCasting.auditionDate && (
-                        React.createElement('div', {__self: this, __source: {fileName: _jsxFileName, lineNumber: 336}}, React.createElement('span', { className: "text-muted-foreground", __self: this, __source: {fileName: _jsxFileName, lineNumber: 336}}, "Audition:"), " " , new Date(selectedCasting.auditionDate).toLocaleDateString())
+                        React.createElement('div', {__self: this, __source: {fileName: _jsxFileName, lineNumber: 339}}, React.createElement('span', { className: "text-muted-foreground", __self: this, __source: {fileName: _jsxFileName, lineNumber: 339}}, "Audition:"), " " , new Date(selectedCasting.auditionDate).toLocaleDateString())
                       )
                       , selectedCasting.shootingStartDate && (
-                        React.createElement('div', {__self: this, __source: {fileName: _jsxFileName, lineNumber: 339}}, React.createElement('span', { className: "text-muted-foreground", __self: this, __source: {fileName: _jsxFileName, lineNumber: 339}}, "Shoot Start:" ), " " , new Date(selectedCasting.shootingStartDate).toLocaleDateString())
+                        React.createElement('div', {__self: this, __source: {fileName: _jsxFileName, lineNumber: 342}}, React.createElement('span', { className: "text-muted-foreground", __self: this, __source: {fileName: _jsxFileName, lineNumber: 342}}, "Shoot Start:" ), " " , new Date(selectedCasting.shootingStartDate).toLocaleDateString())
                       )
                       , selectedCasting.shootingEndDate && (
-                        React.createElement('div', {__self: this, __source: {fileName: _jsxFileName, lineNumber: 342}}, React.createElement('span', { className: "text-muted-foreground", __self: this, __source: {fileName: _jsxFileName, lineNumber: 342}}, "Shoot End:" ), " " , new Date(selectedCasting.shootingEndDate).toLocaleDateString())
+                        React.createElement('div', {__self: this, __source: {fileName: _jsxFileName, lineNumber: 345}}, React.createElement('span', { className: "text-muted-foreground", __self: this, __source: {fileName: _jsxFileName, lineNumber: 345}}, "Shoot End:" ), " " , new Date(selectedCasting.shootingEndDate).toLocaleDateString())
                       )
                     )
                     , _optionalChain([selectedCasting, 'access', _23 => _23.skills, 'optionalAccess', _24 => _24.length]) ? (

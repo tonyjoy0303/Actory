@@ -41,6 +41,9 @@ import Login from "./pages/auth/Login";
 import Register from "./pages/auth/Register";
 import RegisterActor from "./pages/auth/RegisterActor";
 import RegisterProducer from "./pages/auth/RegisterProducer";
+import ForgotPassword from "./pages/auth/ForgotPassword";
+import ResetPassword from "./pages/auth/ResetPassword";
+import LoginRequired from "./pages/LoginRequired";
 
 // Pages - Marketing
 import KnowMore from "./pages/KnowMore";
@@ -178,6 +181,22 @@ const App = () => (
                 })
               
               , React.createElement(Route, {
+                path: "/forgot-password",
+                element: 
+                  React.createElement(MainLayout, null
+                    , React.createElement(ForgotPassword, null )
+                  )
+                })
+              
+              , React.createElement(Route, {
+                path: "/reset-password/:token",
+                element: 
+                  React.createElement(MainLayout, null
+                    , React.createElement(ResetPassword, null )
+                  )
+                })
+              
+              , React.createElement(Route, {
                 path: "/know-more",
                 element: 
                   React.createElement(MainLayout, null
@@ -190,6 +209,22 @@ const App = () => (
                 element: 
                   React.createElement(MainLayout, null
                     , React.createElement(Features, null )
+                  )
+                })
+              
+              , React.createElement(Route, {
+                path: "/login-required",
+                element: 
+                  React.createElement(MainLayout, null
+                    , React.createElement(LoginRequired, null )
+                  )
+                })
+
+              , React.createElement(Route, {
+                path: "/reset-password/:token",
+                element: 
+                  React.createElement(MainLayout, null
+                    , React.createElement(ResetPassword, null )
                   )
                 })
               

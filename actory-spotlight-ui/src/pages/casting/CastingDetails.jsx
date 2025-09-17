@@ -265,7 +265,17 @@ function CastingDetailsContent() {
             Back
           </Button>
           <Button 
-            onClick={() => navigate(`/audition/submit/${casting._id}`)}
+            onClick={() => {
+              // Check if user is logged in by looking for token in localStorage
+              const token = localStorage.getItem('token');
+              if (!token) {
+                // If not logged in, redirect to login-required page
+                navigate('/login-required', { state: { from: `/casting/${id}` } });
+              } else {
+                // If logged in, proceed to audition submission
+                navigate(`/audition/submit/${casting._id}`);
+              }
+            }}
           >
             Apply Now
           </Button>

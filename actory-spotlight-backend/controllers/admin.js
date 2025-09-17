@@ -166,11 +166,30 @@ exports.deleteCastingCall = async (req, res, next) => {
             return res.status(404).json({ success: false, message: 'Casting call not found' });
         }
 
-        await castingCall.remove();
+        // Use deleteOne() instead of remove() as it's the newer API
+        await CastingCall.deleteOne({ _id: req.params.id });
 
-        res.status(200).json({ success: true, data: {} });
+        res.status(200).json({ 
+            success: true, 
+            data: {},
+            message: 'Casting call deleted successfully'
+        });
     } catch (err) {
-        res.status(500).json({ success: false, message: 'Server Error' });
+        console.error('Error deleting casting call:', err);
+        
+        // Handle specific error cases
+        if (err.name === 'CastError' && err.kind === 'ObjectId') {
+            return res.status(400).json({ 
+                success: false, 
+                message: 'Invalid casting call ID' 
+            });
+        }
+        
+        res.status(500).json({ 
+            success: false, 
+            message: 'Error deleting casting call',
+            error: process.env.NODE_ENV === 'development' ? err.message : undefined
+        });
     }
 };
 
@@ -218,13 +237,35 @@ exports.deleteVideo = async (req, res, next) => {
         const video = await Video.findById(req.params.id);
 
         if (!video) {
-            return res.status(404).json({ success: false, message: 'Video not found' });
+            return res.status(404).json({ 
+                success: false, 
+                message: 'Video not found' 
+            });
         }
 
-        await video.remove();
+        // Use deleteOne() instead of remove() as it's the newer API
+        await Video.deleteOne({ _id: req.params.id });
 
-        res.status(200).json({ success: true, data: {} });
+        res.status(200).json({ 
+            success: true, 
+            data: {},
+            message: 'Video deleted successfully'
+        });
     } catch (err) {
-        res.status(500).json({ success: false, message: 'Server Error' });
+        console.error('Error deleting video:', err);
+        
+        // Handle specific error cases
+        if (err.name === 'CastError' && err.kind === 'ObjectId') {
+            return res.status(400).json({ 
+                success: false, 
+                message: 'Invalid video ID' 
+            });
+        }
+        
+        res.status(500).json({ 
+            success: false, 
+            message: 'Error deleting video',
+            error: process.env.NODE_ENV === 'development' ? err.message : undefined
+        });
     }
 };

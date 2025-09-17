@@ -31,11 +31,23 @@ export default function ProducerDashboard() {
   const fetchCastingCalls = async () => {
     try {
       const { data } = await API.get('/casting');
-      // Filter calls by the logged-in producer
+      // Get current user ID safely
       const storedUser = JSON.parse(localStorage.getItem('user') || '{}');
-      setCastingCalls(data.data.filter((call) => call.producer._id === storedUser.id));
+      
+      // Filter calls by the logged-in producer
+      // Check both direct _id and populated producer object
+      setCastingCalls(data.data.filter((call) => {
+        // If producer is populated as an object
+        if (call.producer && typeof call.producer === 'object') {
+          return call.producer._id === storedUser.id;
+        }
+        // If producer is just an ID
+        return call.producer === storedUser.id;
+      }));
+      
     } catch (error) {
-      toast.error('Failed to fetch casting calls.');
+      console.error('Error fetching casting calls:', error);
+      toast.error(error.response?.data?.message || 'Failed to fetch casting calls.');
     }
   };
 
