@@ -265,7 +265,7 @@ function CastingDetailsContent() {
             Back
           </Button>
           <Button 
-            onClick={() => navigate(`/audition/apply/${casting._id}`)}
+            onClick={() => navigate(`/audition/submit/${casting._id}`)}
           >
             Apply Now
           </Button>

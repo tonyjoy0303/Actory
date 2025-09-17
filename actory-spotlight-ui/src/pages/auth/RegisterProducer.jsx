@@ -1,5 +1,4 @@
-import React from 'react'
-const _jsxFileName = ""; function _optionalChain(ops) { let lastAccessLHS = undefined; let value = ops[0]; let i = 1; while (i < ops.length) { const op = ops[i]; const fn = ops[i + 1]; i += 2; if ((op === 'optionalAccess' || op === 'optionalCall') && value == null) { return undefined; } if (op === 'access' || op === 'optionalAccess') { lastAccessLHS = value; value = fn(value); } else if (op === 'call' || op === 'optionalCall') { value = fn((...args) => value.call(lastAccessLHS, ...args)); lastAccessLHS = undefined; } } return value; }import { useState, useEffect } from "react";
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import API from "@/lib/api";
@@ -8,14 +7,24 @@ import SEO from "@/components/SEO";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import GoogleSignIn from "@/components/GoogleSignIn";
+import { useEmailValidation } from "@/hooks/useEmailValidation";
 
 export default function RegisterProducer() {
   const navigate = useNavigate();
   const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
+  const { 
+    email, 
+    setEmail, 
+    isValid: isEmailValid, 
+    isChecking, 
+    error: emailError 
+  } = useEmailValidation("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [passwordError, setPasswordError] = useState("");
   const [companyName, setCompanyName] = useState("");
   const [phone, setPhone] = useState("");
+  const [phoneError, setPhoneError] = useState("");
   const [location, setLocation] = useState("");
   const [website, setWebsite] = useState("");
   const [loading, setLoading] = useState(false);
@@ -26,29 +35,58 @@ export default function RegisterProducer() {
     setName("");
     setEmail("");
     setPassword("");
+    setConfirmPassword("");
+    setPasswordError("");
     setCompanyName("");
     setPhone("");
+    setPhoneError("");
     setLocation("");
     setWebsite("");
   }, []);
+
+  // Real-time password validation
+  useEffect(() => {
+    if (confirmPassword && password !== confirmPassword) {
+      setPasswordError("Passwords do not match");
+    } else {
+      setPasswordError("");
+    }
+  }, [password, confirmPassword]);
+
+  // Real-time phone number validation
+  useEffect(() => {
+    if (phone && !/^\d{0,10}$/.test(phone)) {
+      setPhoneError("Phone number must contain only digits");
+    } else if (phone && phone.length !== 10) {
+      setPhoneError("Phone number must be exactly 10 digits");
+    } else {
+      setPhoneError("");
+    }
+  }, [phone]);
+
+  const handlePhoneChange = (e) => {
+    const value = e.target.value.replace(/\D/g, ''); // Remove non-digit characters
+    setPhone(value);
+  };
 
   const validate = () => {
     if (!name || name.trim().length < 2 || name.trim().length > 50) {
       return "Full Name must be 2–50 characters";
     }
-    const emailRegex = /^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,})+$/;
-    if (!email || !emailRegex.test(email)) {
+    if (!isEmailValid || isChecking) {
       return "Please enter a valid email";
     }
     if (!password || password.length < 6) {
       return "Password must be at least 6 characters";
     }
-    if (!companyName) {
-      return "Production House / Company Name is required";
+    if (password !== confirmPassword) {
+      return "Passwords do not match";
     }
-    const phoneRegex = /^\+?[0-9\-\s]{7,15}$/;
-    if (!phone || !phoneRegex.test(phone)) {
-      return "Please enter a valid phone number";
+    if (!phone || phone.length !== 10 || !/^\d{10}$/.test(phone)) {
+      return "Please enter a valid 10-digit phone number";
+    }
+    if (!companyName || companyName.trim().length < 2) {
+      return "Production House / Company Name is required";
     }
     if (!location) {
       return "Location/City is required";
@@ -56,7 +94,8 @@ export default function RegisterProducer() {
     return null;
   };
 
-  const handleRegister = async () => {
+  const handleRegister = async (e) => {
+    e?.preventDefault();
     setLoading(true);
     setError("");
 
@@ -69,7 +108,7 @@ export default function RegisterProducer() {
     }
 
     try {
-      const payload = {
+      const userData = {
         name,
         email,
         password,
@@ -80,11 +119,39 @@ export default function RegisterProducer() {
         website
       };
 
-      const { data } = await API.post('/auth/register', payload);
-      toast.success("Registration successful! Please log in.");
-      navigate('/auth/login');
-    } catch (err) {
-      const errorMessage = _optionalChain([err, 'access', _ => _.response, 'optionalAccess', _2 => _2.data, 'optionalAccess', _3 => _3.message]) || "An unexpected error occurred.";
+      console.log('Sending registration request with data:', userData);
+      const response = await API.post("/auth/register", userData);
+      console.log('Registration response:', response.data);
+      
+      if (response.data && response.data.success) {
+        const { token, user } = response.data;
+        
+        if (!token || !user) {
+          console.error('Invalid response structure:', response.data);
+          throw new Error('Registration successful but could not log you in. Please try logging in manually.');
+        }
+
+        // Store authentication data
+        localStorage.setItem('token', token);
+        localStorage.setItem('user', JSON.stringify(user));
+        
+        // Notify other components about the auth change
+        window.dispatchEvent(new Event('authChange'));
+
+        toast.success("Registration successful! Redirecting to your dashboard...");
+        
+        // Redirect based on role (default to producer if not specified)
+        const userRole = (user.role || 'producer').toLowerCase();
+        navigate(`/dashboard/${userRole}`);
+        
+      } else {
+        throw new Error(response.data?.message || 'Registration failed. Please try again.');
+      }
+    } catch (error) {
+      console.error('Registration error:', error);
+      const errorMessage = error.response?.data?.message || 
+                         error.message || 
+                         "Registration failed. Please try again.";
       setError(errorMessage);
       toast.error(errorMessage);
     } finally {
@@ -93,87 +160,162 @@ export default function RegisterProducer() {
   };
 
   return (
-    React.createElement(React.Fragment, null
-      , React.createElement(SEO, { title: "Join as Producer"  , description: "Create your Producer account on Actory."     , __self: this, __source: {fileName: _jsxFileName, lineNumber: 57}} )
-      , React.createElement('section', { className: "relative min-h-[80vh] flex items-center justify-center"    , __self: this, __source: {fileName: _jsxFileName, lineNumber: 58}}
-        , React.createElement('img', { src: heroImage, alt: "Cinematic backdrop" , className: "absolute inset-0 w-full h-full object-cover"    , __self: this, __source: {fileName: _jsxFileName, lineNumber: 59}} )
-        , React.createElement('div', { className: "absolute inset-0 bg-background/70 backdrop-blur"   , __self: this, __source: {fileName: _jsxFileName, lineNumber: 60}} )
-        , React.createElement('div', { className: "relative w-full max-w-md p-8 rounded-xl border bg-card shadow-xl"       , __self: this, __source: {fileName: _jsxFileName, lineNumber: 61}}
-          , React.createElement('h1', { className: "font-display text-3xl text-center"  , __self: this, __source: {fileName: _jsxFileName, lineNumber: 62}}, "Join as Producer"  )
-          , React.createElement('p', { className: "text-center text-muted-foreground mt-1"  , __self: this, __source: {fileName: _jsxFileName, lineNumber: 63}}, "Create your producer account"   )
-          , React.createElement('div', { className: "mt-6 space-y-4" , __self: this, __source: {fileName: _jsxFileName, lineNumber: 64}}
-            , React.createElement('div', { className: "space-y-1" , __self: this, __source: {fileName: _jsxFileName, lineNumber: 65}}
-              , React.createElement('label', { className: "text-sm" , __self: this, __source: {fileName: _jsxFileName, lineNumber: 66}}, "Full name *")
-              , React.createElement(Input, { 
-                placeholder: "Full name" , 
-                value: name,
-                onChange: (e) => setName(e.target.value),
-                autoComplete: "off",
-                name: "new-name",
-                disabled: loading, __self: this, __source: {fileName: _jsxFileName, lineNumber: 67}}
-              )
-            )
-            , React.createElement('div', { className: "space-y-1" , __self: this, __source: {fileName: _jsxFileName, lineNumber: 74}}
-              , React.createElement('label', { className: "text-sm" , __self: this, __source: {fileName: _jsxFileName, lineNumber: 75}}, "Email *")
-              , React.createElement(Input, { 
-                placeholder: "Email", 
-                type: "email", 
-                value: email,
-                onChange: (e) => setEmail(e.target.value),
-                autoComplete: "off",
-                name: "new-email",
-                disabled: loading, __self: this, __source: {fileName: _jsxFileName, lineNumber: 76}}
-              )
-            )
-            , React.createElement('div', { className: "space-y-1" , __self: this, __source: {fileName: _jsxFileName, lineNumber: 84}}
-              , React.createElement('label', { className: "text-sm" , __self: this, __source: {fileName: _jsxFileName, lineNumber: 85}}, "Password *")
-              , React.createElement(Input, { 
-                placeholder: "Password", 
-                type: "password", 
-                value: password,
-                onChange: (e) => setPassword(e.target.value),
-                autoComplete: "new-password",
-                name: "new-password",
-                disabled: loading, __self: this, __source: {fileName: _jsxFileName, lineNumber: 86}}
-              )
-            )
-            , React.createElement('div', { className: "space-y-1" , __self: this, __source: {fileName: _jsxFileName, lineNumber: 94}}
-              , React.createElement('label', { className: "text-sm" , __self: this, __source: {fileName: _jsxFileName, lineNumber: 95}}, "Production House / Company Name *")
-              , React.createElement(Input, { placeholder: "Company name", value: companyName, onChange: (e) => setCompanyName(e.target.value), disabled: loading, __self: this, __source: {fileName: _jsxFileName, lineNumber: 96}} )
-            )
-            , React.createElement('div', { className: "space-y-1" , __self: this, __source: {fileName: _jsxFileName, lineNumber: 98}}
-              , React.createElement('label', { className: "text-sm" , __self: this, __source: {fileName: _jsxFileName, lineNumber: 99}}, "Phone Number *")
-              , React.createElement(Input, { placeholder: "+1 555 123 4567", value: phone, onChange: (e) => setPhone(e.target.value), disabled: loading, __self: this, __source: {fileName: _jsxFileName, lineNumber: 100}} )
-            )
-            , React.createElement('div', { className: "space-y-1" , __self: this, __source: {fileName: _jsxFileName, lineNumber: 102}}
-              , React.createElement('label', { className: "text-sm" , __self: this, __source: {fileName: _jsxFileName, lineNumber: 103}}, "Location/City *")
-              , React.createElement(Input, { placeholder: "City", value: location, onChange: (e) => setLocation(e.target.value), disabled: loading, __self: this, __source: {fileName: _jsxFileName, lineNumber: 104}} )
-            )
-            , React.createElement('div', { className: "space-y-1" , __self: this, __source: {fileName: _jsxFileName, lineNumber: 106}}
-              , React.createElement('label', { className: "text-sm" , __self: this, __source: {fileName: _jsxFileName, lineNumber: 107}}, "Website / Social Handle (optional)")
-              , React.createElement(Input, { placeholder: "https://...", value: website, onChange: (e) => setWebsite(e.target.value), disabled: loading, __self: this, __source: {fileName: _jsxFileName, lineNumber: 108}} )
-            )
-            , error && React.createElement('p', { className: "text-sm text-red-500 text-center"  , __self: this, __source: {fileName: _jsxFileName, lineNumber: 110}}, error)
-            , React.createElement(Button, { 
-              variant: "hero", 
-              className: "w-full", 
-              onClick: handleRegister,
-              disabled: loading, __self: this, __source: {fileName: _jsxFileName, lineNumber: 111}}
+    <>
+      <SEO title="Join as Producer" description="Create your Producer account on Actory." />
+      
+      <section className="relative min-h-[80vh] flex items-center justify-center">
+        <img 
+          src={heroImage} 
+          alt="Cinematic backdrop" 
+          className="absolute inset-0 w-full h-full object-cover" 
+        />
+        <div className="absolute inset-0 bg-background/70 backdrop-blur" />
+        
+        <div className="relative w-full max-w-md p-8 rounded-xl border bg-card shadow-xl">
+          <h1 className="font-display text-3xl text-center">Join as Producer</h1>
+          <p className="text-center text-muted-foreground mt-1">Create your producer account</p>
+          
+          <div className="mt-6 space-y-4">
+            <div className="space-y-1">
+              <label className="text-sm">Full name *</label>
+              <Input 
+                placeholder="Full name"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                autoComplete="off"
+                name="new-name"
+                disabled={loading}
+              />
+            </div>
+            
+            <div className="space-y-1">
+              <label className="text-sm">Email *</label>
+              <Input
+                placeholder="Email"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                autoComplete="off"
+                name="new-email"
+                disabled={loading}
+                className={!isEmailValid && email ? 'border-red-500' : ''}
+              />
+              {isChecking && <p className="text-xs text-muted-foreground">Checking email availability...</p>}
+              {emailError && <p className="text-xs text-red-500">{emailError}</p>}
+            </div>
+            
+            <div className="space-y-1">
+              <label className="text-sm">Password *</label>
+              <Input
+                placeholder="Password"
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                autoComplete="new-password"
+                name="new-password"
+                disabled={loading}
+                className={passwordError && confirmPassword ? 'border-red-500' : ''}
+              />
+              <p className="text-xs text-muted-foreground">At least 6 characters</p>
+            </div>
 
-              , loading ? 'Signing up...' : 'Sign up as Producer'
-            )
-          )
-          , React.createElement('div', { className: "my-4 flex items-center gap-3"   , __self: this, __source: {fileName: _jsxFileName, lineNumber: 120}}
-            , React.createElement('div', { className: "h-px flex-1 bg-border"  , __self: this, __source: {fileName: _jsxFileName, lineNumber: 121}} )
-            , React.createElement('span', { className: "text-xs text-muted-foreground" , __self: this, __source: {fileName: _jsxFileName, lineNumber: 122}}, "or")
-            , React.createElement('div', { className: "h-px flex-1 bg-border"  , __self: this, __source: {fileName: _jsxFileName, lineNumber: 123}} )
-          )
-          , React.createElement(GoogleSignIn, { text: "signup_with", role: "Producer", __self: this, __source: {fileName: _jsxFileName, lineNumber: 125}} )
-          , React.createElement('p', { className: "mt-4 text-center text-sm text-muted-foreground"   , __self: this, __source: {fileName: _jsxFileName, lineNumber: 126}}, "Already have an account? "
-                , React.createElement('a', { href: "/auth/login", className: "story-link", __self: this, __source: {fileName: _jsxFileName, lineNumber: 127}}, "Log in" )
-          )
-        )
-      )
-    )
+            <div className="space-y-1">
+              <label className="text-sm">Confirm Password *</label>
+              <Input
+                placeholder="Confirm Password"
+                type="password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                autoComplete="new-password"
+                name="confirm-password"
+                disabled={loading}
+                className={passwordError ? 'border-red-500' : ''}
+              />
+              {passwordError && (
+                <p className="text-xs text-red-500">{passwordError}</p>
+              )}
+            </div>
+            
+            <div className="space-y-1">
+              <label className="text-sm">Production House / Company Name *</label>
+              <Input 
+                placeholder="Company name"
+                value={companyName}
+                onChange={(e) => setCompanyName(e.target.value)}
+                disabled={loading}
+              />
+            </div>
+            
+            <div className="space-y-1">
+              <label className="text-sm">Phone Number *</label>
+              <Input 
+                placeholder="Phone Number"
+                value={phone}
+                onChange={handlePhoneChange}
+                maxLength={10}
+                inputMode="numeric"
+                className={phoneError ? 'border-red-500' : ''}
+                disabled={loading}
+              />
+              {phoneError && (
+                <p className="text-xs text-red-500">{phoneError}</p>
+              )}
+            </div>
+            
+            <div className="space-y-1">
+              <label className="text-sm">Location/City *</label>
+              <Input 
+                placeholder="City"
+                value={location}
+                onChange={(e) => setLocation(e.target.value)}
+                disabled={loading}
+              />
+            </div>
+            
+            <div className="space-y-1">
+              <label className="text-sm">Website / Social Handle (optional)</label>
+              <Input 
+                placeholder="https://..."
+                value={website}
+                onChange={(e) => setWebsite(e.target.value)}
+                disabled={loading}
+              />
+            </div>
+            
+            {error && <p className="text-sm text-red-500 text-center">{error}</p>}
+            
+            <Button 
+              className="w-full mt-2" 
+              onClick={handleRegister}
+              disabled={loading || passwordError || phoneError}
+            >
+              {loading ? 'Creating Account...' : 'Create Account'}
+            </Button>
+          </div>
+          
+          <div className="my-4 flex items-center gap-3">
+            <div className="h-px flex-1 bg-border" />
+            <span className="text-xs text-muted-foreground">or</span>
+            <div className="h-px flex-1 bg-border" />
+          </div>
+          
+          <GoogleSignIn text="signup_with" role="Producer" />
+          
+          <p className="mt-4 text-center text-sm text-muted-foreground">
+            Already have an account?{' '}
+            <a 
+              href="/login" 
+              className="font-medium text-primary hover:underline"
+              onClick={(e) => {
+                e.preventDefault();
+                navigate('/login');
+              }}
+            >
+              Log in
+            </a>
+          </p>
+        </div>
+      </section>
+    </>
   );
 }

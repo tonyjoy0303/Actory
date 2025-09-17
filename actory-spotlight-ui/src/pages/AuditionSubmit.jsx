@@ -12,18 +12,6 @@ import { Progress } from '@/components/ui/progress';
 
 // Define types
 
-
-
-
-
-
-
-
-
-
-
-
-
 export default function AuditionSubmit() {
   const { castingCallId } = useParams();
   const navigate = useNavigate();
@@ -34,7 +22,6 @@ export default function AuditionSubmit() {
   const [height, setHeight] = useState(''); // cm
   const [weight, setWeight] = useState(''); // kg
   const [age, setAge] = useState('');
-  const [skintone, setSkintone] = useState('');
   const [loading, setLoading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const videoRef = useRef(null);
@@ -79,7 +66,7 @@ export default function AuditionSubmit() {
     const w = Number(weight);
     const a = Number(age);
 
-    if (!file || !title || !height || !weight || !age || !skintone) {
+    if (!file || !title || !height || !weight || !age) {
       toast.error('Please fill all fields and select a video file.');
       return;
     }
@@ -120,7 +107,6 @@ export default function AuditionSubmit() {
           height: h,
           weight: w,
           age: a,
-          skintone: skintone.trim(),
         }
       );
 
@@ -218,10 +204,6 @@ export default function AuditionSubmit() {
                 , React.createElement('div', {__self: this, __source: {fileName: _jsxFileName, lineNumber: 215}}
                   , React.createElement('label', { className: "block text-sm mb-1"  , __self: this, __source: {fileName: _jsxFileName, lineNumber: 216}}, "Age")
                   , React.createElement(Input, { type: "number", inputMode: "numeric", min: 1, max: 120, step: 1, placeholder: "e.g., 26" , value: age, onChange: (e) => setAge(e.target.value), disabled: loading, __self: this, __source: {fileName: _jsxFileName, lineNumber: 217}} )
-                )
-                , React.createElement('div', {__self: this, __source: {fileName: _jsxFileName, lineNumber: 219}}
-                  , React.createElement('label', { className: "block text-sm mb-1"  , __self: this, __source: {fileName: _jsxFileName, lineNumber: 220}}, "Skintone")
-                  , React.createElement(Input, { placeholder: "e.g., Fair, Medium, Dark"   , value: skintone, onChange: (e) => setSkintone(e.target.value), disabled: loading, __self: this, __source: {fileName: _jsxFileName, lineNumber: 221}} )
                 )
               )
 

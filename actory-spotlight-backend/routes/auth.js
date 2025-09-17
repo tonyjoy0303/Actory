@@ -1,5 +1,14 @@
 const express = require('express');
-const { register, login, updatePassword, getMe, googleLogin, updateMe, uploadPhoto } = require('../controllers/auth');
+const { 
+  register, 
+  login, 
+  updatePassword, 
+  getMe, 
+  googleLogin, 
+  updateMe, 
+  uploadPhoto,
+  checkEmail  
+} = require('../controllers/auth');
 const { protect } = require('../middleware/auth');
 const multer = require('multer');
 const path = require('path');
@@ -28,20 +37,29 @@ const storage = multer.diskStorage({
 const upload = multer({
   storage,
   limits: { fileSize: 2 * 1024 * 1024 }, // 2MB
-  fileFilter: (req, file, cb) => {
-    if (!file.mimetype.startsWith('image/')) {
-      return cb(new Error('Only image files are allowed'));
+  fileFilter: function (req, file, cb) {
+    const filetypes = /jpe?g|png/;
+    const mimetype = filetypes.test(file.mimetype);
+    const extname = filetypes.test(path.extname(file.originalname).toLowerCase());
+    
+    if (mimetype && extname) {
+      return cb(null, true);
     }
-    cb(null, true);
+    cb(new Error('Only .png, .jpg and .jpeg format allowed!'));
   }
 });
 
+// Public routes
 router.post('/register', register);
 router.post('/login', login);
-router.put('/updatepassword', protect, updatePassword);
-router.get('/me', protect, getMe);
-router.put('/me', protect, updateMe);
-router.put('/me/photo', protect, upload.single('photo'), uploadPhoto);
 router.post('/google', googleLogin);
+router.get('/check-email', checkEmail);  
+
+// Protected routes (require authentication)
+router.use(protect);
+router.get('/me', getMe);
+router.put('/me', updateMe);
+router.put('/me/photo', upload.single('photo'), uploadPhoto);
+router.put('/updatepassword', updatePassword);
 
 module.exports = router;

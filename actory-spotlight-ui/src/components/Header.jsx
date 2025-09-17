@@ -121,7 +121,7 @@ export default function Header() {
               )
               , React.createElement(Button, { onClick: handleLogout, variant: "hero", __self: this, __source: {fileName: _jsxFileName, lineNumber: 73}}, "Logout")
               , user.role === 'Producer' && (
-                React.createElement(NavLink, { to: "/dashboard/producer", __self: this, __source: {fileName: _jsxFileName, lineNumber: 75}}
+                React.createElement(NavLink, { to: "/casting/new", __self: this, __source: {fileName: _jsxFileName, lineNumber: 75}}
                   , React.createElement(Button, { variant: "hero", className: "hover-scale", __self: this, __source: {fileName: _jsxFileName, lineNumber: 76}}, "Post Casting" )
                 )
               )

@@ -389,3 +389,36 @@ exports.googleLogin = async (req, res) => {
     res.status(401).json({ success: false, message: 'Google authentication failed' });
   }
 };
+
+// @desc    Check if email exists
+// @route   GET /api/v1/auth/check-email
+// @access  Public
+exports.checkEmail = async (req, res, next) => {
+  try {
+    const { email } = req.query;
+    
+    if (!email) {
+      return res.status(400).json({
+        success: false,
+        message: 'Email is required'
+      });
+    }
+
+    // Check if email exists in the database
+    const user = await User.findOne({ email: email.toLowerCase().trim() });
+    
+    res.status(200).json({
+      success: true,
+      available: !user, // true if email is available, false if already exists
+      message: user ? 'Email is already registered' : 'Email is available'
+    });
+    
+  } catch (err) {
+    console.error('Error checking email:', err);
+    res.status(500).json({
+      success: false,
+      message: 'Server error while checking email',
+      error: process.env.NODE_ENV === 'development' ? err.message : undefined
+    });
+  }
+};
