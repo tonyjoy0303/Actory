@@ -29,12 +29,9 @@ export default function RegisterActor() {
   const [phoneError, setPhoneError] = useState("");
   const [location, setLocation] = useState("");
   const [experienceLevel, setExperienceLevel] = useState("");
-  const [profileImage, setProfileImage] = useState(null);
-  const [profileImagePreview, setProfileImagePreview] = useState("");
   const [bio, setBio] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const fileInputRef = useRef(null);
 
   // Clear any persisted values on mount
   useEffect(() => {
@@ -47,8 +44,6 @@ export default function RegisterActor() {
     setPhone("");
     setLocation("");
     setExperienceLevel("");
-    setProfileImage(null);
-    setProfileImagePreview("");
     setBio("");
   }, []);
 
@@ -107,33 +102,6 @@ export default function RegisterActor() {
     return null;
   };
 
-  const handleImageChange = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      // Check file type
-      if (!file.type.match('image.*')) {
-        setError("Please select a valid image file");
-        return;
-      }
-      
-      // Check file size (2MB max)
-      if (file.size > 2 * 1024 * 1024) {
-        setError("Image size should be less than 2MB");
-        return;
-      }
-      
-      setProfileImage(file);
-      
-      // Create preview
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setProfileImagePreview(reader.result);
-      };
-      reader.readAsDataURL(file);
-      setError("");
-    }
-  };
-
   const handlePhoneChange = (e) => {
     const value = e.target.value.replace(/\D/g, ''); // Remove non-digit characters
     setPhone(value);
@@ -186,40 +154,9 @@ export default function RegisterActor() {
         // Notify other components about the auth change
         window.dispatchEvent(new Event('authChange'));
 
-        // Handle profile image upload if provided
-        if (profileImage) {
-          try {
-            const formData = new FormData();
-            formData.append('photo', profileImage);
-            
-            await API.post("/auth/me/photo", formData, {
-              headers: {
-                'Content-Type': 'multipart/form-data',
-                'Authorization': `Bearer ${token}`
-              },
-            });
-
-            // Refresh user data after uploading photo
-            const userResponse = await API.get('/auth/me', {
-              headers: { 'Authorization': `Bearer ${token}` }
-            });
-            
-            if (userResponse.data?.success) {
-              localStorage.setItem('user', JSON.stringify(userResponse.data.data));
-              window.dispatchEvent(new Event('authChange'));
-            }
-          } catch (uploadError) {
-            console.error("Error uploading profile image:", uploadError);
-            toast.warning("Account created, but there was an error uploading your profile image. You can update it later.");
-          }
-        }
-
-        toast.success("Registration successful! Redirecting to your dashboard...");
-        
-        // Redirect based on role (default to actor if not specified)
-        const userRole = (user.role || 'actor').toLowerCase();
-        navigate(`/dashboard/${userRole}`);
-        
+        // Redirect to dashboard
+        navigate("/dashboard");
+        toast.success("Registration successful! Welcome to Actory.");
       } else {
         throw new Error(response.data?.message || 'Registration failed. Please try again.');
       }
@@ -391,60 +328,6 @@ export default function RegisterActor() {
                 <option value="experienced">Experienced (3-5 years)</option>
                 <option value="professional">Professional (5+ years)</option>
               </select>
-            </div>
-
-            <div className="space-y-1">
-              <label className="text-sm">Profile Image</label>
-              <div className="flex items-center gap-4">
-                <div className="relative w-16 h-16 rounded-full overflow-hidden bg-muted">
-                  {profileImagePreview ? (
-                    <img 
-                      src={profileImagePreview} 
-                      alt="Profile preview" 
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center text-muted-foreground">
-                      <svg 
-                        xmlns="http://www.w3.org/2000/svg" 
-                        width="24" 
-                        height="24" 
-                        viewBox="0 0 24 24" 
-                        fill="none" 
-                        stroke="currentColor" 
-                        strokeWidth="2" 
-                        strokeLinecap="round" 
-                        strokeLinejoin="round"
-                        className="w-6 h-6"
-                      >
-                        <rect width="18" height="18" x="3" y="3" rx="2" ry="2" />
-                        <circle cx="9" cy="9" r="2" />
-                        <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" />
-                      </svg>
-                    </div>
-                  )}
-                </div>
-                <div>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => fileInputRef.current?.click()}
-                    disabled={loading}
-                  >
-                    Upload Photo
-                  </Button>
-                  <input
-                    type="file"
-                    ref={fileInputRef}
-                    onChange={handleImageChange}
-                    accept="image/*"
-                    className="hidden"
-                    disabled={loading}
-                  />
-                  <p className="text-xs text-muted-foreground mt-1">JPEG, PNG (max 2MB)</p>
-                </div>
-              </div>
             </div>
 
             <div className="space-y-1">
