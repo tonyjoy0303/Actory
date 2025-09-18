@@ -31,6 +31,7 @@ import EditCastingCall from "./pages/casting/EditCastingCall";
 
 // Pages - Profiles & Submissions
 import ActorProfile from "./pages/ActorProfile";
+import PublicProfile from "./pages/PublicProfile";
 import AuditionSubmit from "./pages/AuditionSubmit";
 
 // Pages - Messaging
@@ -121,6 +122,14 @@ const App = () => (
                 element: 
                   React.createElement(MainLayout, null
                     , React.createElement(EditCastingCall, null )
+                  )
+                })
+              
+              , React.createElement(Route, {
+                path: "/profile/:id",
+                element: 
+                  React.createElement(MainLayout, null
+                    , React.createElement(PublicProfile, null )
                   )
                 })
               

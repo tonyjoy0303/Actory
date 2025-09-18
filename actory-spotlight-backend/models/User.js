@@ -2,6 +2,49 @@ const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
 
+// Video schema that will be embedded in the User model
+const VideoSchema = new mongoose.Schema({
+  title: {
+    type: String,
+    required: [true, 'Please add a title for the video'],
+    maxlength: [100, 'Title cannot be more than 100 characters']
+  },
+  description: {
+    type: String,
+    maxlength: [500, 'Description cannot be more than 500 characters']
+  },
+  category: {
+    type: String,
+    required: [true, 'Please select a category'],
+    enum: ['Monologue', 'Dance', 'Demo Reel', 'Other'],
+    default: 'Other'
+  },
+  url: {
+    type: String,
+    required: [true, 'Video URL is required']
+  },
+  thumbnailUrl: {
+    type: String,
+    required: [true, 'Thumbnail URL is required']
+  },
+  duration: {
+    type: Number,
+    required: [true, 'Video duration is required']
+  },
+  views: {
+    type: Number,
+    default: 0
+  },
+  isActive: {
+    type: Boolean,
+    default: true
+  },
+  uploadedAt: {
+    type: Date,
+    default: Date.now
+  }
+}, { _id: true });
+
 const UserSchema = new mongoose.Schema({
   name: {
     type: String,
@@ -57,6 +100,7 @@ const UserSchema = new mongoose.Schema({
   experienceLevel: { type: String, enum: ['beginner', 'intermediate', 'experienced', 'professional'] },
   bio: { type: String, maxlength: 500 },
   profileImage: { type: String },
+  videos: [VideoSchema], // Add videos array to store actor's videos
 
   // Producer-specific
   companyName: { type: String },
@@ -113,6 +157,47 @@ UserSchema.path('experienceLevel').validate(function(value) {
   }
   return true;
 }, 'Experience level is required');
+
+// Add instance method to add a video to user's profile
+UserSchema.methods.addVideo = async function(videoData) {
+  try {
+    this.videos.push(videoData);
+    await this.save();
+    return this.videos[this.videos.length - 1];
+  } catch (error) {
+    throw new Error(`Failed to add video: ${error.message}`);
+  }
+};
+
+// Add instance method to remove a video
+UserSchema.methods.removeVideo = async function(videoId) {
+  try {
+    const videoIndex = this.videos.findIndex(v => v._id.toString() === videoId);
+    if (videoIndex === -1) {
+      throw new Error('Video not found');
+    }
+    this.videos.splice(videoIndex, 1);
+    await this.save();
+    return true;
+  } catch (error) {
+    throw new Error(`Failed to remove video: ${error.message}`);
+  }
+};
+
+// Add instance method to increment video views
+UserSchema.methods.incrementVideoViews = async function(videoId) {
+  try {
+    const video = this.videos.id(videoId);
+    if (!video) {
+      throw new Error('Video not found');
+    }
+    video.views += 1;
+    await this.save();
+    return video.views;
+  } catch (error) {
+    throw new Error(`Failed to increment video views: ${error.message}`);
+  }
+};
 
 // Encrypt password using bcrypt
 UserSchema.pre('save', async function (next) {

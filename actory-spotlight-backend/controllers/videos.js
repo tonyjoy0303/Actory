@@ -52,7 +52,7 @@ exports.getMyVideos = async (req, res, next) => {
   try {
     const videos = await Video.find({ actor: req.user.id })
       .sort({ createdAt: -1 })
-      .populate('castingCall', 'roleName');
+      .populate('castingCall', 'roleTitle roleName');
     res.status(200).json({ success: true, count: videos.length, data: videos });
   } catch (err) {
     res.status(400).json({ success: false, message: err.message });

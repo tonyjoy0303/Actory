@@ -6,13 +6,14 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import API from "@/lib/api";
-import { Star } from "lucide-react";
+import { Star, Upload as UploadIcon, Pencil } from "lucide-react";
 import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Slider } from "@/components/ui/slider";
 import Cropper from "react-easy-crop";
 import "react-easy-crop/react-easy-crop.css";
+import VideoList from "@/components/profile/VideoList";
 
 export default function ActorProfile() {
   const navigate = useNavigate();
@@ -23,7 +24,8 @@ export default function ActorProfile() {
   const [name, setName] = useState("");
   const [photoFile, setPhotoFile] = useState(null);
   const [uploading, setUploading] = useState(false);
-
+  const [videos, setVideos] = useState([]);
+  
   // Cropper state
   const [isCropOpen, setIsCropOpen] = useState(false);
   const [crop, setCrop] = useState({ x: 0, y: 0 });
@@ -58,6 +60,22 @@ export default function ActorProfile() {
 
     fetchMe();
   }, [navigate]);
+
+  useEffect(() => {
+    const fetchVideos = async () => {
+      try {
+        const { data } = await API.get('/videos/mine');
+        setVideos(data.data || []);
+      } catch (error) {
+        console.error('Error fetching videos:', error);
+        toast.error('Failed to load videos');
+      }
+    };
+
+    if (user?._id) {
+      fetchVideos();
+    }
+  }, [user?._id]); 
 
   const handlePhotoChange = (e) => {
     const file = e.target.files?.[0];
@@ -162,6 +180,14 @@ export default function ActorProfile() {
     setZoom((z) => Math.max(z, computedMin));
   };
 
+  const handleVideoDeleted = (deletedVideoId) => {
+    setVideos(prevVideos => prevVideos.filter(video => video._id !== deletedVideoId));
+  };
+
+  const handleVideoPlay = (video) => {
+    window.open(video.videoUrl, '_blank');
+  };
+
   return (
     React.createElement(React.Fragment, null
       , React.createElement(SEO, { title: "Your Profile" , description: "View and manage your profile information."     , __self: this, __source: {fileName: _jsxFileName, lineNumber: 51}} )
@@ -264,9 +290,11 @@ export default function ActorProfile() {
               , React.createElement(CardTitle, { className: "font-display", __self: this, __source: {fileName: _jsxFileName, lineNumber: 97}}, "Videos")
             )
             , React.createElement(CardContent, { className: "grid grid-cols-2 gap-3"  , __self: this, __source: {fileName: _jsxFileName, lineNumber: 99}}
-              , Array.from({ length: 2 }).map((_, i) => (
-                React.createElement('div', { key: i, className: "aspect-video rounded-md bg-muted"  , __self: this, __source: {fileName: _jsxFileName, lineNumber: 101}} )
-              ))
+              , videos.length > 0 ? (
+                React.createElement(VideoList, { videos: videos, isOwner: true, onVideoDeleted: handleVideoDeleted, onVideoPlay: handleVideoPlay, __self: this, __source: {fileName: _jsxFileName, lineNumber: 100}} )
+              ) : (
+                React.createElement('p', { className: "text-sm text-muted-foreground", __self: this, __source: {fileName: _jsxFileName, lineNumber: 102}}, "No videos uploaded yet")
+              )
             )
           )
         )
