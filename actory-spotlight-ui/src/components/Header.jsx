@@ -1,16 +1,18 @@
 import React from 'react'
 const _jsxFileName = ""; function _nullishCoalesce(lhs, rhsFn) { if (lhs != null) { return lhs; } else { return rhsFn(); } } function _optionalChain(ops) { let lastAccessLHS = undefined; let value = ops[0]; let i = 1; while (i < ops.length) { const op = ops[i]; const fn = ops[i + 1]; i += 2; if ((op === 'optionalAccess' || op === 'optionalCall') && value == null) { return undefined; } if (op === 'access' || op === 'optionalAccess') { lastAccessLHS = value; value = fn(value); } else if (op === 'call' || op === 'optionalCall') { value = fn((...args) => value.call(lastAccessLHS, ...args)); lastAccessLHS = undefined; } } return value; }import { NavLink, useNavigate, useLocation } from "react-router-dom";
 import { useEffect, useState } from "react";
+import { Search, User } from "lucide-react";
 import ThemeToggle from "@/components/ThemeToggle";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { Badge } from "@/components/ui/badge";
 import Logo from "@/components/Logo";
 import API from "@/lib/api";
 import recruiterImg from "@/assets/recruiter.jpg";
 import actorImg from "@/assets/actor.jpg";
-import {
-  Dialog,
-  DialogContent,
-} from "@/components/ui/dialog";
+import { toast } from 'sonner';
 
 const API_ORIGIN = API.defaults.baseURL.replace(/\/api\/v1$/, "");
 
@@ -19,6 +21,14 @@ export default function Header() {
   const location = useLocation();
   const [user, setUser] = useState(null);
   const [registerOpen, setRegisterOpen] = useState(false);
+  const [switchRoleOpen, setSwitchRoleOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [reason, setReason] = useState('');
+  const [isRequesting, setIsRequesting] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
 
   const dashboardPathFor = (role) => {
     if (role === 'Actor') return '/dashboard/actor';
@@ -27,17 +37,90 @@ export default function Header() {
     return '/';
   };
 
+  const handleSwitchRole = () => {
+    if (user?.role === 'Actor') {
+      setSwitchRoleOpen(true);
+    }
+  };
+
+  const handleSearch = async (query) => {
+    if (!query.trim()) {
+      setSearchResults([]);
+      return;
+    }
+
+    try {
+      setIsSearching(true);
+      const { data } = await API.get('/profile/search', {
+        params: { username: query }
+      });
+
+      if (data.success) {
+        setSearchResults(data.data);
+      }
+    } catch (error) {
+      console.error('Error searching users:', error);
+      toast.error('Failed to search users');
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
+  useEffect(() => {
+    const timeoutId = setTimeout(() => handleSearch(searchQuery), 300);
+    return () => clearTimeout(timeoutId);
+  }, [searchQuery]);
+
+  const handleSubmitSwitchRequest = async () => {
+    if (!reason.trim()) {
+      toast.error('Please provide a reason for switching to Producer');
+      return;
+    }
+
+    try {
+      setIsRequesting(true);
+      const { data } = await API.post('/actor/request-switch', { reason });
+
+      if (data.success) {
+        toast.success('Role switch request submitted. Please wait for admin approval.');
+        setSwitchRoleOpen(false);
+        setReason('');
+      }
+    } catch (error) {
+      console.error('Error submitting role switch request:', error);
+      toast.error(error.response?.data?.message || 'Failed to submit request');
+    } finally {
+      setIsRequesting(false);
+    }
+  };
+
+  const fetchUnreadCount = async () => {
+    try {
+      const { data } = await API.get('/messages/unread-count');
+      if (data.success) {
+        setUnreadCount(data.data.count);
+      }
+    } catch (error) {
+      console.error('Error fetching unread count:', error);
+      // Don't show toast for this, just log
+    }
+  };
+
   // Check for user session on component mount and when storage changes
   useEffect(() => {
     const checkUser = () => {
       const userData = localStorage.getItem("user");
       const token = localStorage.getItem("token");
       if (token && userData) {
-        setUser(JSON.parse(userData));
+        const parsedUser = JSON.parse(userData);
+        setUser(parsedUser);
+        // Fetch unread count when user is logged in
+        fetchUnreadCount();
       } else {
         // If token is missing, treat as logged out and clean up stale data
         if (!token && userData) localStorage.removeItem('user');
         setUser(null);
+        setUnreadCount(0);
       }
     };
 
@@ -45,12 +128,23 @@ export default function Header() {
 
     // Listen for custom event to re-check auth state
     window.addEventListener('authChange', checkUser);
+    // Listen for unread count updates
+    window.addEventListener('updateUnreadCount', fetchUnreadCount);
 
-    // Cleanup listener
+    // Cleanup listeners
     return () => {
       window.removeEventListener('authChange', checkUser);
+      window.removeEventListener('updateUnreadCount', fetchUnreadCount);
     };
   }, []);
+
+  // Poll for unread count updates every 30 seconds when user is logged in
+  useEffect(() => {
+    if (!user) return;
+
+    const interval = setInterval(fetchUnreadCount, 30000);
+    return () => clearInterval(interval);
+  }, [user]);
 
   // On initial load or path change, if authenticated and on a public page, redirect to dashboard
   useEffect(() => {
@@ -95,74 +189,197 @@ export default function Header() {
       : "text-muted-foreground hover:text-foreground transition-colors";
 
   return (
-    React.createElement('header', { className: "sticky top-0 z-40 w-full border-b bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/60"       , __self: this, __source: {fileName: _jsxFileName, lineNumber: 53}}
-      , React.createElement('nav', { className: "container h-16 flex items-center justify-between gap-4"     , __self: this, __source: {fileName: _jsxFileName, lineNumber: 54}}
-        , React.createElement(NavLink, { to: "/", className: "flex items-center gap-2"  , 'aria-label': "Actory home" , __self: this, __source: {fileName: _jsxFileName, lineNumber: 55}}
-          , React.createElement(Logo, {__self: this, __source: {fileName: _jsxFileName, lineNumber: 56}} )
-        )
+    <>
+      <header className="sticky top-0 z-40 w-full border-b bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+        <nav className="container h-16 flex items-center justify-between gap-4">
+          <NavLink to="/" className="flex items-center gap-2" aria-label="Actory home">
+            <Logo />
+          </NavLink>
 
-        , React.createElement('div', { className: "hidden md:flex items-center gap-6"   , __self: this, __source: {fileName: _jsxFileName, lineNumber: 59}}
-          , React.createElement(NavLink, { to: "/casting", className: linkCls, end: true, __self: this, __source: {fileName: _jsxFileName, lineNumber: 60}}, "Castings")
-          , _optionalChain([user, 'optionalAccess', _ => _.role]) === 'Actor' && React.createElement(NavLink, { to: "/dashboard/actor", className: linkCls, end: true, __self: this, __source: {fileName: _jsxFileName, lineNumber: 61}}, "Dashboard")
-          , _optionalChain([user, 'optionalAccess', _2 => _2.role]) === 'Producer' && React.createElement(NavLink, { to: "/dashboard/producer", className: linkCls, end: true, __self: this, __source: {fileName: _jsxFileName, lineNumber: 62}}, "Dashboard")
-          , user && React.createElement(NavLink, { to: "/messages", className: linkCls, end: true, __self: this, __source: {fileName: _jsxFileName, lineNumber: 63}}, "Messages")
-        )
+          <div className="hidden md:flex items-center gap-6">
+            <NavLink to="/casting" className={linkCls} end={true}>Castings</NavLink>
+            {_optionalChain([user, 'optionalAccess', _ => _.role]) === 'Actor' && <NavLink to="/dashboard/actor" className={linkCls} end={true}>Dashboard</NavLink>}
+            {_optionalChain([user, 'optionalAccess', _2 => _2.role]) === 'Producer' && <NavLink to="/dashboard/producer" className={linkCls} end={true}>Dashboard</NavLink>}
+            {user && (
+              <div className="relative">
+                <NavLink to="/messages" className={linkCls} end={true}>Messages</NavLink>
+                {unreadCount > 0 && (
+                  <Badge variant="destructive" className="absolute -top-2 -right-2 h-5 w-5 p-0 flex items-center justify-center text-xs">
+                    {unreadCount > 99 ? '99+' : unreadCount}
+                  </Badge>
+                )}
+              </div>
+            )}
+          </div>
 
-        , React.createElement('div', { className: "flex items-center gap-2"  , __self: this, __source: {fileName: _jsxFileName, lineNumber: 66}}
-          , user ? (
-            React.createElement(React.Fragment, null
-              /* Profile button at the end for viewing user details */
-              , React.createElement(NavLink, { to: `/actor/profile/${_nullishCoalesce(user.id, () => ( ''))}`, className: "hidden sm:inline-flex items-center gap-2" , __self: this, __source: {fileName: _jsxFileName, lineNumber: 70}}
-                , _optionalChain([user, 'optionalAccess', _ => _.photo]) ? (
-                  React.createElement('img', { src: `${API_ORIGIN}${_optionalChain([user, 'optionalAccess', _2 => _2.photo])}`, alt: "Avatar", className: "w-8 h-8 rounded-full object-cover border" , __self: this, __source: {fileName: _jsxFileName, lineNumber: 71}} )
-                ) : (
-                  React.createElement(Button, { variant: "ghost", __self: this, __source: {fileName: _jsxFileName, lineNumber: 73}}, "Profile")
-                )
-              )
-              , React.createElement(Button, { onClick: handleLogout, variant: "hero", __self: this, __source: {fileName: _jsxFileName, lineNumber: 73}}, "Logout")
-              , user.role === 'Producer' && (
-                React.createElement(NavLink, { to: "/casting/new", __self: this, __source: {fileName: _jsxFileName, lineNumber: 75}}
-                  , React.createElement(Button, { variant: "hero", className: "hover-scale", __self: this, __source: {fileName: _jsxFileName, lineNumber: 76}}, "Post Casting" )
-                )
-              )
-            )
-          ) : (
-            React.createElement(React.Fragment, null
-              , React.createElement(NavLink, { to: "/auth/login", className: "hidden sm:inline-block" , __self: this, __source: {fileName: _jsxFileName, lineNumber: 82}}
-                , React.createElement(Button, { variant: "ghost", __self: this, __source: {fileName: _jsxFileName, lineNumber: 83}}, "Log in" )
-              )
-              , React.createElement(React.Fragment, null
-                  , React.createElement(Button, { variant: "hero", className: "hover-scale", onClick: () => setRegisterOpen(true), __self: this, __source: {fileName: _jsxFileName, lineNumber: 86}}, "Get Started" )
-                  , React.createElement(Dialog, { open: registerOpen, onOpenChange: setRegisterOpen, __self: this, __source: {fileName: _jsxFileName, lineNumber: 87}}
-                    , React.createElement(DialogContent, { className: "max-w-5xl p-0 overflow-hidden", __self: this, __source: {fileName: _jsxFileName, lineNumber: 88}}
-                      , React.createElement('div', { className: "relative grid grid-cols-2", __self: this, __source: {fileName: _jsxFileName, lineNumber: 89}}
-                        , React.createElement('div', { className: "p-10 flex flex-col items-center text-center gap-5", __self: this, __source: {fileName: _jsxFileName, lineNumber: 90}}
-                          , React.createElement('div', { className: "h-56 w-80 flex items-center justify-center", __self: this, __source: {fileName: _jsxFileName, lineNumber: 91}}
-                            , React.createElement('img', { src: actorImg, alt: "Artist", className: "max-h-full max-w-full object-contain", __self: this, __source: {fileName: _jsxFileName, lineNumber: 92}} )
-                          )
-                          , React.createElement('p', { className: "text-sm text-muted-foreground max-w-xs", __self: this, __source: {fileName: _jsxFileName, lineNumber: 93}}, "Apply for unlimited jobs/auditions posted by top industry recruiters.")
-                          , React.createElement('button', { className: "text-xs font-semibold text-primary/80", onClick: () => navigate('/casting'), __self: this, __source: {fileName: _jsxFileName, lineNumber: 94}}, "KNOW MORE")
-                          , React.createElement(Button, { variant: "hero", className: "rounded-full px-6 py-6 text-base w-[220px]", onClick: () => handleRegisterClick('Actor'), __self: this, __source: {fileName: _jsxFileName, lineNumber: 95}}, "Register As Artist" )
-                        )
-                        , React.createElement('div', { className: "p-10 flex flex-col items-center text-center gap-5", __self: this, __source: {fileName: _jsxFileName, lineNumber: 97}}
-                          , React.createElement('div', { className: "h-56 w-80 flex items-center justify-center", __self: this, __source: {fileName: _jsxFileName, lineNumber: 98}}
-                            , React.createElement('img', { src: recruiterImg, alt: "Producer", className: "max-h-full max-w-full object-contain", __self: this, __source: {fileName: _jsxFileName, lineNumber: 99}} )
-                          )
-                          , React.createElement('p', { className: "text-sm text-muted-foreground max-w-xs", __self: this, __source: {fileName: _jsxFileName, lineNumber: 100}}, "Search and find the perfect talent for your project.")
-                          , React.createElement('button', { className: "text-xs font-semibold text-primary/80", onClick: () => navigate('/casting'), __self: this, __source: {fileName: _jsxFileName, lineNumber: 101}}, "KNOW MORE")
-                          , React.createElement(Button, { variant: "hero", className: "rounded-full px-6 py-6 text-base w-[220px]", onClick: () => handleRegisterClick('Producer'), __self: this, __source: {fileName: _jsxFileName, lineNumber: 102}}, "Register As Producer" )
-                        )
-                        , React.createElement('div', { className: "hidden md:block absolute inset-y-0 left-1/2 w-px bg-border" , __self: this, __source: {fileName: _jsxFileName, lineNumber: 103}} )
-                      )
-                      , React.createElement('div', { className: "px-6 pb-6 text-center text-xs text-muted-foreground", __self: this, __source: {fileName: _jsxFileName, lineNumber: 104}}, "Are you a talent agency? ", React.createElement('span', { className: "underline cursor-pointer", onClick: () => navigate('/auth/register/producer'), __self: this, __source: {fileName: _jsxFileName, lineNumber: 104}}, "Click here."))
-                    )
-                  )
-                )
-            )
-          )
-          , React.createElement(ThemeToggle, {__self: this, __source: {fileName: _jsxFileName, lineNumber: 110}} )
-        )
-      )
-    )
+          <div className="flex items-center gap-2">
+            {user ? (
+              <React.Fragment>
+                <Button variant="ghost" size="sm" onClick={() => setSearchOpen(true)}>
+                  <Search className="w-4 h-4" />
+                </Button>
+                {/* Profile button at the end for viewing user details */}
+                <NavLink to={`/profile/${_nullishCoalesce(user._id, () => ( ''))}`} className="hidden sm:inline-flex items-center gap-2">
+                  {_optionalChain([user, 'optionalAccess', _ => _.photo]) ? (
+                    <img src={`${API_ORIGIN}${_optionalChain([user, 'optionalAccess', _2 => _2.photo])}`} alt="Avatar" className="w-8 h-8 rounded-full object-cover border" />
+                  ) : (
+                    <Button variant="ghost">Profile</Button>
+                  )}
+                </NavLink>
+                <Button onClick={handleLogout} variant="hero">Logout</Button>
+                {user.role === 'Producer' && (
+                  <NavLink to="/casting/new">
+                    <Button variant="hero" className="hover-scale">Post Casting</Button>
+                  </NavLink>
+                )}
+                {user?.role === 'Actor' && (
+                  <Button variant="hero" size="sm" onClick={handleSwitchRole}>
+                    Switch to Producer
+                  </Button>
+                )}
+
+              </React.Fragment>
+            ) : (
+              <React.Fragment>
+                <NavLink to="/auth/login" className="hidden sm:inline-block">
+                  <Button variant="ghost">Log in</Button>
+                </NavLink>
+                <React.Fragment>
+                  <Button variant="hero" className="hover-scale" onClick={() => setRegisterOpen(true)}>Get Started</Button>
+                  <Dialog open={registerOpen} onOpenChange={setRegisterOpen}>
+                    <DialogContent className="max-w-5xl p-0 overflow-hidden">
+                      <div className="relative grid grid-cols-1 md:grid-cols-2">
+                        <div className="p-10 flex flex-col items-center text-center gap-5">
+                          <div className="h-56 w-80 flex items-center justify-center">
+                            <img src={actorImg} alt="Artist" className="max-h-full max-w-full object-contain" />
+                          </div>
+                          <p className="text-sm text-muted-foreground max-w-xs">Apply for unlimited jobs/auditions posted by top industry recruiters.</p>
+                          <button className="text-xs font-semibold text-primary/80" onClick={() => navigate('/casting')}>KNOW MORE</button>
+                          <Button variant="hero" className="rounded-full px-6 py-6 text-base w-[220px]" onClick={() => handleRegisterClick('Actor')}>Register As Artist</Button>
+                        </div>
+                        <div className="p-10 flex flex-col items-center text-center gap-5">
+                          <div className="h-56 w-80 flex items-center justify-center">
+                            <img src={recruiterImg} alt="Producer" className="max-h-full max-w-full object-contain" />
+                          </div>
+                          <p className="text-sm text-muted-foreground max-w-xs">Search and find the perfect talent for your project.</p>
+                          <button className="text-xs font-semibold text-primary/80" onClick={() => navigate('/casting')}>KNOW MORE</button>
+                          <Button variant="hero" className="rounded-full px-6 py-6 text-base w-[220px]" onClick={() => handleRegisterClick('Producer')}>Register As Producer</Button>
+                        </div>
+                        <div className="hidden md:block absolute inset-y-0 left-1/2 w-px bg-border" />
+                      </div>
+                      <div className="px-6 pb-6 text-center text-xs text-muted-foreground">Are you a talent agency? <span className="underline cursor-pointer" onClick={() => navigate('/auth/register/producer')}>Click here.</span></div>
+                    </DialogContent>
+                  </Dialog>
+                </React.Fragment>
+              </React.Fragment>
+            )}
+            <ThemeToggle />
+          </div>
+        </nav>
+      </header>
+
+      {/* Search Dialog */}
+      <Dialog open={searchOpen} onOpenChange={setSearchOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Search Users</DialogTitle>
+            <DialogDescription>
+              Search for actors and producers by their username.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <Input
+              placeholder="Enter username..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full"
+            />
+
+            {isSearching && <p className="text-sm text-muted-foreground">Searching...</p>}
+
+            <div className="max-h-64 overflow-y-auto space-y-2">
+              {searchResults.map((result) => (
+                <div
+                  key={result._id}
+                  className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted cursor-pointer"
+                  onClick={() => {
+                    navigate(`/profile/${result._id}`);
+                    setSearchOpen(false);
+                    setSearchQuery('');
+                    setSearchResults([]);
+                  }}
+                >
+                  {result.profileImage ? (
+                    <img
+                      src={result.profileImage}
+                      alt={result.name}
+                      className="w-8 h-8 rounded-full object-cover"
+                    />
+                  ) : (
+                    <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center">
+                      <User className="w-4 h-4" />
+                    </div>
+                  )}
+                  <div className="flex-1">
+                    <p className="font-medium">{result.name}</p>
+                    <p className="text-sm text-muted-foreground">{result.role}</p>
+                  </div>
+                  {result.isVerified && (
+                    <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded-full">
+                      Verified
+                    </span>
+                  )}
+                </div>
+              ))}
+              {searchQuery && !isSearching && searchResults.length === 0 && (
+                <p className="text-sm text-muted-foreground">No users found.</p>
+              )}
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Role Switch Request Dialog */}
+      <Dialog open={switchRoleOpen} onOpenChange={setSwitchRoleOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Request Role Switch to Producer</DialogTitle>
+            <DialogDescription>
+              Please provide a reason for switching to a Producer account. Your request will be reviewed by an administrator.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="grid gap-4 py-4">
+            <div className="space-y-2">
+              <label htmlFor="reason" className="text-sm font-medium">Reason</label>
+              <Textarea
+                id="reason"
+                placeholder="Explain why you want to switch to a Producer account..."
+                value={reason}
+                onChange={(e) => setReason(e.target.value)}
+                className="min-h-[100px]"
+              />
+            </div>
+          </div>
+          
+          <DialogFooter>
+            <Button 
+              variant="outline" 
+              onClick={() => setSwitchRoleOpen(false)}
+              disabled={isRequesting}
+            >
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleSubmitSwitchRequest}
+              disabled={isRequesting || !reason.trim()}
+            >
+              {isRequesting ? 'Submitting...' : 'Submit Request'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }

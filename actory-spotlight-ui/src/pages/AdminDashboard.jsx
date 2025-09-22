@@ -107,6 +107,12 @@ export default function AdminDashboard() {
     setLoadingCasting(true);
     try {
       const { data } = await API.get('/admin/castingcalls');
+      console.log('Frontend received casting calls:', data.data.map(c => ({
+        _id: c._id,
+        title: c.roleTitle || c.roleName,
+        producer: c.producer,
+        producerName: c.producer?.name
+      })));
       setCastingCalls(data.data);
     } catch (error) {
       console.error('Error fetching casting calls:', error);
@@ -322,9 +328,16 @@ export default function AdminDashboard() {
                   , React.createElement(DialogDescription, {__self: this, __source: {fileName: _jsxFileName, lineNumber: 321}}, "Full casting information"  )
                 )
                 , selectedCasting && (
-                  React.createElement('div', { className: "space-y-2 text-sm" , __self: this, __source: {fileName: _jsxFileName, lineNumber: 324}}
+                  React.createElement('div', { className: "space-y-3 text-sm" , __self: this, __source: {fileName: _jsxFileName, lineNumber: 324}}
+                    , React.createElement('div', { className: "flex items-center gap-2 p-3 bg-muted rounded-lg" , __self: this, __source: {fileName: _jsxFileName, lineNumber: 325}}
+                      , React.createElement('span', { className: "font-semibold text-foreground", __self: this, __source: {fileName: _jsxFileName, lineNumber: 325}}, "Created by:")
+                      , React.createElement('span', { className: "font-medium", __self: this, __source: {fileName: _jsxFileName, lineNumber: 325}}, typeof selectedCasting.producer === 'object' ? _optionalChain([selectedCasting, 'access', _21 => _21.producer, 'optionalAccess', _22 => _22.name]) || 'Unknown Producer' : '—')
+                      , typeof selectedCasting.producer === 'object' && _optionalChain([selectedCasting, 'access', _23 => _23.producer, 'optionalAccess', _24 => _24.email]) && (
+                        React.createElement('span', { className: "text-muted-foreground", __self: this, __source: {fileName: _jsxFileName, lineNumber: 326}}, `(${_optionalChain([selectedCasting, 'access', _23 => _23.producer, 'optionalAccess', _24 => _24.email])})`)
+                      )
+                    )
                     , selectedCasting.description && (
-                      React.createElement('p', { className: "leading-relaxed", __self: this, __source: {fileName: _jsxFileName, lineNumber: 326}}, selectedCasting.description)
+                      React.createElement('p', { className: "leading-relaxed", __self: this, __source: {fileName: _jsxFileName, lineNumber: 328}}, selectedCasting.description)
                     )
                     , React.createElement('div', { className: "grid grid-cols-1 sm:grid-cols-2 gap-2"   , __self: this, __source: {fileName: _jsxFileName, lineNumber: 328}}
                       , selectedCasting.location && (
@@ -358,10 +371,6 @@ export default function AdminDashboard() {
                         ))
                       )
                     ) : null
-                    , React.createElement('div', { className: "text-xs text-muted-foreground" , __self: this, __source: {fileName: _jsxFileName, lineNumber: 352}}, "Producer: "
-                       , typeof selectedCasting.producer === 'object' ? _optionalChain([selectedCasting, 'access', _25 => _25.producer, 'optionalAccess', _26 => _26.name]) : '—'
-                      , typeof selectedCasting.producer === 'object' && _optionalChain([selectedCasting, 'access', _27 => _27.producer, 'optionalAccess', _28 => _28.email]) ? ` • ${selectedCasting.producer.email}` : ''
-                    )
                   )
                 )
               )

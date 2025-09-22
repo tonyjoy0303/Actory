@@ -159,7 +159,7 @@ const sendTokenResponse = (user, statusCode, res) => {
 
   // Send user data without the password
   const userResponse = {
-    id: user._id,
+    _id: user._id,
     name: user.name,
     email: user.email,
     role: user.role,
@@ -220,7 +220,7 @@ exports.updatePassword = async (req, res, next) => {
 // @access  Private
 exports.getMe = async (req, res, next) => {
   try {
-    const user = await User.findById(req.user.id);
+    const user = await User.findById(req.user.id).populate('following', '_id');
     if (!user) {
       return res.status(404).json({ success: false, message: 'User not found' });
     }
@@ -240,7 +240,8 @@ exports.getMe = async (req, res, next) => {
       bio: user.bio,
       profileImage: user.profileImage,
       companyName: user.companyName,
-      website: user.website
+      website: user.website,
+      following: user.following
     };
 
     res.status(200).json({ success: true, user: userResponse });
@@ -317,7 +318,7 @@ exports.uploadPhoto = async (req, res) => {
 
     const user = await User.findByIdAndUpdate(
       req.user.id,
-      { photo: filePath },
+      { profileImage: filePath },
       { new: true }
     );
 
@@ -332,13 +333,12 @@ exports.uploadPhoto = async (req, res) => {
       role: user.role,
       phone: user.phone,
       createdAt: user.createdAt,
-      photo: user.photo || '',
+      profileImage: user.profileImage || '',
       location: user.location,
       age: user.age,
       gender: user.gender,
       experienceLevel: user.experienceLevel,
       bio: user.bio,
-      profileImage: user.profileImage,
       companyName: user.companyName,
       website: user.website
     };

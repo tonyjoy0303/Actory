@@ -147,6 +147,28 @@ router.get('/me', protect, async (req, res) => {
   }
 });
 
+// @route   GET /api/profile/search
+// @desc    Search users by username
+// @access  Public
+router.get('/search', async (req, res) => {
+  try {
+    const { username } = req.query;
+    if (!username) {
+      return res.status(400).json({ message: 'Username query parameter is required' });
+    }
+
+    const users = await User.find({
+      name: { $regex: username, $options: 'i' },
+      role: { $in: ['Actor', 'Producer'] }
+    }).select('_id name role profileImage isVerified');
+
+    res.json({ success: true, data: users });
+  } catch (error) {
+    console.error('Error searching users:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+});
+
 // @route   GET /api/profile/:id
 // @desc    Get public profile by user ID
 // @access  Public
@@ -172,6 +194,7 @@ router.get('/:id', async (req, res) => {
     const stats = {
       videoCount: publicVideos.length,
       totalViews: publicVideos.reduce((sum, video) => sum + (video.views || 0), 0),
+      followerCount: user.followers ? user.followers.length : 0,
       // Add more stats as needed
     };
 
@@ -194,6 +217,10 @@ router.get('/:id', async (req, res) => {
       role: user.role,
       joinedAt: user.createdAt,
       videos: publicVideos,
+      videoCount: stats.videoCount,
+      followerCount: stats.followerCount,
+      viewCount: stats.totalViews,
+      submissionCount: 0, // TODO: implement submissions count
       stats
     };
 
@@ -230,7 +257,7 @@ router.put('/videos/:videoId/view', async (req, res) => {
 router.delete('/videos/:videoId', protect, admin, async (req, res) => {
   try {
     const user = await User.findOne({ 'videos._id': req.params.videoId });
-    
+
     if (!user) {
       return res.status(404).json({ message: 'Video not found' });
     }
@@ -257,6 +284,97 @@ router.delete('/videos/:videoId', protect, admin, async (req, res) => {
     res.json({ success: true, message: 'Video removed successfully' });
   } catch (error) {
     console.error('Error deleting video:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+});
+
+// @route   PUT /api/profile/me
+// @desc    Update current user's profile
+// @access  Private (only owner)
+router.put('/me', protect, async (req, res) => {
+  try {
+    const allowedFields = ['bio', 'location', 'socialLinks', 'skills', 'experienceLevel'];
+
+    const updates = {};
+    allowedFields.forEach(field => {
+      if (req.body[field] !== undefined) {
+        updates[field] = req.body[field];
+      }
+    });
+
+    const user = await User.findByIdAndUpdate(req.user._id, updates, { new: true, runValidators: true })
+      .select('-password -resetPasswordToken -resetPasswordExpire -__v');
+
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    res.json({ success: true, data: user });
+  } catch (error) {
+    console.error('Error updating profile:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+});
+
+// @route   POST /api/profile/:id/follow
+// @desc    Follow a user
+// @access  Private
+router.post('/:id/follow', protect, async (req, res) => {
+  try {
+    const userToFollow = await User.findById(req.params.id);
+
+    if (!userToFollow) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    if (req.user._id.toString() === req.params.id) {
+      return res.status(400).json({ message: 'Cannot follow yourself' });
+    }
+
+    // Check if already following
+    if (userToFollow.followers.includes(req.user._id)) {
+      return res.status(400).json({ message: 'Already following this user' });
+    }
+
+    // Add to followers
+    userToFollow.followers.push(req.user._id);
+    await userToFollow.save();
+
+    // Add to following
+    const currentUser = await User.findById(req.user._id);
+    currentUser.following.push(req.params.id);
+    await currentUser.save();
+
+    res.json({ success: true, message: 'Followed successfully' });
+  } catch (error) {
+    console.error('Error following user:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+});
+
+// @route   DELETE /api/profile/:id/unfollow
+// @desc    Unfollow a user
+// @access  Private
+router.delete('/:id/unfollow', protect, async (req, res) => {
+  try {
+    const userToUnfollow = await User.findById(req.params.id);
+
+    if (!userToUnfollow) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    // Remove from followers
+    userToUnfollow.followers = userToUnfollow.followers.filter(id => id.toString() !== req.user._id.toString());
+    await userToUnfollow.save();
+
+    // Remove from following
+    const currentUser = await User.findById(req.user._id);
+    currentUser.following = currentUser.following.filter(id => id.toString() !== req.params.id);
+    await currentUser.save();
+
+    res.json({ success: true, message: 'Unfollowed successfully' });
+  } catch (error) {
+    console.error('Error unfollowing user:', error);
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 });

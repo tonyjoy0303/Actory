@@ -28,6 +28,7 @@ app.use('/api/v1/videos', require('./routes/videos'));
 app.use('/api/v1/actor', require('./routes/actor'));
 app.use('/api/v1/admin', require('./routes/admin'));
 app.use('/api/v1/profile', require('./routes/profile'));
+app.use('/api/v1/messages', require('./routes/messages'));
 
 app.get('/', (req, res) => {
     res.send('Actory API is running...');

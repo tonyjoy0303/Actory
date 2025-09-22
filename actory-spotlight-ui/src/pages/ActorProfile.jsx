@@ -39,6 +39,15 @@ export default function ActorProfile() {
   const API_ORIGIN = API.defaults.baseURL.replace(/\/api\/v1$/, "");
 
   useEffect(() => {
+    console.log('User state updated:', { 
+      user, 
+      userId: user?.id,  
+      hasUserId: !!user?.id,  
+      loading 
+    });
+  }, [user, loading]);
+
+  useEffect(() => {
     const fetchMe = async () => {
       try {
         setLoading(true);
@@ -63,19 +72,43 @@ export default function ActorProfile() {
 
   useEffect(() => {
     const fetchVideos = async () => {
+      console.log('Fetching profile videos for user:', user?.id);
       try {
-        const { data } = await API.get('/videos/mine');
-        setVideos(data.data || []);
+        const { data } = await API.get('/videos/profile');
+        console.log('Profile videos response:', data);
+        
+        if (data.success && Array.isArray(data.data)) {
+          const transformedVideos = data.data.map(video => ({
+            ...video,
+            // Ensure all required fields have default values
+            thumbnailUrl: video.thumbnailUrl || video.videoUrl?.replace(/\.(mp4|mov|avi|wmv|flv|webm)$/i, '.jpg') || '',
+            views: video.views || 0,
+            duration: video.duration || 0,
+            uploadedAt: video.uploadedAt || video.createdAt || new Date().toISOString(),
+            category: video.category || 'Profile Video'
+          }));
+          
+          console.log('Transformed videos:', transformedVideos);
+          setVideos(transformedVideos);
+        } else {
+          console.error('Unexpected response format:', data);
+          setVideos([]);
+        }
       } catch (error) {
-        console.error('Error fetching videos:', error);
-        toast.error('Failed to load videos');
+        console.error('Error fetching profile videos:', {
+          message: error.message,
+          response: error.response?.data,
+          config: error.config
+        });
+        toast.error('Failed to load profile videos');
+        setVideos([]);
       }
     };
 
-    if (user?._id) {
+    if (user?.id && _optionalChain([user, 'optionalAccess', _ => _.role]) !== 'Producer') {
       fetchVideos();
     }
-  }, [user?._id]); 
+  }, [user?.id]);
 
   const handlePhotoChange = (e) => {
     const file = e.target.files?.[0];
@@ -285,15 +318,17 @@ export default function ActorProfile() {
             )
           )
 
-          , React.createElement(Card, {__self: this, __source: {fileName: _jsxFileName, lineNumber: 95}}
-            , React.createElement(CardHeader, {__self: this, __source: {fileName: _jsxFileName, lineNumber: 96}}
-              , React.createElement(CardTitle, { className: "font-display", __self: this, __source: {fileName: _jsxFileName, lineNumber: 97}}, "Videos")
-            )
-            , React.createElement(CardContent, { className: "grid grid-cols-2 gap-3"  , __self: this, __source: {fileName: _jsxFileName, lineNumber: 99}}
-              , videos.length > 0 ? (
-                React.createElement(VideoList, { videos: videos, isOwner: true, onVideoDeleted: handleVideoDeleted, onVideoPlay: handleVideoPlay, __self: this, __source: {fileName: _jsxFileName, lineNumber: 100}} )
-              ) : (
-                React.createElement('p', { className: "text-sm text-muted-foreground", __self: this, __source: {fileName: _jsxFileName, lineNumber: 102}}, "No videos uploaded yet")
+          , (_optionalChain([user, 'optionalAccess', _ => _.role]) !== 'Producer') && (
+            React.createElement(Card, {__self: this, __source: {fileName: _jsxFileName, lineNumber: 95}}
+              , React.createElement(CardHeader, {__self: this, __source: {fileName: _jsxFileName, lineNumber: 96}}
+                , React.createElement(CardTitle, { className: "font-display", __self: this, __source: {fileName: _jsxFileName, lineNumber: 97}}, "Videos")
+              )
+              , React.createElement(CardContent, { className: "p-6"  , __self: this, __source: {fileName: _jsxFileName, lineNumber: 99}}
+                , videos.length > 0 ? (
+                  React.createElement(VideoList, { videos: videos, user: user, onVideoDeleted: handleVideoDeleted, onVideoPlay: handleVideoPlay, __self: this, __source: {fileName: _jsxFileName, lineNumber: 100}} )
+                ) : (
+                  React.createElement('p', { className: "text-sm text-muted-foreground", __self: this, __source: {fileName: _jsxFileName, lineNumber: 102}}, "No videos uploaded yet")
+                )
               )
             )
           )

@@ -2,6 +2,14 @@ const RoleSwitchRequest = require('../models/RoleSwitchRequest');
 const User = require('../models/User');
 const CastingCall = require('../models/CastingCall');
 const Video = require('../models/Video');
+const cloudinary = require('cloudinary').v2;
+
+// Configure Cloudinary
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET
+});
 
 // @desc    Get all role switch requests
 // @route   GET /api/v1/admin/switch-requests
@@ -127,8 +135,15 @@ exports.deleteUser = async (req, res, next) => {
 exports.getCastingCalls = async (req, res, next) => {
     try {
         const castingCalls = await CastingCall.find().populate('producer', 'name email');
+        console.log('Admin casting calls:', castingCalls.map(c => ({
+            _id: c._id,
+            title: c.roleTitle || c.roleName,
+            producer: c.producer,
+            producerId: c.producer?._id
+        })));
         res.status(200).json({ success: true, count: castingCalls.length, data: castingCalls });
     } catch (err) {
+        console.error('Error fetching casting calls:', err);
         res.status(500).json({ success: false, message: 'Server Error' });
     }
 };
@@ -241,6 +256,11 @@ exports.deleteVideo = async (req, res, next) => {
                 success: false, 
                 message: 'Video not found' 
             });
+        }
+
+        // Delete from cloudinary if exists
+        if (video.cloudinaryId) {
+            await cloudinary.uploader.destroy(video.cloudinaryId, { resource_type: 'video' });
         }
 
         // Use deleteOne() instead of remove() as it's the newer API

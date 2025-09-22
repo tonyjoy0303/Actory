@@ -101,10 +101,15 @@ const UserSchema = new mongoose.Schema({
   bio: { type: String, maxlength: 500 },
   profileImage: { type: String },
   videos: [VideoSchema], // Add videos array to store actor's videos
+  followers: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
+  following: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
 
   // Producer-specific
   companyName: { type: String },
   website: { type: String },
+
+  // Verification status
+  isVerified: { type: Boolean, default: false },
 
   resetPasswordToken: String,
   resetPasswordExpire: Date,

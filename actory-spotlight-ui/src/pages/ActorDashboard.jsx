@@ -441,9 +441,9 @@ export default function ActorDashboard() {
               
               <Card>
                 <CardContent className="pt-6">
-                  <VideoList 
-                    videos={videos} 
-                    isOwner={user?.role === 'actor'} 
+                  <VideoList
+                    videos={videos}
+                    user={user}
                     onVideoPlay={handleVideoPlay}
                     onVideoDeleted={handleVideoDeleted}
                   />
@@ -505,7 +505,7 @@ export default function ActorDashboard() {
                               variant="outline" 
                               size="sm" 
                               className="flex items-center gap-1"
-                              onClick={() => setSelectedVideo(submission.videoUrl)}
+                              onClick={() => handleVideoPlay({ ...submission, title: submission.displayTitle })}
                             >
                               <PlayCircle className="h-4 w-4" />
                               View Video

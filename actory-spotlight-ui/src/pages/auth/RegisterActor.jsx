@@ -154,8 +154,9 @@ export default function RegisterActor() {
         // Notify other components about the auth change
         window.dispatchEvent(new Event('authChange'));
 
-        // Redirect to dashboard
-        navigate("/dashboard");
+        // Redirect to the correct dashboard based on role
+        const userRole = (user.role || 'actor').toLowerCase();
+        navigate(`/dashboard/${userRole}`);
         toast.success("Registration successful! Welcome to Actory.");
       } else {
         throw new Error(response.data?.message || 'Registration failed. Please try again.');

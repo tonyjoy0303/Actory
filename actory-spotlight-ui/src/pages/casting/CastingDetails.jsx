@@ -24,9 +24,14 @@ function CastingDetailsContent() {
         const response = await API.get(`/casting/${id}`);
         
         console.log('API Response:', response);
-        
+
         if (response.data && response.data.success) {
           setCasting(response.data.data);
+          console.log('Casting details received:', {
+            id: response.data.data._id,
+            title: response.data.data.title,
+            producer: response.data.data.producer
+          });
         } else {
           console.error('Invalid response format:', response.data);
           throw new Error(response.data?.message || 'Invalid response format');
@@ -136,6 +141,14 @@ function CastingDetailsContent() {
             <div>
               <CardTitle className="text-2xl font-bold">{casting.title}</CardTitle>
               <p className="text-muted-foreground mt-1">{casting.productionCompany}</p>
+              {/* Producer Information */}
+              {casting.producer && (
+                <div className="mt-3 p-3 bg-primary/5 border border-primary/20 rounded-lg">
+                  <p className="text-sm font-medium text-primary">
+                    Created by: {casting.producer.name || 'Unknown'} ({casting.producer.email || 'N/A'})
+                  </p>
+                </div>
+              )}
             </div>
             <Badge variant={new Date(casting.submissionDeadline || casting.deadline) < new Date() ? 'destructive' : 'default'}>
               {new Date(casting.submissionDeadline || casting.deadline) < new Date() ? 'Closed' : 'Open'}

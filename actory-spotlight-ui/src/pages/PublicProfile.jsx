@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
-import { Facebook, Instagram, Twitter, Youtube, MessageCircle, Mail, Share2 } from 'lucide-react';
+import { Facebook, Instagram, Twitter, Youtube, MessageCircle, Mail, Share2, Edit, Upload, Camera } from 'lucide-react';
 import SEO from "@/components/SEO";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -12,7 +12,12 @@ import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import VideoList from "@/components/profile/VideoList";
+import ContactModal from "@/components/ContactModal";
 import API from "@/lib/api";
 
 const PublicProfile = () => {
@@ -23,6 +28,21 @@ const PublicProfile = () => {
   const [isContactModalOpen, setIsContactModalOpen] = useState(false);
   const [shareUrl, setShareUrl] = useState('');
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
+  const [currentUser, setCurrentUser] = useState(null);
+  const [isOwner, setIsOwner] = useState(false);
+  const [editMode, setEditMode] = useState(false);
+  const [editData, setEditData] = useState({
+    bio: '',
+    location: '',
+    socialLinks: {},
+    skills: [],
+    experienceLevel: ''
+  });
+  const [profileImageFile, setProfileImageFile] = useState(null);
+  const [profileImagePreview, setProfileImagePreview] = useState(null);
+  const [imageKey, setImageKey] = useState(Date.now());
+
+  const queryClient = useQueryClient();
 
   // Fetch actor profile data
   const { data: profile, isLoading, error } = useQuery({
@@ -41,6 +61,56 @@ const PublicProfile = () => {
     }
   }, []);
 
+  // Check if current user is the owner
+  useEffect(() => {
+    const userData = localStorage.getItem("user");
+    if (userData) {
+      const user = JSON.parse(userData);
+      setCurrentUser(user);
+      setIsOwner(user._id === id);
+    }
+  }, [id]);
+
+  // Set isFollowing based on currentUser's following
+  useEffect(() => {
+    if (currentUser && profile) {
+      setIsFollowing(currentUser.following?.some(f => f._id === id) || false);
+    }
+  }, [currentUser, profile, id]);
+
+  // Set edit data when profile loads
+  useEffect(() => {
+    if (profile && isOwner) {
+      setEditData({
+        bio: profile.bio || '',
+        location: profile.location || '',
+        socialLinks: profile.socialLinks || {},
+        skills: profile.skills || [],
+        experienceLevel: profile.experienceLevel || ''
+      });
+    }
+  }, [profile, isOwner]);
+
+  // Update image key when profile changes to force browser cache refresh
+  useEffect(() => {
+    if (profile) {
+      setImageKey(Date.now());
+    }
+  }, [profile]);
+
+  // Handle profile image change
+  const handleProfileImageChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      setProfileImageFile(file);
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        setProfileImagePreview(e.target.result);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
   // Handle follow/unfollow
   const handleFollow = async () => {
     try {
@@ -52,9 +122,75 @@ const PublicProfile = () => {
         toast.success(`Following ${profile?.name}`);
       }
       setIsFollowing(!isFollowing);
+
+      // Update localStorage
+      if (currentUser) {
+        const updatedUser = { ...currentUser };
+        if (!isFollowing) { // after toggle, !isFollowing means we just followed
+          updatedUser.following = [...(updatedUser.following || []), { _id: id }];
+        } else {
+          updatedUser.following = updatedUser.following.filter(f => f._id !== id);
+        }
+        localStorage.setItem('user', JSON.stringify(updatedUser));
+        setCurrentUser(updatedUser);
+      }
+
+      // Invalidate profile query to refresh follower count
+      queryClient.invalidateQueries({ queryKey: ['publicProfile', id] });
     } catch (error) {
       console.error('Error updating follow status:', error);
       toast.error('Failed to update follow status');
+    }
+  };
+
+  // Handle save edit
+  const handleSaveEdit = async () => {
+    try {
+      // Upload profile image if selected
+      if (profileImageFile) {
+        const imageFormData = new FormData();
+        imageFormData.append('photo', profileImageFile);
+
+        const imageResponse = await API.put('/auth/me/photo', imageFormData, {
+          headers: {
+            'Content-Type': 'multipart/form-data',
+          },
+        });
+
+        if (!imageResponse.data.success) {
+          throw new Error('Failed to upload profile image');
+        }
+      }
+
+      // Update text fields
+      const textFormData = new FormData();
+      Object.keys(editData).forEach(key => {
+        if (editData[key] !== null && editData[key] !== undefined) {
+          if (typeof editData[key] === 'object') {
+            textFormData.append(key, JSON.stringify(editData[key]));
+          } else {
+            textFormData.append(key, editData[key]);
+          }
+        }
+      });
+
+      const { data } = await API.put('/profile/me', textFormData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+
+      if (data.success) {
+        toast.success('Profile updated successfully!');
+        setEditMode(false);
+        setProfileImageFile(null);
+        setProfileImagePreview(null);
+        // Refetch profile
+        queryClient.invalidateQueries(['publicProfile', id]);
+      }
+    } catch (error) {
+      console.error('Error updating profile:', error);
+      toast.error('Failed to update profile');
     }
   };
 
@@ -158,7 +294,7 @@ const PublicProfile = () => {
           <div className="flex flex-col md:flex-row items-center justify-between gap-8">
             <div className="flex items-center space-x-6">
               <Avatar className="h-32 w-32 border-4 border-background">
-                <AvatarImage src={profile?.profileImage} alt={profile?.name} />
+                <AvatarImage src={profileImagePreview || (profile?.profileImage ? `${profile?.profileImage}?t=${imageKey}` : undefined)} alt={profile?.name} />
                 <AvatarFallback className="text-4xl">
                   {profile?.name?.charAt(0) || 'A'}
                 </AvatarFallback>
@@ -202,17 +338,26 @@ const PublicProfile = () => {
               </div>
             </div>
             <div className="flex space-x-3">
-              <Button variant="outline" onClick={handleShare}>
-                <Share2 className="h-4 w-4 mr-2" />
-                Share
-              </Button>
-              <Button onClick={() => setIsContactModalOpen(true)}>
-                <MessageCircle className="h-4 w-4 mr-2" />
-                Contact
-              </Button>
-              <Button variant="secondary" onClick={handleFollow}>
-                {isFollowing ? 'Following' : 'Follow'}
-              </Button>
+              {isOwner ? (
+                <Button onClick={() => setEditMode(!editMode)}>
+                  <Edit className="h-4 w-4 mr-2" />
+                  {editMode ? 'Cancel Edit' : 'Edit Profile'}
+                </Button>
+              ) : (
+                <>
+                  <Button variant="outline" onClick={handleShare}>
+                    <Share2 className="h-4 w-4 mr-2" />
+                    Share
+                  </Button>
+                  <Button onClick={() => setIsContactModalOpen(true)}>
+                    <MessageCircle className="h-4 w-4 mr-2" />
+                    Contact
+                  </Button>
+                  <Button variant="secondary" onClick={handleFollow}>
+                    {isFollowing ? 'Following' : 'Follow'}
+                  </Button>
+                </>
+              )}
             </div>
           </div>
         </div>
@@ -228,64 +373,145 @@ const PublicProfile = () => {
                 <CardTitle>About</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                {profile?.bio ? (
-                  <p className="text-sm text-muted-foreground whitespace-pre-line">
-                    {profile.bio}
-                  </p>
+                {editMode ? (
+                  <div className="space-y-4">
+                    <div>
+                      <Label htmlFor="profileImage">Profile Photo</Label>
+                      <div className="mt-2">
+                        <div className="flex items-center gap-4">
+                          <Avatar className="h-20 w-20 border-2 border-dashed border-muted-foreground/25">
+                            <AvatarImage src={profileImagePreview || (profile?.profileImage ? `${profile?.profileImage}?t=${imageKey}` : undefined)} alt="Profile preview" />
+                            <AvatarFallback>
+                              <Camera className="h-6 w-6 text-muted-foreground" />
+                            </AvatarFallback>
+                          </Avatar>
+                          <div className="flex-1">
+                            <Input
+                              id="profileImage"
+                              type="file"
+                              accept="image/*"
+                              onChange={handleProfileImageChange}
+                              className="hidden"
+                            />
+                            <Label htmlFor="profileImage" className="cursor-pointer">
+                              <Button variant="outline" size="sm" asChild>
+                                <span>
+                                  <Upload className="h-4 w-4 mr-2" />
+                                  Choose Photo
+                                </span>
+                              </Button>
+                            </Label>
+                            <p className="text-xs text-muted-foreground mt-1">
+                              JPG, PNG or GIF. Max size 5MB.
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                    <div>
+                      <Label htmlFor="bio">Bio</Label>
+                      <Textarea
+                        id="bio"
+                        value={editData.bio}
+                        onChange={(e) => setEditData({ ...editData, bio: e.target.value })}
+                        placeholder="Tell us about yourself..."
+                        className="min-h-[100px]"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="location">Location</Label>
+                      <Input
+                        id="location"
+                        value={editData.location}
+                        onChange={(e) => setEditData({ ...editData, location: e.target.value })}
+                        placeholder="Your location"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="experienceLevel">Experience Level</Label>
+                      <Input
+                        id="experienceLevel"
+                        value={editData.experienceLevel}
+                        onChange={(e) => setEditData({ ...editData, experienceLevel: e.target.value })}
+                        placeholder="e.g. Beginner, Intermediate, Professional"
+                      />
+                    </div>
+                    <div className="flex gap-2">
+                      <Button onClick={handleSaveEdit}>Save Changes</Button>
+                      <Button
+                        variant="outline"
+                        onClick={() => {
+                          setEditMode(false);
+                          setProfileImageFile(null);
+                          setProfileImagePreview(null);
+                        }}
+                      >
+                        Cancel
+                      </Button>
+                    </div>
+                  </div>
                 ) : (
-                  <p className="text-sm text-muted-foreground italic">
-                    No bio available
-                  </p>
+                  <>
+                    {profile?.bio ? (
+                      <p className="text-sm text-muted-foreground whitespace-pre-line">
+                        {profile.bio}
+                      </p>
+                    ) : (
+                      <p className="text-sm text-muted-foreground italic">
+                        No bio available
+                      </p>
+                    )}
+
+                    <Separator className="my-2" />
+
+                    <div className="space-y-2">
+                      {profile?.gender && (
+                        <div className="flex justify-between">
+                          <span className="text-sm font-medium">Gender:</span>
+                          <span className="text-sm text-muted-foreground capitalize">
+                            {profile.gender}
+                          </span>
+                        </div>
+                      )}
+
+                      {profile?.age && (
+                        <div className="flex justify-between">
+                          <span className="text-sm font-medium">Age:</span>
+                          <span className="text-sm text-muted-foreground">
+                            {profile.age} years
+                          </span>
+                        </div>
+                      )}
+
+                      {profile?.location && (
+                        <div className="flex justify-between">
+                          <span className="text-sm font-medium">Location:</span>
+                          <span className="text-sm text-muted-foreground">
+                            {profile.location}
+                          </span>
+                        </div>
+                      )}
+
+                      {profile?.experienceLevel && (
+                        <div className="flex justify-between">
+                          <span className="text-sm font-medium">Experience:</span>
+                          <span className="text-sm text-muted-foreground capitalize">
+                            {profile.experienceLevel}
+                          </span>
+                        </div>
+                      )}
+
+                      {profile?.joinedAt && (
+                        <div className="flex justify-between">
+                          <span className="text-sm font-medium">Member since:</span>
+                          <span className="text-sm text-muted-foreground">
+                            {format(new Date(profile.joinedAt), 'MMM yyyy')}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  </>
                 )}
-                
-                <Separator className="my-2" />
-                
-                <div className="space-y-2">
-                  {profile?.gender && (
-                    <div className="flex justify-between">
-                      <span className="text-sm font-medium">Gender:</span>
-                      <span className="text-sm text-muted-foreground capitalize">
-                        {profile.gender}
-                      </span>
-                    </div>
-                  )}
-                  
-                  {profile?.age && (
-                    <div className="flex justify-between">
-                      <span className="text-sm font-medium">Age:</span>
-                      <span className="text-sm text-muted-foreground">
-                        {profile.age} years
-                      </span>
-                    </div>
-                  )}
-                  
-                  {profile?.location && (
-                    <div className="flex justify-between">
-                      <span className="text-sm font-medium">Location:</span>
-                      <span className="text-sm text-muted-foreground">
-                        {profile.location}
-                      </span>
-                    </div>
-                  )}
-                  
-                  {profile?.experienceLevel && (
-                    <div className="flex justify-between">
-                      <span className="text-sm font-medium">Experience:</span>
-                      <span className="text-sm text-muted-foreground capitalize">
-                        {profile.experienceLevel}
-                      </span>
-                    </div>
-                  )}
-                  
-                  {profile?.joinedAt && (
-                    <div className="flex justify-between">
-                      <span className="text-sm font-medium">Member since:</span>
-                      <span className="text-sm text-muted-foreground">
-                        {format(new Date(profile.joinedAt), 'MMM yyyy')}
-                      </span>
-                    </div>
-                  )}
-                </div>
               </CardContent>
             </Card>
             
@@ -347,9 +573,9 @@ const PublicProfile = () => {
               </TabsList>
               
               <TabsContent value="videos" className="space-y-6">
-                <VideoList 
-                  videos={profile?.videos || []} 
-                  isOwner={false}
+                <VideoList
+                  videos={profile?.videos || []}
+                  user={currentUser}
                 />
               </TabsContent>
               
@@ -412,32 +638,11 @@ const PublicProfile = () => {
 
       {/* Contact Modal */}
       <Dialog open={isContactModalOpen} onOpenChange={setIsContactModalOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Contact {profile?.name}</DialogTitle>
-            <DialogDescription>
-              Send a message to {profile?.name} through Actory's messaging system.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div className="grid gap-2">
-              <label htmlFor="message" className="text-sm font-medium">
-                Your Message
-              </label>
-              <textarea
-                id="message"
-                className="flex min-h-[100px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                placeholder="Write your message here..."
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsContactModalOpen(false)}>
-              Cancel
-            </Button>
-            <Button>Send Message</Button>
-          </DialogFooter>
-        </DialogContent>
+        <ContactModal
+          recipientId={id}
+          recipientName={profile?.name}
+          onClose={() => setIsContactModalOpen(false)}
+        />
       </Dialog>
 
       {/* Share Modal */}

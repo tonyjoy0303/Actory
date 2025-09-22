@@ -54,33 +54,32 @@ const VideoUploadForm = ({ onUploadSuccess, onCancel }) => {
 
     const formDataToSend = new FormData();
     formDataToSend.append('video', formData.video);
-    formDataToSend.append('title', formData.title);
-    formDataToSend.append('description', formData.description);
-    formDataToSend.append('category', formData.category);
+    formDataToSend.append('title', formData.title || 'Untitled Video');
+    formDataToSend.append('description', formData.description || '');
+    formDataToSend.append('category', formData.category || 'Other');
+    // Explicitly set the type to 'profile' for profile videos
+    formDataToSend.append('type', 'profile');
 
+    setUploading(true);
+    
     try {
-      setUploading(true);
       const { data } = await API.post('/profile/videos', formDataToSend, {
         headers: {
-          'Content-Type': 'multipart/form-data'
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+
+      if (data.success) {
+        toast.success('Video uploaded successfully!');
+        if (onUploadSuccess) {
+          onUploadSuccess(data.data);
         }
-      });
-      
-      toast.success('Video uploaded successfully!');
-      setFormData({
-        title: '',
-        description: '',
-        category: 'Other',
-        video: null
-      });
-      setPreview(null);
-      
-      if (onUploadSuccess) {
-        onUploadSuccess(data);
+      } else {
+        throw new Error(data.message || 'Failed to upload video');
       }
     } catch (error) {
       console.error('Error uploading video:', error);
-      toast.error(error.response?.data?.message || 'Failed to upload video');
+      toast.error(error.response?.data?.message || 'Failed to upload video. Please try again.');
     } finally {
       setUploading(false);
     }
