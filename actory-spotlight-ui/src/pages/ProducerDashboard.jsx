@@ -30,20 +30,14 @@ export default function ProducerDashboard() {
 
   const fetchCastingCalls = async () => {
     try {
-      const { data } = await API.get('/casting');
-      // Get current user ID safely
-      const storedUser = JSON.parse(localStorage.getItem('user') || '{}');
+      // Use the dedicated producer endpoint that includes authentication
+      const { data } = await API.get('/casting/producer');
       
-      // Filter calls by the logged-in producer
-      // Check both direct _id and populated producer object
-      setCastingCalls(data.data.filter((call) => {
-        // If producer is populated as an object
-        if (call.producer && typeof call.producer === 'object') {
-          return call.producer._id === storedUser.id;
-        }
-        // If producer is just an ID
-        return call.producer === storedUser.id;
-      }));
+      // Set the casting calls directly from the response
+      setCastingCalls(data.data);
+      
+      // Log success for debugging
+      console.log(`Successfully fetched ${data.count} casting calls for producer`);
       
     } catch (error) {
       console.error('Error fetching casting calls:', error);
@@ -223,12 +217,15 @@ export default function ProducerDashboard() {
         <div className="space-y-6">
           {/* Messaging Card */}
           <Card>
-            <CardHeader>
+            <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle className="font-display">Messaging</CardTitle>
+              <Button variant="outline" size="sm" onClick={() => navigate('/messages')}>
+                Open Messages
+              </Button>
             </CardHeader>
             <CardContent>
-              <p className="text-sm text-muted-foreground text-center">
-                Messaging feature coming soon.
+              <p className="text-sm text-muted-foreground">
+                Chat with actors and other producers. Connect and communicate directly.
               </p>
             </CardContent>
           </Card>

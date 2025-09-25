@@ -275,4 +275,32 @@ router.get('/unread-count', protect, async (req, res) => {
   }
 });
 
+// @route   DELETE /api/messages/:messageId
+// @desc    Delete a message (unsend for both users)
+// @access  Private
+router.delete('/:messageId', protect, async (req, res) => {
+  try {
+    const message = await Message.findById(req.params.messageId);
+
+    if (!message) {
+      return res.status(404).json({ success: false, message: 'Message not found' });
+    }
+
+    // Only sender can delete their message
+    if (message.sender.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ success: false, message: 'You can only delete your own messages' });
+    }
+
+    await Message.findByIdAndDelete(req.params.messageId);
+
+    res.json({
+      success: true,
+      message: 'Message deleted successfully'
+    });
+  } catch (error) {
+    console.error('Error deleting message:', error);
+    res.status(500).json({ success: false, message: 'Server error', error: error.message });
+  }
+});
+
 module.exports = router;

@@ -11,6 +11,10 @@ const { protect, authorize } = require('../middleware/auth');
 
 router.use('/:castingCallId/videos', videoRouter);
 
+// Get all producer casting calls (including past ones)
+router.route('/producer')
+  .get(protect, authorize('Producer'), castingController.getProducerCastingCalls);
+
 router
   .route('/')
   .get(castingController.getCastingCalls)

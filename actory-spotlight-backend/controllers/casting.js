@@ -14,6 +14,11 @@ exports.getCastingCalls = async (req, res, next) => {
       ]
     };
     
+    // Filter by producer if provided (for producer dashboard)
+    if (req.query.producer) {
+      query.producer = req.query.producer;
+    }
+    
     // Filter by experience level if provided
     if (req.query.experienceLevel) {
       query.experienceLevel = req.query.experienceLevel;
@@ -36,6 +41,29 @@ exports.getCastingCalls = async (req, res, next) => {
     res.status(200).json({ success: true, count: castingCalls.length, data: castingCalls });
   } catch (err) {
     res.status(400).json({ success: false, message: err.message });
+  }
+};
+
+// @desc    Get all producer casting calls (including past ones)
+// @route   GET /api/v1/casting/producer
+// @access  Private (Producer only)
+exports.getProducerCastingCalls = async (req, res, next) => {
+  try {
+    // Find all casting calls for the logged-in producer
+    const castingCalls = await CastingCall.find({ producer: req.user.id })
+      .populate('producer', 'name email')
+      .sort({ createdAt: -1 }); // Sort by creation date, newest first
+      
+    res.status(200).json({ 
+      success: true, 
+      count: castingCalls.length, 
+      data: castingCalls 
+    });
+  } catch (err) {
+    res.status(500).json({ 
+      success: false, 
+      message: 'Server error: ' + err.message 
+    });
   }
 };
 
@@ -246,7 +274,7 @@ exports.deleteCastingCall = async (req, res, next) => {
       });
     }
 
-    await castingCall.remove();
+    await CastingCall.findByIdAndDelete(req.params.id);
     res.status(200).json({ success: true, data: {} });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });

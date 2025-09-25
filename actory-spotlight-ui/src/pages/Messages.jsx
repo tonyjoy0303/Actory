@@ -10,6 +10,8 @@ import { format } from 'date-fns';
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { MoreVertical, Trash2 } from "lucide-react";
 
 
 
@@ -74,6 +76,23 @@ export default function Messages() {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       send();
+    }
+  };
+
+  const deleteMessage = async (messageId) => {
+    try {
+      const { data } = await API.delete(`/messages/${messageId}`);
+      if (data.success) {
+        toast.success('Message deleted successfully');
+        // Refetch messages and conversations
+        refetchMessages();
+        refetchConversations();
+        // Update unread count in header
+        window.dispatchEvent(new Event('updateUnreadCount'));
+      }
+    } catch (error) {
+      console.error('Error deleting message:', error);
+      toast.error('Failed to delete message');
     }
   };
 
@@ -161,11 +180,32 @@ export default function Messages() {
                     const isFromMe = message.sender._id === JSON.parse(localStorage.getItem('user') || '{}')._id;
                     return React.createElement('div', {
                       key: message._id,
-                      className: `max-w-[75%] p-3 rounded-lg ${isFromMe ? 'ml-auto bg-primary text-primary-foreground' : 'bg-muted'}`,
+                      className: `max-w-[75%] p-3 rounded-lg relative group ${isFromMe ? 'ml-auto bg-primary text-primary-foreground' : 'bg-muted'}`,
                       __self: this,
                       __source: {fileName: _jsxFileName, lineNumber: 95}}
                       , React.createElement('p', { className: "text-sm" , __self: this, __source: {fileName: _jsxFileName, lineNumber: 96}}, message.content)
-                      , React.createElement('p', { className: "text-xs mt-1 opacity-70" , __self: this, __source: {fileName: _jsxFileName, lineNumber: 97}}, format(new Date(message.createdAt), 'MMM d, h:mm a'))
+                      , React.createElement('div', { className: "flex items-center justify-between mt-1" , __self: this, __source: {fileName: _jsxFileName, lineNumber: 97}}
+                        , React.createElement('p', { className: "text-xs opacity-70" , __self: this, __source: {fileName: _jsxFileName, lineNumber: 98}}, format(new Date(message.createdAt), 'MMM d, h:mm a'))
+                        , isFromMe && (
+                          React.createElement(DropdownMenu, { __self: this, __source: {fileName: _jsxFileName, lineNumber: 100}}
+                            , React.createElement(DropdownMenuTrigger, { asChild: true, __self: this, __source: {fileName: _jsxFileName, lineNumber: 101}}
+                              , React.createElement('button', { className: "opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-black/10 rounded" , __self: this, __source: {fileName: _jsxFileName, lineNumber: 102}}
+                                , React.createElement(MoreVertical, { className: "h-3 w-3" , __self: this, __source: {fileName: _jsxFileName, lineNumber: 103}} )
+                              )
+                            )
+                            , React.createElement(DropdownMenuContent, { align: "end", __self: this, __source: {fileName: _jsxFileName, lineNumber: 105}}
+                              , React.createElement(DropdownMenuItem, {
+                                onClick: () => deleteMessage(message._id),
+                                className: "text-destructive focus:text-destructive",
+                                __self: this,
+                                __source: {fileName: _jsxFileName, lineNumber: 106}}
+                                , React.createElement(Trash2, { className: "h-4 w-4 mr-2" , __self: this, __source: {fileName: _jsxFileName, lineNumber: 110}} )
+                                , "Delete message"
+                              )
+                            )
+                          )
+                        )
+                      )
                     );
                   })
                 ) : (

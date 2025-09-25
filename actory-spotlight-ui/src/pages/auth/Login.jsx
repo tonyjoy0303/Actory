@@ -8,6 +8,9 @@ import SEO from "@/components/SEO";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import GoogleSignIn from "@/components/GoogleSignIn";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
+import actorImg from "@/assets/actor.jpg";
+import recruiterImg from "@/assets/recruiter.jpg";
 
 export default function Login() {
   const navigate = useNavigate();
@@ -15,6 +18,7 @@ export default function Login() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [registerOpen, setRegisterOpen] = useState(false);
 
   // Ensure fields are cleared on page load and discourage autofill persistence
   useEffect(() => {
@@ -117,7 +121,33 @@ export default function Login() {
           )
           , React.createElement(GoogleSignIn, { text: "signin_with", __self: this, __source: {fileName: _jsxFileName, lineNumber: 95}} )
           , React.createElement('p', { className: "mt-4 text-center text-sm text-muted-foreground"   , __self: this, __source: {fileName: _jsxFileName, lineNumber: 96}}, "No account? "
-              , React.createElement('a', { href: "/auth/register", className: "story-link", __self: this, __source: {fileName: _jsxFileName, lineNumber: 97}}, "Create one" )
+              , React.createElement('button', { onClick: () => setRegisterOpen(true), className: "story-link", __self: this, __source: {fileName: _jsxFileName, lineNumber: 97}}, "Create one" )
+          )
+        )
+      )
+      , React.createElement(Dialog, { open: registerOpen, onOpenChange: setRegisterOpen, __self: this, __source: {fileName: _jsxFileName, lineNumber: 99}}
+        , React.createElement(DialogContent, { className: "max-w-5xl p-0 overflow-hidden", __self: this, __source: {fileName: _jsxFileName, lineNumber: 100}}
+          , React.createElement('div', { className: "relative grid grid-cols-1 md:grid-cols-2", __self: this, __source: {fileName: _jsxFileName, lineNumber: 101}}
+            , React.createElement('div', { className: "p-10 flex flex-col items-center text-center gap-5", __self: this, __source: {fileName: _jsxFileName, lineNumber: 102}}
+              , React.createElement('div', { className: "h-56 w-80 flex items-center justify-center", __self: this, __source: {fileName: _jsxFileName, lineNumber: 103}}
+                , React.createElement('img', { src: actorImg, alt: "Artist", className: "max-h-full max-w-full object-contain", __self: this, __source: {fileName: _jsxFileName, lineNumber: 104}} )
+              )
+              , React.createElement('p', { className: "text-sm text-slate-300 max-w-xs", __self: this, __source: {fileName: _jsxFileName, lineNumber: 106}}, "Apply for unlimited jobs/auditions posted by top industry recruiters." )
+              , React.createElement('button', { className: "text-xs font-semibold text-[#FFD700]", onClick: () => navigate('/casting'), __self: this, __source: {fileName: _jsxFileName, lineNumber: 107}}, "KNOW MORE" )
+              , React.createElement(Button, { onClick: () => navigate('/auth/register/actor'), variant: "brand-outline", className: "rounded-full px-8 py-3 font-semibold border-[#FFD700]/70 text-[#FFD700] hover:bg-[#151a22] hover:border-[#FFD700] hover:text-[#FFE066] transition-colors", __self: this, __source: {fileName: _jsxFileName, lineNumber: 108}}
+                , "Join as Actor"
+              )
+            )
+            , React.createElement('div', { className: "p-10 flex flex-col items-center text-center gap-5 bg-[#0f1115]", __self: this, __source: {fileName: _jsxFileName, lineNumber: 113}}
+              , React.createElement('div', { className: "h-56 w-80 flex items-center justify-center", __self: this, __source: {fileName: _jsxFileName, lineNumber: 114}}
+                , React.createElement('img', { src: recruiterImg, alt: "Recruiter", className: "max-h-full max-w-full object-contain", __self: this, __source: {fileName: _jsxFileName, lineNumber: 115}} )
+              )
+              , React.createElement('p', { className: "text-sm text-slate-300 max-w-xs", __self: this, __source: {fileName: _jsxFileName, lineNumber: 117}}, "Post casting calls and discover talented actors for your projects." )
+              , React.createElement('button', { className: "text-xs font-semibold text-[#FFD700]", onClick: () => navigate('/casting'), __self: this, __source: {fileName: _jsxFileName, lineNumber: 118}}, "KNOW MORE" )
+              , React.createElement(Button, { onClick: () => navigate('/auth/register/producer'), variant: "brand-outline", className: "rounded-full px-8 py-3 font-semibold border-[#FFD700]/70 text-[#FFD700] hover:bg-[#151a22] hover:border-[#FFD700] hover:text-[#FFE066] transition-colors", __self: this, __source: {fileName: _jsxFileName, lineNumber: 121}}
+                , "Join as Producer"
+              )
+            )
           )
         )
       )

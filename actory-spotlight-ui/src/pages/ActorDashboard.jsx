@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { Bell, Video, Upload as UploadIcon, PlayCircle } from "lucide-react";
+import { Bell, Video, Upload as UploadIcon, PlayCircle, MessageCircle } from "lucide-react";
 import VideoUploadForm from "@/components/profile/VideoUploadForm";
 import VideoList from "@/components/profile/VideoList";
 
@@ -417,6 +417,10 @@ export default function ActorDashboard() {
               </span>
             )}
           </TabsTrigger>
+          <TabsTrigger value="messages">
+            <MessageCircle className="h-4 w-4 mr-2" />
+            Messages
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="videos" className="space-y-6">
@@ -522,6 +526,31 @@ export default function ActorDashboard() {
                   ))}
                 </div>
               )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="messages">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <MessageCircle className="h-5 w-5" />
+                Messages
+              </CardTitle>
+              <CardDescription>
+                Chat with producers and other actors. Connect and communicate directly.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="text-center py-12">
+                <MessageCircle className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                <p className="text-muted-foreground mb-4">
+                  Access your messages to connect with producers and other actors.
+                </p>
+                <Button onClick={() => navigate('/messages')}>
+                  Open Messages
+                </Button>
+              </div>
             </CardContent>
           </Card>
         </TabsContent>

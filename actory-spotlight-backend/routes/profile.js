@@ -108,6 +108,13 @@ router.get('/me', protect, async (req, res) => {
       return res.status(404).json({ message: 'User not found' });
     }
 
+    // Get submission count from Video model
+    const Video = require('../models/Video');
+    const submissionCount = await Video.countDocuments({
+      actor: req.user._id,
+      type: 'audition'
+    });
+
     // Calculate stats
     const publicVideos = user.videos.filter(video => video.isActive);
     const stats = {
@@ -115,7 +122,7 @@ router.get('/me', protect, async (req, res) => {
       totalViews: publicVideos.reduce((sum, video) => sum + (video.views || 0), 0),
       followerCount: user.followers?.length || 0,
       followingCount: user.following?.length || 0,
-      submissionCount: user.submissions?.length || 0
+      submissionCount
     };
 
     // Create profile response object
@@ -187,15 +194,22 @@ router.get('/:id', async (req, res) => {
       return res.status(404).json({ message: 'User not found' });
     }
 
+    // Get submission count from Video model
+    const Video = require('../models/Video');
+    const submissionCount = await Video.countDocuments({
+      actor: req.params.id,
+      type: 'audition'
+    });
+
     // Only show active videos for public profiles
     const publicVideos = user.videos.filter(video => video.isActive);
-    
+
     // Calculate stats
     const stats = {
       videoCount: publicVideos.length,
       totalViews: publicVideos.reduce((sum, video) => sum + (video.views || 0), 0),
       followerCount: user.followers ? user.followers.length : 0,
-      // Add more stats as needed
+      submissionCount
     };
 
     // Create public profile object
@@ -208,7 +222,7 @@ router.get('/:id', async (req, res) => {
       location: user.location,
       gender: user.gender,
       dateOfBirth: user.dateOfBirth,
-      age: user.dateOfBirth ? 
+      age: user.dateOfBirth ?
         new Date().getFullYear() - new Date(user.dateOfBirth).getFullYear() : null,
       experienceLevel: user.experienceLevel,
       skills: user.skills || [],
@@ -220,7 +234,7 @@ router.get('/:id', async (req, res) => {
       videoCount: stats.videoCount,
       followerCount: stats.followerCount,
       viewCount: stats.totalViews,
-      submissionCount: 0, // TODO: implement submissions count
+      submissionCount,
       stats
     };
 
