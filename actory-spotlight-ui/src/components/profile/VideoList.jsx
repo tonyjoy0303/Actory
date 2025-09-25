@@ -1,12 +1,12 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Trash2, Eye } from 'lucide-react';
+import { Trash2, Eye, Heart, MessageCircle, Share2 } from 'lucide-react';
 import API from '@/lib/api';
 import { toast } from 'sonner';
 
 // Inline autoplay previews + full-size modal on click
-const VideoList = ({ videos = [], user, onVideoDeleted }) => {
+const VideoList = ({ videos = [], user, onVideoDeleted, ownerName, ownerAvatar }) => {
   const [open, setOpen] = useState(false);
   const [activeSrc, setActiveSrc] = useState('');
   const [deletingVideoId, setDeletingVideoId] = useState(null);
@@ -50,6 +50,16 @@ const VideoList = ({ videos = [], user, onVideoDeleted }) => {
     if (!src) return;
     setActiveSrc(src);
     setOpen(true);
+  };
+
+  const handleShare = (src) => {
+    if (!src) return;
+    if (navigator.share) {
+      navigator.share({ title: 'Actory Video', url: src }).catch(() => {});
+    } else {
+      navigator.clipboard.writeText(src);
+      toast.success('Video link copied');
+    }
   };
 
   const handleDeleteVideo = async (videoId) => {
@@ -104,8 +114,17 @@ const VideoList = ({ videos = [], user, onVideoDeleted }) => {
           return (
             <div
               key={video._id || src}
-              className="group relative w-full cursor-pointer rounded-md overflow-hidden focus:outline-none"
+              className="group relative w-full rounded-md overflow-hidden focus:outline-none border bg-background"
             >
+              {/* Header with owner */}
+              <div className="flex items-center gap-3 px-3 py-2">
+                {ownerAvatar ? (
+                  <img src={ownerAvatar} alt={ownerName || 'Owner'} className="h-8 w-8 rounded-full object-cover" />
+                ) : (
+                  <div className="h-8 w-8 rounded-full bg-muted" />
+                )}
+                <div className="text-sm font-medium">{ownerName || 'Creator'}</div>
+              </div>
               <button
                 type="button"
                 onClick={() => openModal(src)}
@@ -129,37 +148,37 @@ const VideoList = ({ videos = [], user, onVideoDeleted }) => {
                 />
               </button>
 
-              {/* Overlay with controls */}
-              <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-50 transition-all duration-200 rounded-md flex items-center justify-center">
-                <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      openModal(src);
-                    }}
-                    className="bg-white/20 hover:bg-white/30 text-white border-white/30"
-                  >
-                    <Eye className="w-4 h-4 mr-1" />
-                    View
+              {/* Actions */}
+              <div className="px-3 pt-2 pb-3">
+                <div className="flex items-center gap-3 mb-1">
+                  <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => toast.success('Liked')}>
+                    <Heart className="h-5 w-5" />
                   </Button>
-
-                  {showDeleteButton && (
-                    <Button
-                      size="sm"
-                      variant="destructive"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleDeleteVideo(video._id);
-                      }}
-                      disabled={isDeleting}
-                      className="bg-red-600/80 hover:bg-red-600 text-white"
-                    >
-                      <Trash2 className="w-4 h-4 mr-1" />
-                      {isDeleting ? 'Deleting...' : 'Delete'}
-                    </Button>
-                  )}
+                  <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => openModal(src)}>
+                    <MessageCircle className="h-5 w-5" />
+                  </Button>
+                  <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => handleShare(src)}>
+                    <Share2 className="h-5 w-5" />
+                  </Button>
+                  <div className="ml-auto">
+                    {showDeleteButton && (
+                      <Button
+                        size="sm"
+                        variant="destructive"
+                        onClick={() => handleDeleteVideo(video._id)}
+                        disabled={isDeleting}
+                        className="h-8"
+                      >
+                        <Trash2 className="w-4 h-4 mr-1" />
+                        {isDeleting ? 'Deleting...' : 'Delete'}
+                      </Button>
+                    )}
+                  </div>
+                </div>
+                {/* Caption */}
+                <div className="text-sm">
+                  <span className="font-semibold mr-1">{ownerName || 'Creator'}</span>
+                  <span className="text-muted-foreground">{video.description || video.title}</span>
                 </div>
               </div>
             </div>

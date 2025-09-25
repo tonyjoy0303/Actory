@@ -43,6 +43,7 @@ router.post('/videos', protect, upload.single('video'), async (req, res) => {
     }
 
     const { title, description, category } = req.body;
+    const safeTitle = (title && title.trim()) ? title.trim() : (description ? String(description).slice(0, 80) : 'Profile Video');
 
     // Upload video to Cloudinary
     const videoResult = await new Promise((resolve) => {
@@ -69,7 +70,7 @@ router.post('/videos', protect, upload.single('video'), async (req, res) => {
 
     // Create video data object
     const videoData = {
-      title,
+      title: safeTitle,
       description,
       category: category || 'Other',
       url: videoResult.secure_url,
@@ -305,16 +306,35 @@ router.delete('/videos/:videoId', protect, admin, async (req, res) => {
 // @route   PUT /api/profile/me
 // @desc    Update current user's profile
 // @access  Private (only owner)
-router.put('/me', protect, async (req, res) => {
+router.put('/me', protect, upload.none(), async (req, res) => {
   try {
     const allowedFields = ['bio', 'location', 'socialLinks', 'skills', 'experienceLevel'];
 
     const updates = {};
     allowedFields.forEach(field => {
       if (req.body[field] !== undefined) {
+        // Parse JSON strings for structured fields if needed
+        if ((field === 'socialLinks' || field === 'skills') && typeof req.body[field] === 'string') {
+          try {
+            updates[field] = JSON.parse(req.body[field]);
+          } catch (_) {
+            updates[field] = req.body[field];
+          }
+        } else {
         updates[field] = req.body[field];
+        }
       }
     });
+
+  // Remove empty strings and empty objects/arrays from updates to avoid validation errors
+  Object.keys(updates).forEach((key) => {
+    const value = updates[key];
+    const isEmptyObject = typeof value === 'object' && value != null && Object.keys(value).length === 0;
+    const isEmptyArray = Array.isArray(value) && value.length === 0;
+    if (value === '' || isEmptyObject || isEmptyArray) {
+      delete updates[key];
+    }
+  });
 
     const user = await User.findByIdAndUpdate(req.user._id, updates, { new: true, runValidators: true })
       .select('-password -resetPasswordToken -resetPasswordExpire -__v');
@@ -331,65 +351,64 @@ router.put('/me', protect, async (req, res) => {
 });
 
 // @route   POST /api/profile/:id/follow
-// @desc    Follow a user
+// @desc    Follow a user (idempotent)
 // @access  Private
 router.post('/:id/follow', protect, async (req, res) => {
   try {
-    const userToFollow = await User.findById(req.params.id);
+    const targetId = req.params.id;
+    const currentUserId = req.user._id.toString();
 
+    if (currentUserId === targetId) {
+      return res.status(400).json({ message: 'Cannot follow yourself' });
+    }
+
+    const userToFollow = await User.findById(targetId);
     if (!userToFollow) {
       return res.status(404).json({ message: 'User not found' });
     }
 
-    if (req.user._id.toString() === req.params.id) {
-      return res.status(400).json({ message: 'Cannot follow yourself' });
-    }
+    // Use $addToSet for idempotent add and avoid duplicates
+    await User.findByIdAndUpdate(targetId, {
+      $addToSet: { followers: req.user._id }
+    });
 
-    // Check if already following
-    if (userToFollow.followers.includes(req.user._id)) {
-      return res.status(400).json({ message: 'Already following this user' });
-    }
+    await User.findByIdAndUpdate(currentUserId, {
+      $addToSet: { following: targetId }
+    });
 
-    // Add to followers
-    userToFollow.followers.push(req.user._id);
-    await userToFollow.save();
-
-    // Add to following
-    const currentUser = await User.findById(req.user._id);
-    currentUser.following.push(req.params.id);
-    await currentUser.save();
-
-    res.json({ success: true, message: 'Followed successfully' });
+    return res.json({ success: true, message: 'Followed successfully' });
   } catch (error) {
     console.error('Error following user:', error);
-    res.status(500).json({ message: 'Server error', error: error.message });
+    return res.status(500).json({ message: 'Server error', error: error.message });
   }
 });
 
 // @route   DELETE /api/profile/:id/unfollow
-// @desc    Unfollow a user
+// @desc    Unfollow a user (idempotent)
 // @access  Private
 router.delete('/:id/unfollow', protect, async (req, res) => {
   try {
-    const userToUnfollow = await User.findById(req.params.id);
+    const targetId = req.params.id;
+    const currentUserId = req.user._id.toString();
 
-    if (!userToUnfollow) {
+    const userExists = await User.exists({ _id: targetId });
+    if (!userExists) {
       return res.status(404).json({ message: 'User not found' });
     }
 
-    // Remove from followers
-    userToUnfollow.followers = userToUnfollow.followers.filter(id => id.toString() !== req.user._id.toString());
-    await userToUnfollow.save();
+    // Use $pull for idempotent remove
+    await User.findByIdAndUpdate(targetId, {
+      $pull: { followers: req.user._id }
+    });
 
-    // Remove from following
-    const currentUser = await User.findById(req.user._id);
-    currentUser.following = currentUser.following.filter(id => id.toString() !== req.params.id);
-    await currentUser.save();
+    await User.findByIdAndUpdate(currentUserId, {
+      $pull: { following: targetId }
+    });
 
-    res.json({ success: true, message: 'Unfollowed successfully' });
+    return res.json({ success: true, message: 'Unfollowed successfully' });
   } catch (error) {
     console.error('Error unfollowing user:', error);
-    res.status(500).json({ message: 'Server error', error: error.message });
+    return res.status(500).json({ message: 'Server error', error: error.message });
   }
 });
 

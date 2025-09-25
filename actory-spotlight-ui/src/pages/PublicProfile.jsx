@@ -165,12 +165,17 @@ const PublicProfile = () => {
       // Update text fields
       const textFormData = new FormData();
       Object.keys(editData).forEach(key => {
-        if (editData[key] !== null && editData[key] !== undefined) {
-          if (typeof editData[key] === 'object') {
-            textFormData.append(key, JSON.stringify(editData[key]));
-          } else {
-            textFormData.append(key, editData[key]);
-          }
+        const val = editData[key];
+        if (val === null || val === undefined) return;
+        // Skip empty strings/objects/arrays to avoid backend enum validations
+        if (typeof val === 'string' && val.trim() === '') return;
+        if (typeof val === 'object') {
+          const isEmptyObj = !Array.isArray(val) && Object.keys(val).length === 0;
+          const isEmptyArr = Array.isArray(val) && val.length === 0;
+          if (isEmptyObj || isEmptyArr) return;
+          textFormData.append(key, JSON.stringify(val));
+        } else {
+          textFormData.append(key, val);
         }
       });
 
@@ -186,7 +191,19 @@ const PublicProfile = () => {
         setProfileImageFile(null);
         setProfileImagePreview(null);
         // Refetch profile
-        queryClient.invalidateQueries(['publicProfile', id]);
+        queryClient.invalidateQueries({ queryKey: ['publicProfile', id] });
+        // Update header avatar immediately if current user updated their own profile
+        try {
+          const stored = localStorage.getItem('user');
+          if (stored) {
+            const u = JSON.parse(stored);
+            if (u._id === id) {
+              const updated = { ...u, profileImage: data.data?.profileImage || u.profileImage };
+              localStorage.setItem('user', JSON.stringify(updated));
+              window.dispatchEvent(new Event('authChange'));
+            }
+          }
+        } catch {}
       }
     } catch (error) {
       console.error('Error updating profile:', error);
@@ -576,6 +593,8 @@ const PublicProfile = () => {
                 <VideoList
                   videos={profile?.videos || []}
                   user={currentUser}
+                  ownerName={profile?.name}
+                  ownerAvatar={profile?.profileImage ? `${profile?.profileImage}?t=${imageKey}` : undefined}
                 />
               </TabsContent>
               

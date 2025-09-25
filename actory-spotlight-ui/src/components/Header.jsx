@@ -220,8 +220,18 @@ export default function Header() {
                 </Button>
                 {/* Profile button at the end for viewing user details */}
                 <NavLink to={`/profile/${_nullishCoalesce(user._id, () => ( ''))}`} className="hidden sm:inline-flex items-center gap-2">
-                  {_optionalChain([user, 'optionalAccess', _ => _.photo]) ? (
-                    <img src={`${API_ORIGIN}${_optionalChain([user, 'optionalAccess', _2 => _2.photo])}`} alt="Avatar" className="w-8 h-8 rounded-full object-cover border" />
+                  {_optionalChain([user, 'optionalAccess', _ => _.profileImage]) ? (
+                    <img 
+                      src={`${_optionalChain([user, 'optionalAccess', _2 => _2.profileImage])}`}
+                      alt="Avatar" 
+                      className="w-8 h-8 rounded-full object-cover border" 
+                    />
+                  ) : _optionalChain([user, 'optionalAccess', _3 => _3.photo]) ? (
+                    <img 
+                      src={`${API_ORIGIN}${_optionalChain([user, 'optionalAccess', _4 => _4.photo])}`}
+                      alt="Avatar" 
+                      className="w-8 h-8 rounded-full object-cover border" 
+                    />
                   ) : (
                     <Button variant="ghost">Profile</Button>
                   )}

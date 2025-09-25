@@ -1,10 +1,8 @@
 import React, { useState } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Loader2, Upload, X } from 'lucide-react';
 import { toast } from 'sonner';
 import API from '@/lib/api';
@@ -13,9 +11,7 @@ const VideoUploadForm = ({ onUploadSuccess, onCancel }) => {
   const [uploading, setUploading] = useState(false);
   const [preview, setPreview] = useState(null);
   const [formData, setFormData] = useState({
-    title: '',
     description: '',
-    category: 'Other',
     video: null
   });
 
@@ -54,9 +50,7 @@ const VideoUploadForm = ({ onUploadSuccess, onCancel }) => {
 
     const formDataToSend = new FormData();
     formDataToSend.append('video', formData.video);
-    formDataToSend.append('title', formData.title || 'Untitled Video');
     formDataToSend.append('description', formData.description || '');
-    formDataToSend.append('category', formData.category || 'Other');
     // Explicitly set the type to 'profile' for profile videos
     formDataToSend.append('type', 'profile');
 
@@ -99,19 +93,6 @@ const VideoUploadForm = ({ onUploadSuccess, onCancel }) => {
       
       <form onSubmit={handleSubmit} className="space-y-4">
         <div className="space-y-2">
-          <Label htmlFor="title">Title *</Label>
-          <Input
-            id="title"
-            name="title"
-            value={formData.title}
-            onChange={handleChange}
-            placeholder="Video title"
-            required
-            maxLength={100}
-          />
-        </div>
-
-        <div className="space-y-2">
           <Label htmlFor="description">Description</Label>
           <Textarea
             id="description"
@@ -122,26 +103,6 @@ const VideoUploadForm = ({ onUploadSuccess, onCancel }) => {
             rows={3}
             maxLength={500}
           />
-        </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="category">Category *</Label>
-          <Select
-            value={formData.category}
-            onValueChange={(value) => 
-              setFormData(prev => ({ ...prev, category: value }))
-            }
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Select a category" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="Monologue">Monologue</SelectItem>
-              <SelectItem value="Dance">Dance</SelectItem>
-              <SelectItem value="Demo Reel">Demo Reel</SelectItem>
-              <SelectItem value="Other">Other</SelectItem>
-            </SelectContent>
-          </Select>
         </div>
 
         {!preview ? (

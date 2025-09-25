@@ -439,7 +439,7 @@ export default function ActorDashboard() {
                 <h2 className="text-2xl font-semibold">My Videos</h2>
                 <Button onClick={() => setShowUploadForm(true)}>
                   <UploadIcon className="mr-2 h-4 w-4" />
-                  Upload New Video
+                  Showcase Your Skills
                 </Button>
               </div>
               
@@ -450,6 +450,8 @@ export default function ActorDashboard() {
                     user={user}
                     onVideoPlay={handleVideoPlay}
                     onVideoDeleted={handleVideoDeleted}
+                    ownerName={user?.name}
+                    ownerAvatar={user?.profileImage}
                   />
                 </CardContent>
               </Card>

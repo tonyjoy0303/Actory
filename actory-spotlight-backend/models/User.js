@@ -6,8 +6,8 @@ const crypto = require('crypto');
 const VideoSchema = new mongoose.Schema({
   title: {
     type: String,
-    required: [true, 'Please add a title for the video'],
-    maxlength: [100, 'Title cannot be more than 100 characters']
+    maxlength: [100, 'Title cannot be more than 100 characters'],
+    default: undefined
   },
   description: {
     type: String,
@@ -15,7 +15,6 @@ const VideoSchema = new mongoose.Schema({
   },
   category: {
     type: String,
-    required: [true, 'Please select a category'],
     enum: ['Monologue', 'Dance', 'Demo Reel', 'Other'],
     default: 'Other'
   },
@@ -44,6 +43,21 @@ const VideoSchema = new mongoose.Schema({
     default: Date.now
   }
 }, { _id: true });
+
+// Ensure sensible defaults for missing title/category when uploading profile videos
+VideoSchema.pre('validate', function(next) {
+  if (!this.title || !this.title.trim()) {
+    if (this.description && this.description.trim()) {
+      this.title = this.description.trim().slice(0, 80);
+    } else {
+      this.title = 'Profile Video';
+    }
+  }
+  if (!this.category) {
+    this.category = 'Other';
+  }
+  next();
+});
 
 const UserSchema = new mongoose.Schema({
   name: {

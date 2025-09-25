@@ -247,14 +247,13 @@ exports.uploadProfileVideo = async (req, res, next) => {
 
     // Create video in database
     const video = await Video.create({
-      title: req.body.title || 'Untitled Video',
+      title: req.body.description?.slice(0, 80) || 'Profile Video',
       description: req.body.description || '',
       videoUrl: result.secure_url,
       cloudinaryId: result.public_id,
       actor: req.user.id,
       type: 'profile', // Mark as profile video
-      category: req.body.category || 'Other',
-      // No castingCall field for profile videos
+      // No castingCall or category for profile videos
     });
 
     res.status(201).json({

@@ -60,7 +60,7 @@ const Index = () => {
               desc: "Collaborate in real-time with typing indicators.",
             },
           ].map((f) => (
-            React.createElement('div', { key: f.title, className: "rounded-lg border p-6 bg-card shadow-sm hover:shadow-[var(--shadow-elegant)] transition-shadow"      , __self: this, __source: {fileName: _jsxFileName, lineNumber: 62}}
+            React.createElement('div', { key: f.title, className: "rounded-lg border p-6 bg-card shadow-sm hover:shadow-2xl hover:scale-105 transition-all duration-300 ease-in-out cursor-pointer"      , __self: this, __source: {fileName: _jsxFileName, lineNumber: 62}}
               , React.createElement('h3', { className: "font-display text-xl" , __self: this, __source: {fileName: _jsxFileName, lineNumber: 63}}, f.title)
               , React.createElement('p', { className: "mt-2 text-muted-foreground" , __self: this, __source: {fileName: _jsxFileName, lineNumber: 64}}, f.desc)
             )

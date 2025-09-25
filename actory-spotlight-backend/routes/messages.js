@@ -173,6 +173,38 @@ router.get('/conversations', protect, async (req, res) => {
 // @route   GET /api/messages/:conversationId
 // @desc    Get messages in a conversation
 // @access  Private
+// Place static route(s) before dynamic ":conversationId" to avoid conflicts
+router.get('/unread-count', protect, async (req, res) => {
+  try {
+    const result = await Message.aggregate([
+      {
+        $match: {
+          recipient: new mongoose.Types.ObjectId(req.user._id),
+          isRead: false
+        }
+      },
+      {
+        $group: {
+          _id: '$sender'
+        }
+      },
+      {
+        $count: 'count'
+      }
+    ]);
+
+    const count = result.length > 0 ? result[0].count : 0;
+
+    res.json({
+      success: true,
+      data: { count }
+    });
+  } catch (error) {
+    console.error('Error fetching unread count:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+});
+
 router.get('/:conversationId', protect, async (req, res) => {
   try {
     const { conversationId } = req.params;
@@ -237,40 +269,6 @@ router.put('/:messageId/read', protect, async (req, res) => {
     });
   } catch (error) {
     console.error('Error marking message as read:', error);
-    res.status(500).json({ message: 'Server error', error: error.message });
-  }
-});
-
-// @route   GET /api/messages/unread-count
-// @desc    Get count of distinct senders with unread messages for user
-// @access  Private
-router.get('/unread-count', protect, async (req, res) => {
-  try {
-    const result = await Message.aggregate([
-      {
-        $match: {
-          recipient: req.user._id,
-          isRead: false
-        }
-      },
-      {
-        $group: {
-          _id: '$sender'
-        }
-      },
-      {
-        $count: 'count'
-      }
-    ]);
-
-    const count = result.length > 0 ? result[0].count : 0;
-
-    res.json({
-      success: true,
-      data: { count }
-    });
-  } catch (error) {
-    console.error('Error fetching unread count:', error);
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 });
