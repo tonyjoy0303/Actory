@@ -8,9 +8,9 @@ export function useEmailValidation(initialValue = '') {
   const [error, setError] = useState('');
   const [isAvailable, setIsAvailable] = useState(null);
 
-  // Simple email format validation
+  // Gmail-only email format validation
   const validateEmailFormat = (email) => {
-    const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    const re = /^[^\s@]+@gmail\.com$/i;
     return re.test(email);
   };
 
@@ -18,7 +18,7 @@ export function useEmailValidation(initialValue = '') {
   const checkEmailAvailability = async (email) => {
     if (!email || !validateEmailFormat(email)) {
       setIsValid(false);
-      setError('Please enter a valid email address');
+      setError('Only Gmail addresses are allowed (e.g., yourname@gmail.com)');
       return;
     }
 
@@ -48,7 +48,7 @@ export function useEmailValidation(initialValue = '') {
         checkEmailAvailability(email);
       } else if (email) {
         setIsValid(false);
-        setError('Please enter a valid email address');
+        setError('Only Gmail addresses are allowed (e.g., yourname@gmail.com)');
       } else {
         setIsValid(true);
         setError('');

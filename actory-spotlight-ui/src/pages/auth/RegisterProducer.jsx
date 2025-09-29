@@ -191,7 +191,7 @@ export default function RegisterProducer() {
             <div className="space-y-1">
               <label className="text-sm">Email *</label>
               <Input
-                placeholder="Email"
+                placeholder="yourname@gmail.com"
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
