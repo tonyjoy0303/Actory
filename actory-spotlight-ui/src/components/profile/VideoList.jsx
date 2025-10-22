@@ -6,7 +6,7 @@ import API from '@/lib/api';
 import { toast } from 'sonner';
 
 // Inline autoplay previews + full-size modal on click
-const VideoList = ({ videos = [], user, onVideoDeleted, ownerName, ownerAvatar }) => {
+const VideoList = ({ videos = [], user, onVideoDeleted, ownerName, ownerAvatar, profileOwnerId }) => {
   const [open, setOpen] = useState(false);
   const [activeSrc, setActiveSrc] = useState('');
   const [deletingVideoId, setDeletingVideoId] = useState(null);
@@ -93,10 +93,17 @@ const VideoList = ({ videos = [], user, onVideoDeleted, ownerName, ownerAvatar }
     if (user?.role === 'Admin') {
       return true;
     }
-    // Actors can only delete their own videos
+    
+    // If profileOwnerId is provided, check if current user is the profile owner
+    if (profileOwnerId) {
+      return user?.id === profileOwnerId;
+    }
+    
+    // Fallback: Actors can only delete their own videos (for backward compatibility)
     if (user?.role === 'Actor' && video.actor === user?.id) {
       return true;
     }
+    
     return false;
   };
 

@@ -36,7 +36,7 @@ const Index = () => {
               )
             )
             , React.createElement(NavLink, { to: "/auth/register/producer", __self: this, __source: {fileName: _jsxFileName, lineNumber: 37}}
-              , React.createElement(Button, { variant: "brand-outline", className: "hover-scale", 'aria-label': "Join as Producer"  , __self: this, __source: {fileName: _jsxFileName, lineNumber: 38}}, "Join as Producer"
+              , React.createElement(Button, { variant: "brand-outline", className: "hover-scale", 'aria-label': "Join as Recruiter"  , __self: this, __source: {fileName: _jsxFileName, lineNumber: 38}}, "Join as Recruiter"
 
               )
             )

@@ -325,7 +325,7 @@ export default function ActorProfile() {
               )
               , React.createElement(CardContent, { className: "p-6"  , __self: this, __source: {fileName: _jsxFileName, lineNumber: 99}}
                 , videos.length > 0 ? (
-                  React.createElement(VideoList, { videos: videos, user: user, onVideoDeleted: handleVideoDeleted, onVideoPlay: handleVideoPlay, __self: this, __source: {fileName: _jsxFileName, lineNumber: 100}} )
+                  React.createElement(VideoList, { videos: videos, user: user, onVideoDeleted: handleVideoDeleted, onVideoPlay: handleVideoPlay, profileOwnerId: user?._id, __self: this, __source: {fileName: _jsxFileName, lineNumber: 100}} )
                 ) : (
                   React.createElement('p', { className: "text-sm text-muted-foreground", __self: this, __source: {fileName: _jsxFileName, lineNumber: 102}}, "No videos uploaded yet")
                 )

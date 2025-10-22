@@ -12,6 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { MoreVertical, Trash2 } from "lucide-react";
+import { useNavigate } from 'react-router-dom';
 
 
 
@@ -20,6 +21,7 @@ export default function Messages() {
   const [draft, setDraft] = useState("");
   const [isSending, setIsSending] = useState(false);
   const endRef = useRef(null);
+  const navigate = useNavigate();
 
   // Fetch conversations
   const { data: conversations, isLoading: conversationsLoading, refetch: refetchConversations } = useQuery({
@@ -79,6 +81,15 @@ export default function Messages() {
     }
   };
 
+  const handleProfileClick = (userId, userRole, e) => {
+    e.stopPropagation(); // Prevent conversation selection when clicking profile
+    if (userRole === 'Actor') {
+      navigate(`/actor/profile/${userId}`);
+    } else {
+      navigate(`/profile/${userId}`);
+    }
+  };
+
   const deleteMessage = async (messageId) => {
     try {
       const { data } = await API.delete(`/messages/${messageId}`);
@@ -124,7 +135,12 @@ export default function Messages() {
                      setTimeout(() => window.dispatchEvent(new Event('updateUnreadCount')), 100);
                    }, __self: this, __source: {fileName: _jsxFileName, lineNumber: 33}}
                     , React.createElement('div', { className: "flex items-center gap-3" , __self: this, __source: {fileName: _jsxFileName, lineNumber: 37}}
-                      , React.createElement(Avatar, { className: "h-10 w-10", __self: this, __source: {fileName: _jsxFileName, lineNumber: 38}}
+                      , React.createElement(Avatar, { 
+                          className: "h-10 w-10 cursor-pointer hover:opacity-80 transition-opacity", 
+                          onClick: (e) => handleProfileClick(conv.otherUser._id, conv.otherUser.role, e),
+                          __self: this, 
+                          __source: {fileName: _jsxFileName, lineNumber: 38}
+                        }
                         , React.createElement(AvatarImage, { src: conv.otherUser.profileImage, alt: conv.otherUser.name , __self: this, __source: {fileName: _jsxFileName, lineNumber: 39}} )
                         , React.createElement(AvatarFallback, { __self: this, __source: {fileName: _jsxFileName, lineNumber: 40}}, conv.otherUser.name?.charAt(0) || 'U')
                       )
@@ -156,7 +172,12 @@ export default function Messages() {
             React.createElement(React.Fragment, null
               , React.createElement('div', { className: "p-4 border-b" , __self: this, __source: {fileName: _jsxFileName, lineNumber: 69}}
                 , React.createElement('div', { className: "flex items-center gap-3" , __self: this, __source: {fileName: _jsxFileName, lineNumber: 70}}
-                  , React.createElement(Avatar, { className: "h-8 w-8", __self: this, __source: {fileName: _jsxFileName, lineNumber: 71}}
+                  , React.createElement(Avatar, { 
+                      className: "h-8 w-8 cursor-pointer hover:opacity-80 transition-opacity", 
+                      onClick: (e) => handleProfileClick(selectedConversation.otherUser._id, selectedConversation.otherUser.role, e),
+                      __self: this, 
+                      __source: {fileName: _jsxFileName, lineNumber: 71}
+                    }
                     , React.createElement(AvatarImage, { src: selectedConversation.otherUser.profileImage, alt: selectedConversation.otherUser.name , __self: this, __source: {fileName: _jsxFileName, lineNumber: 72}} )
                     , React.createElement(AvatarFallback, { __self: this, __source: {fileName: _jsxFileName, lineNumber: 74}}, selectedConversation.otherUser.name?.charAt(0) || 'U')
                   )
@@ -180,13 +201,28 @@ export default function Messages() {
                     const isFromMe = message.sender._id === JSON.parse(localStorage.getItem('user') || '{}')._id;
                     return React.createElement('div', {
                       key: message._id,
-                      className: `max-w-[75%] p-3 rounded-lg relative group ${isFromMe ? 'ml-auto bg-primary text-primary-foreground' : 'bg-muted'}`,
+                      className: `flex items-start gap-2 ${isFromMe ? 'flex-row-reverse' : 'flex-row'}`,
                       __self: this,
                       __source: {fileName: _jsxFileName, lineNumber: 95}}
-                      , React.createElement('p', { className: "text-sm" , __self: this, __source: {fileName: _jsxFileName, lineNumber: 96}}, message.content)
-                      , React.createElement('div', { className: "flex items-center justify-between mt-1" , __self: this, __source: {fileName: _jsxFileName, lineNumber: 97}}
-                        , React.createElement('p', { className: "text-xs opacity-70" , __self: this, __source: {fileName: _jsxFileName, lineNumber: 98}}, format(new Date(message.createdAt), 'MMM d, h:mm a'))
-                        , isFromMe && (
+                      , !isFromMe && (
+                        React.createElement(Avatar, { 
+                            className: "h-6 w-6 cursor-pointer hover:opacity-80 transition-opacity flex-shrink-0", 
+                            onClick: (e) => handleProfileClick(message.sender._id, message.sender.role, e),
+                            __self: this, 
+                            __source: {fileName: _jsxFileName, lineNumber: 96}
+                          }
+                          , React.createElement(AvatarImage, { src: message.sender.profileImage, alt: message.sender.name , __self: this, __source: {fileName: _jsxFileName, lineNumber: 97}} )
+                          , React.createElement(AvatarFallback, { className: "text-xs", __self: this, __source: {fileName: _jsxFileName, lineNumber: 98}}, message.sender.name?.charAt(0) || 'U')
+                        )
+                      )
+                      , React.createElement('div', {
+                          className: `max-w-[75%] p-3 rounded-lg relative group ${isFromMe ? 'bg-primary text-primary-foreground' : 'bg-muted'}`,
+                          __self: this,
+                          __source: {fileName: _jsxFileName, lineNumber: 100}}
+                        , React.createElement('p', { className: "text-sm" , __self: this, __source: {fileName: _jsxFileName, lineNumber: 101}}, message.content)
+                        , React.createElement('div', { className: "flex items-center justify-between mt-1" , __self: this, __source: {fileName: _jsxFileName, lineNumber: 102}}
+                          , React.createElement('p', { className: "text-xs opacity-70" , __self: this, __source: {fileName: _jsxFileName, lineNumber: 103}}, format(new Date(message.createdAt), 'MMM d, h:mm a'))
+                          , isFromMe && (
                           React.createElement(DropdownMenu, { __self: this, __source: {fileName: _jsxFileName, lineNumber: 100}}
                             , React.createElement(DropdownMenuTrigger, { asChild: true, __self: this, __source: {fileName: _jsxFileName, lineNumber: 101}}
                               , React.createElement('button', { className: "opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-black/10 rounded" , __self: this, __source: {fileName: _jsxFileName, lineNumber: 102}}
@@ -206,6 +242,7 @@ export default function Messages() {
                           )
                         )
                       )
+                    )
                     );
                   })
                 ) : (

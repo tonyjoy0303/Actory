@@ -30,12 +30,16 @@ export default function GoogleSignIn({
   const navigate = useNavigate();
   const btnRef = useRef(null);
   const [loaded, setLoaded] = useState(false);
-  const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID ;
+  const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+  
+  // Debug logging
+  console.log('Google Client ID:', clientId);
+  console.log('All env vars:', import.meta.env);
 
   useEffect(() => {
     if (!clientId) {
       // eslint-disable-next-line no-console
-      console.warn('VITE_GOOGLE_CLIENT_ID is not set');
+      console.warn('VITE_GOOGLE_CLIENT_ID is not set. Please create a .env file with your Google OAuth Client ID.');
       return;
     }
 
@@ -92,6 +96,16 @@ export default function GoogleSignIn({
       width,
     });
   }, [loaded, clientId, navigate, text, shape, theme, size, width, role]);
+
+  if (!clientId) {
+    return (
+      React.createElement('div', { className: "w-full flex justify-center p-4 border border-dashed border-gray-300 rounded-md" },
+        React.createElement('p', { className: "text-sm text-gray-500 text-center" },
+          "Google Sign-In is not configured. Please set VITE_GOOGLE_CLIENT_ID in your .env file."
+        )
+      )
+    );
+  }
 
   return (
     React.createElement('div', { className: "w-full flex justify-center"  , __self: this, __source: {fileName: _jsxFileName, lineNumber: 96}}

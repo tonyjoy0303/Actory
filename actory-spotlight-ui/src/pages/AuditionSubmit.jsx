@@ -25,6 +25,8 @@ export default function AuditionSubmit() {
   const [skintone, setSkintone] = useState('');
   const [loading, setLoading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
+  const [portfolioFile, setPortfolioFile] = useState(null);
+  const [portfolioUploadProgress, setPortfolioUploadProgress] = useState(0);
   const videoRef = useRef(null);
 
   useEffect(() => {
@@ -61,14 +63,34 @@ export default function AuditionSubmit() {
     }
   };
 
+  const onSelectPortfolio = (e) => {
+    const f = _optionalChain([e, 'access', _ => _.target, 'access', _2 => _2.files, 'optionalAccess', _3 => _3[0]]);
+    const maxBytes = 500 * 1024; // 500 KB
+    if (f && f.type === 'application/pdf') {
+      if (f.size <= maxBytes) {
+        setPortfolioFile(f);
+      } else {
+        setPortfolioFile(null);
+        toast.error('Portfolio PDF must be 500 KB or smaller.');
+      }
+    } else {
+      setPortfolioFile(null);
+      toast.error('Please select a valid PDF file for your portfolio.');
+    }
+  };
+
   const handleSubmit = async () => {
     // Basic validation
     const h = Number(height);
     const w = Number(weight);
     const a = Number(age);
 
-    if (!file || !title || !height || !weight || !age || !skintone) {
-      toast.error('Please fill all fields and select a video file.');
+    if (!file || !portfolioFile || !title || !height || !weight || !age || !skintone) {
+      toast.error('Please fill all fields, select a video, and upload your portfolio PDF.');
+      return;
+    }
+    if (portfolioFile && portfolioFile.size > 500 * 1024) {
+      toast.error('Portfolio PDF must be 500 KB or smaller.');
       return;
     }
     if (Number.isNaN(h) || Number.isNaN(w) || Number.isNaN(a) || h <= 0 || w <= 0 || a <= 0) {
@@ -81,6 +103,17 @@ export default function AuditionSubmit() {
     const formData = new FormData();
     formData.append('file', file);
     formData.append('upload_preset', import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET);
+
+    const portfolioForm = new FormData();
+    portfolioForm.append('file', portfolioFile);
+    const portfolioPreset = import.meta.env.VITE_CLOUDINARY_PORTFOLIO_PRESET || import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET;
+    if (!portfolioPreset) {
+      toast.error('Missing Cloudinary unsigned upload preset for portfolio (VITE_CLOUDINARY_PORTFOLIO_PRESET).');
+      setLoading(false);
+      return;
+    }
+    portfolioForm.append('upload_preset', portfolioPreset);
+    portfolioForm.append('folder', 'portfolio');
 
     try {
       // 1. Upload to Cloudinary
@@ -98,6 +131,20 @@ export default function AuditionSubmit() {
 
       const { secure_url, public_id } = cloudinaryRes.data;
 
+      // Upload portfolio PDF via image endpoint (works with unsigned presets)
+      const portfolioRes = await axios.post(
+        `https://api.cloudinary.com/v1_1/${import.meta.env.VITE_CLOUDINARY_CLOUD_NAME}/image/upload`,
+        portfolioForm,
+        {
+          headers: { 'Content-Type': 'multipart/form-data' },
+          onUploadProgress: (progressEvent) => {
+            const percent = Math.round((progressEvent.loaded * 100) / (progressEvent.total || 1));
+            setPortfolioUploadProgress(percent);
+          },
+        }
+      );
+      const portfolioUrl = _optionalChain([portfolioRes, 'access', _ => _.data, 'optionalAccess', _2 => _2.secure_url]);
+
       // 2. Submit to our backend
       await API.post(`/casting/${castingCallId}/videos`,
         { 
@@ -109,6 +156,7 @@ export default function AuditionSubmit() {
           weight: w,
           age: a,
           skintone,
+          portfolioUrl,
         }
       );
 
@@ -116,7 +164,11 @@ export default function AuditionSubmit() {
       navigate('/dashboard/actor');
 
     } catch (error) {
-      const msg = _optionalChain([error, 'optionalAccess', _7 => _7.response, 'optionalAccess', _8 => _8.data, 'optionalAccess', _9 => _9.message]) || 'Submission failed. Please try again.';
+      // Surface Cloudinary error details when available to aid troubleshooting
+      const msg = _optionalChain([error, 'optionalAccess', _7 => _7.response, 'optionalAccess', _8 => _8.data, 'optionalAccess', _9 => _9.error])?.message
+        || _optionalChain([error, 'optionalAccess', _10 => _10.response, 'optionalAccess', _11 => _11.data, 'optionalAccess', _12 => _12.message])
+        || 'Submission failed. Please try again.';
+      console.error('Upload error:', _optionalChain([error, 'optionalAccess', _13 => _13.response, 'optionalAccess', _14 => _14.data]) || error);
       toast.error(msg);
     } finally {
       setLoading(false);
@@ -131,7 +183,7 @@ export default function AuditionSubmit() {
       , React.createElement('section', { className: "container py-8 max-w-3xl"  , __self: this, __source: {fileName: _jsxFileName, lineNumber: 142}}
         , React.createElement(Card, {__self: this, __source: {fileName: _jsxFileName, lineNumber: 143}}
           , React.createElement(CardHeader, {__self: this, __source: {fileName: _jsxFileName, lineNumber: 144}}
-            , React.createElement(CardTitle, { className: "font-display", __self: this, __source: {fileName: _jsxFileName, lineNumber: 145}}, "Submit Your Audition for: "    , _optionalChain([castingCall, 'optionalAccess', _10 => _10.roleName]) || '...')
+            , React.createElement(CardTitle, { className: "font-display", __self: this, __source: {fileName: _jsxFileName, lineNumber: 145}}, "Submit Your Audition for: "    , (_optionalChain([castingCall, 'optionalAccess', _10 => _10.roleTitle]) || _optionalChain([castingCall, 'optionalAccess', _11 => _11.roleName])) || '...')
             , React.createElement('p', { className: "text-muted-foreground text-sm pt-2"  , __self: this, __source: {fileName: _jsxFileName, lineNumber: 146}}, _optionalChain([castingCall, 'optionalAccess', _11 => _11.description]))
             , castingCall && (
               React.createElement('div', { className: "mt-3 grid gap-2 text-sm text-muted-foreground"    , __self: this, __source: {fileName: _jsxFileName, lineNumber: 148}}
@@ -211,6 +263,11 @@ export default function AuditionSubmit() {
                   , React.createElement('label', { className: "block text-sm mb-1"  , __self: this, __source: {fileName: _jsxFileName, lineNumber: 220}}, "Skintone")
                   , React.createElement(Input, { type: "text", placeholder: "e.g., Fair, Medium, Dark" , value: skintone, onChange: (e) => setSkintone(e.target.value), disabled: loading, __self: this, __source: {fileName: _jsxFileName, lineNumber: 221}} )
                 )
+                  , React.createElement('div', {__self: this, __source: {fileName: _jsxFileName, lineNumber: 222}}
+                    , React.createElement('label', { className: "block text-sm mb-1"  , __self: this, __source: {fileName: _jsxFileName, lineNumber: 223}}, "Portfolio (PDF)")
+                    , React.createElement(Input, { type: "file", accept: "application/pdf", onChange: onSelectPortfolio, disabled: loading, __self: this, __source: {fileName: _jsxFileName, lineNumber: 224}} )
+                    , portfolioFile ? React.createElement('p', { className: "text-xs text-muted-foreground mt-1" , __self: this, __source: {fileName: _jsxFileName, lineNumber: 225}}, _optionalChain([portfolioFile, 'access', _ => _.name])) : null
+                  )
               )
 
               , src && (
@@ -218,9 +275,12 @@ export default function AuditionSubmit() {
                   , React.createElement('source', { src: src, __self: this, __source: {fileName: _jsxFileName, lineNumber: 227}} )
                 )
               )
-              , loading && React.createElement(Progress, { value: uploadProgress, className: "w-full", __self: this, __source: {fileName: _jsxFileName, lineNumber: 230}} )
+              , loading && React.createElement('div', { className: "space-y-2", __self: this, __source: {fileName: _jsxFileName, lineNumber: 230}}
+                , React.createElement(Progress, { value: uploadProgress, className: "w-full", __self: this, __source: {fileName: _jsxFileName, lineNumber: 231}} )
+                , portfolioFile && React.createElement(Progress, { value: portfolioUploadProgress, className: "w-full", __self: this, __source: {fileName: _jsxFileName, lineNumber: 232}} )
+              )
               , React.createElement('div', { className: "mt-2 flex justify-end"  , __self: this, __source: {fileName: _jsxFileName, lineNumber: 231}}
-                , React.createElement(Button, { variant: "hero", className: "hover-scale", onClick: handleSubmit, disabled: loading || !file, __self: this, __source: {fileName: _jsxFileName, lineNumber: 232}}
+                , React.createElement(Button, { variant: "hero", className: "hover-scale", onClick: handleSubmit, disabled: loading || !file || !portfolioFile, __self: this, __source: {fileName: _jsxFileName, lineNumber: 232}}
                   , loading ? `Uploading... ${uploadProgress}%` : 'Submit Audition'
                 )
               )

@@ -1,7 +1,7 @@
 import React from 'react'
 const _jsxFileName = ""; function _nullishCoalesce(lhs, rhsFn) { if (lhs != null) { return lhs; } else { return rhsFn(); } } function _optionalChain(ops) { let lastAccessLHS = undefined; let value = ops[0]; let i = 1; while (i < ops.length) { const op = ops[i]; const fn = ops[i + 1]; i += 2; if ((op === 'optionalAccess' || op === 'optionalCall') && value == null) { return undefined; } if (op === 'access' || op === 'optionalAccess') { lastAccessLHS = value; value = fn(value); } else if (op === 'call' || op === 'optionalCall') { value = fn((...args) => value.call(lastAccessLHS, ...args)); lastAccessLHS = undefined; } } return value; }import { NavLink, useNavigate, useLocation } from "react-router-dom";
 import { useEffect, useState } from "react";
-import { Search, User } from "lucide-react";
+import { Search, User, Video } from "lucide-react";
 import ThemeToggle from "@/components/ThemeToggle";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -198,6 +198,8 @@ export default function Header() {
 
           <div className="hidden md:flex items-center gap-6">
             <NavLink to="/casting" className={linkCls} end={true}>Castings</NavLink>
+            {user && <NavLink to="/feeds" className={linkCls} end={true}>Feeds</NavLink>}
+            {user && <NavLink to="/call" className={linkCls} end={true}>Video Call</NavLink>}
             {_optionalChain([user, 'optionalAccess', _ => _.role]) === 'Actor' && <NavLink to="/dashboard/actor" className={linkCls} end={true}>Dashboard</NavLink>}
             {_optionalChain([user, 'optionalAccess', _2 => _2.role]) === 'Producer' && <NavLink to="/dashboard/producer" className={linkCls} end={true}>Dashboard</NavLink>}
             {user && (
@@ -273,7 +275,7 @@ export default function Header() {
                           </div>
                           <p className="text-sm text-muted-foreground max-w-xs">Search and find the perfect talent for your project.</p>
                           <button className="text-xs font-semibold text-primary/80" onClick={() => navigate('/casting')}>KNOW MORE</button>
-                          <Button variant="hero" className="rounded-full px-6 py-6 text-base w-[220px]" onClick={() => handleRegisterClick('Producer')}>Register As Producer</Button>
+                          <Button variant="hero" className="rounded-full px-6 py-6 text-base w-[220px]" onClick={() => handleRegisterClick('Producer')}>Register As Recruiter</Button>
                         </div>
                         <div className="hidden md:block absolute inset-y-0 left-1/2 w-px bg-border" />
                       </div>

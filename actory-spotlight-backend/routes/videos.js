@@ -7,13 +7,49 @@ const {
   deleteVideo,
   getMyProfileVideos,
   uploadProfileVideo,
-  deleteProfileVideo
+  deleteProfileVideo,
+  getPortfolio,
+  getPortfolioFile,
+  getPublicVideos,
+  incrementVideoView,
+  toggleVideoLike,
+  addVideoComment,
+  getVideoComments
 } = require('../controllers/videos');
 
-const { protect, authorize } = require('../middleware/auth');
+const { protect, authorize, optionalAuth } = require('../middleware/auth');
 const upload = require('../middleware/upload');
 
 const router = express.Router({ mergeParams: true });
+
+// ==============================
+// Public Videos
+// ==============================
+
+// @route   GET /api/v1/videos/public
+// @desc    Get all public videos for feeds
+// @access  Public
+router.get('/public', optionalAuth, getPublicVideos);
+
+// @route   PUT /api/v1/videos/:videoId/view
+// @desc    Increment video view count
+// @access  Public
+router.put('/:videoId/view', incrementVideoView);
+
+// @route   PUT /api/v1/videos/:videoId/like
+// @desc    Toggle like on video
+// @access  Public
+router.put('/:videoId/like', toggleVideoLike);
+
+// @route   GET /api/v1/videos/:videoId/comments
+// @desc    Get comments for a video
+// @access  Public
+router.get('/:videoId/comments', getVideoComments);
+
+// @route   POST /api/v1/videos/:videoId/comment
+// @desc    Add comment to video
+// @access  Public
+router.post('/:videoId/comment', addVideoComment);
 
 // ==============================
 // Profile Videos
@@ -58,6 +94,16 @@ router.patch('/:id/status', protect, authorize('Producer'), updateStatus);
 // @access  Private (Video owner or Admin)
 router.delete('/:id', protect, authorize('Actor', 'Admin'), deleteVideo);
 
+// @route   GET /api/v1/videos/:id/portfolio
+// @desc    Get a viewable portfolio URL (handles authenticated/raw)
+// @access  Private (Producer or Admin)
+router.get('/:id/portfolio', protect, authorize('Producer', 'Admin'), getPortfolio);
+
+// Stream proxy for portfolio PDF (best for embedded viewers)
+// Use standard auth middleware so Authorization header works consistently
+// @access  Private (Producer or Admin)
+router.get('/:id/portfolio/file', protect, authorize('Producer', 'Admin'), getPortfolioFile);
+
 // ==============================
 // Casting Call Videos
 // ==============================
@@ -77,7 +123,6 @@ router.get('/',
 router.post('/',
   protect,
   authorize('Actor'),
-  upload.single('video'),
   addVideo
 );
 

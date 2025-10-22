@@ -15,6 +15,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import VideoList from "@/components/profile/VideoList";
 import ContactModal from "@/components/ContactModal";
@@ -326,7 +327,7 @@ const PublicProfile = () => {
                   )}
                 </div>
                 <p className="text-muted-foreground">
-                  {profile?.role === 'Actor' ? 'Actor' : 'Performer'}
+                  {profile?.role === 'Actor' ? 'Actor' : profile?.role === 'Producer' ? 'Recruiter' : 'Performer'}
                   {profile?.location && ` • ${profile.location}`}
                   {profile?.age && ` • ${profile.age} years old`}
                 </p>
@@ -446,12 +447,20 @@ const PublicProfile = () => {
                     </div>
                     <div>
                       <Label htmlFor="experienceLevel">Experience Level</Label>
-                      <Input
-                        id="experienceLevel"
+                      <Select
                         value={editData.experienceLevel}
-                        onChange={(e) => setEditData({ ...editData, experienceLevel: e.target.value })}
-                        placeholder="e.g. Beginner, Intermediate, Professional"
-                      />
+                        onValueChange={(value) => setEditData({ ...editData, experienceLevel: value })}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select experience level" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="beginner">Beginner</SelectItem>
+                          <SelectItem value="intermediate">Intermediate</SelectItem>
+                          <SelectItem value="experienced">Experienced</SelectItem>
+                          <SelectItem value="professional">Professional</SelectItem>
+                        </SelectContent>
+                      </Select>
                     </div>
                     <div className="flex gap-2">
                       <Button onClick={handleSaveEdit}>Save Changes</Button>
@@ -595,6 +604,7 @@ const PublicProfile = () => {
                   user={currentUser}
                   ownerName={profile?.name}
                   ownerAvatar={profile?.profileImage ? `${profile?.profileImage}?t=${imageKey}` : undefined}
+                  profileOwnerId={profile?._id}
                 />
               </TabsContent>
               
@@ -643,11 +653,32 @@ const PublicProfile = () => {
                     ))}
                   </div>
                 ) : (
-                  <Card>
-                    <CardContent className="py-8 text-center">
-                      <p className="text-muted-foreground">No experience added yet.</p>
-                    </CardContent>
-                  </Card>
+                  <div className="space-y-4">
+                    {/* Experience Level Card */}
+                    {profile?.experienceLevel && (
+                      <Card>
+                        <CardHeader>
+                          <CardTitle className="text-lg">Experience Level</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          <div className="flex items-center space-x-2">
+                            <Badge variant="secondary" className="text-sm capitalize">
+                              {profile.experienceLevel}
+                            </Badge>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    )}
+                    
+                    {/* No Experience Entries Message */}
+                    <Card>
+                      <CardContent className="py-8 text-center">
+                        <p className="text-muted-foreground">
+                          {profile?.experienceLevel ? 'No additional experience entries added yet.' : 'No experience added yet.'}
+                        </p>
+                      </CardContent>
+                    </Card>
+                  </div>
                 )}
               </TabsContent>
             </Tabs>

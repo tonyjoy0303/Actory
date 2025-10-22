@@ -452,6 +452,7 @@ export default function ActorDashboard() {
                     onVideoDeleted={handleVideoDeleted}
                     ownerName={user?.name}
                     ownerAvatar={user?.profileImage}
+                    profileOwnerId={user?._id}
                   />
                 </CardContent>
               </Card>

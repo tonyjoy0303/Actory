@@ -68,8 +68,8 @@ const formSchema = z.object({
 }).refine(data => data.submissionDeadline < data.auditionDate, {
   message: 'Submission deadline must be before the audition date',
   path: ['submissionDeadline']
-}).refine(data => data.shootStartDate >= data.auditionDate, {
-  message: 'Shoot start date must be on or after the audition date',
+}).refine(data => data.shootStartDate > data.auditionDate, {
+  message: 'Shoot start date must be after the audition date',
   path: ['shootStartDate']
 }).refine(data => data.shootEndDate >= data.shootStartDate, {
   message: 'Shoot end date must be on or after the shoot start date',
@@ -78,6 +78,10 @@ const formSchema = z.object({
 
 export default function CastingCallForm({ castingCall, onSubmit, isSubmitting }) {
   const [skillInput, setSkillInput] = useState('');
+  const [auditionDateOpen, setAuditionDateOpen] = useState(false);
+  const [submissionDeadlineOpen, setSubmissionDeadlineOpen] = useState(false);
+  const [shootStartDateOpen, setShootStartDateOpen] = useState(false);
+  const [shootEndDateOpen, setShootEndDateOpen] = useState(false);
   
   const form = useForm({
     resolver: zodResolver(formSchema),
@@ -265,7 +269,7 @@ export default function CastingCallForm({ castingCall, onSubmit, isSubmitting })
             render={({ field }) => (
               <FormItem className="flex flex-col">
                 <FormLabel>Audition Date *</FormLabel>
-                <Popover>
+                <Popover open={auditionDateOpen} onOpenChange={setAuditionDateOpen}>
                   <PopoverTrigger asChild>
                     <FormControl>
                       <Button
@@ -284,7 +288,10 @@ export default function CastingCallForm({ castingCall, onSubmit, isSubmitting })
                     <Calendar
                       mode="single"
                       selected={field.value}
-                      onSelect={field.onChange}
+                      onSelect={(date) => {
+                        field.onChange(date);
+                        setAuditionDateOpen(false);
+                      }}
                       disabled={(date) => {
                         const today = new Date();
                         today.setHours(0, 0, 0, 0);
@@ -309,7 +316,7 @@ export default function CastingCallForm({ castingCall, onSubmit, isSubmitting })
               return (
                 <FormItem className="flex flex-col">
                   <FormLabel>Submission Deadline *</FormLabel>
-                  <Popover>
+                  <Popover open={submissionDeadlineOpen} onOpenChange={setSubmissionDeadlineOpen}>
                     <PopoverTrigger asChild>
                       <FormControl>
                         <Button
@@ -328,7 +335,10 @@ export default function CastingCallForm({ castingCall, onSubmit, isSubmitting })
                       <Calendar
                         mode="single"
                         selected={field.value}
-                        onSelect={field.onChange}
+                        onSelect={(date) => {
+                          field.onChange(date);
+                          setSubmissionDeadlineOpen(false);
+                        }}
                         disabled={(date) => {
                           // Allow today and future dates
                           const today = new Date();
@@ -361,7 +371,7 @@ export default function CastingCallForm({ castingCall, onSubmit, isSubmitting })
             render={({ field }) => (
               <FormItem className="flex flex-col">
                 <FormLabel>Shoot Start Date *</FormLabel>
-                <Popover>
+                <Popover open={shootStartDateOpen} onOpenChange={setShootStartDateOpen}>
                   <PopoverTrigger asChild>
                     <FormControl>
                       <Button
@@ -380,13 +390,20 @@ export default function CastingCallForm({ castingCall, onSubmit, isSubmitting })
                     <Calendar
                       mode="single"
                       selected={field.value}
-                      onSelect={field.onChange}
+                      onSelect={(date) => {
+                        field.onChange(date);
+                        setShootStartDateOpen(false);
+                      }}
                       disabled={(date) => {
                         const today = new Date();
                         today.setHours(0, 0, 0, 0);
                         // Allow today and future dates, but after audition date if set
                         if (date < today) return true;
-                        if (auditionDate && date < new Date(auditionDate)) return true;
+                        if (auditionDate) {
+                          const audition = new Date(auditionDate);
+                          audition.setHours(0, 0, 0, 0);
+                          return date <= audition;
+                        }
                         return false;
                       }}
                       initialFocus
@@ -405,7 +422,7 @@ export default function CastingCallForm({ castingCall, onSubmit, isSubmitting })
             render={({ field }) => (
               <FormItem className="flex flex-col">
                 <FormLabel>Shoot End Date *</FormLabel>
-                <Popover>
+                <Popover open={shootEndDateOpen} onOpenChange={setShootEndDateOpen}>
                   <PopoverTrigger asChild>
                     <FormControl>
                       <Button
@@ -424,7 +441,10 @@ export default function CastingCallForm({ castingCall, onSubmit, isSubmitting })
                     <Calendar
                       mode="single"
                       selected={field.value}
-                      onSelect={field.onChange}
+                      onSelect={(date) => {
+                        field.onChange(date);
+                        setShootEndDateOpen(false);
+                      }}
                       disabled={(date) => {
                         const today = new Date();
                         today.setHours(0, 0, 0, 0);

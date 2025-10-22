@@ -197,7 +197,7 @@ export default function ProducerDashboard() {
                       <Button 
                         variant="outline" 
                         size="sm"
-                        onClick={() => handleViewSubmissions(call)}
+                        onClick={() => navigate(`/casting/${call._id}/submissions`)}
                       >
                         View Submissions
                       </Button>

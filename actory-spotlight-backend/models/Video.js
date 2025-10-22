@@ -13,6 +13,11 @@ const VideoSchema = new mongoose.Schema({
     type: String,
     required: true,
   },
+  // URL to the actor's portfolio PDF (required for audition submissions)
+  portfolioUrl: {
+    type: String,
+    required: function() { return this.type === 'audition'; },
+  },
   actor: {
     type: mongoose.Schema.ObjectId,
     ref: 'User',
@@ -60,6 +65,22 @@ const VideoSchema = new mongoose.Schema({
     enum: ['Pending', 'Accepted', 'Rejected'],
     default: 'Pending',
   },
+  views: {
+    type: Number,
+    default: 0,
+  },
+  likes: {
+    type: Number,
+    default: 0,
+  },
+  comments: {
+    type: Number,
+    default: 0,
+  },
+  likedBy: [{
+    type: mongoose.Schema.ObjectId,
+    ref: 'User',
+  }],
   createdAt: {
     type: Date,
     default: Date.now,

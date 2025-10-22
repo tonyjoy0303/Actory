@@ -161,7 +161,7 @@ export default function RegisterProducer() {
 
   return (
     <>
-      <SEO title="Join as Producer" description="Create your Producer account on Actory." />
+      <SEO title="Join as Recruiter" description="Create your Recruiter account on Actory." />
       
       <section className="relative min-h-[80vh] flex items-center justify-center">
         <img 
@@ -172,8 +172,8 @@ export default function RegisterProducer() {
         <div className="absolute inset-0 bg-background/70 backdrop-blur" />
         
         <div className="relative w-full max-w-md p-8 rounded-xl border bg-card shadow-xl">
-          <h1 className="font-display text-3xl text-center">Join as Producer</h1>
-          <p className="text-center text-muted-foreground mt-1">Create your producer account</p>
+          <h1 className="font-display text-3xl text-center">Join as Recruiter</h1>
+          <p className="text-center text-muted-foreground mt-1">Create your recruiter account</p>
           
           <div className="mt-6 space-y-4">
             <div className="space-y-1">

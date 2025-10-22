@@ -28,6 +28,7 @@ import CastingList from "./pages/CastingList";
 import CastingDetails from "./pages/casting/CastingDetails";
 import CreateCastingCall from "./pages/casting/CreateCastingCall";
 import EditCastingCall from "./pages/casting/EditCastingCall";
+import Submissions from "./pages/casting/Submissions";
 
 // Pages - Profiles & Submissions
 import ActorProfile from "./pages/ActorProfile";
@@ -36,6 +37,9 @@ import AuditionSubmit from "./pages/AuditionSubmit";
 
 // Pages - Messaging
 import Messages from "./pages/Messages";
+
+// Pages - Feeds
+import Feeds from "./pages/Feeds";
 
 // Pages - Auth
 import Login from "./pages/auth/Login";
@@ -49,6 +53,7 @@ import LoginRequired from "./pages/LoginRequired";
 // Pages - Marketing
 import KnowMore from "./pages/KnowMore";
 import Features from "./pages/Features";
+import VideoCall from "./pages/VideoCall";
 
 const queryClient = new QueryClient();
 
@@ -110,6 +115,14 @@ const App = () => (
                 })
 
               , React.createElement(Route, {
+                path: "/casting/:id/submissions",
+                element: 
+                  React.createElement(MainLayout, null
+                    , React.createElement(Submissions, null )
+                  )
+                })
+
+              , React.createElement(Route, {
                 path: "/casting/new",
                 element: 
                   React.createElement(MainLayout, null
@@ -154,6 +167,14 @@ const App = () => (
                 element: 
                   React.createElement(MainLayout, null
                     , React.createElement(Messages, null )
+                  )
+                })
+              
+              , React.createElement(Route, {
+                path: "/feeds",
+                element: 
+                  React.createElement(MainLayout, null
+                    , React.createElement(Feeds, null )
                   )
                 })
               
@@ -234,6 +255,14 @@ const App = () => (
                 element: 
                   React.createElement(MainLayout, null
                     , React.createElement(ResetPassword, null )
+                  )
+                })
+              
+              , React.createElement(Route, {
+                path: "/call",
+                element: 
+                  React.createElement(MainLayout, null
+                    , React.createElement(VideoCall, null )
                   )
                 })
               
