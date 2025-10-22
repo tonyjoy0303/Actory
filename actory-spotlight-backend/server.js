@@ -13,7 +13,12 @@ const app = express();
 app.use(express.json());
 
 // Enable CORS
-app.use(cors());
+const corsOptions = {
+  origin: process.env.CLIENT_ORIGIN || 'http://localhost:8080',
+  credentials: true,
+  optionsSuccessStatus: 200
+};
+app.use(cors(corsOptions));
 
 // Static files for uploads (profile photos, etc.)
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));

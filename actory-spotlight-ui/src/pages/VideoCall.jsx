@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Copy, Users, Video, VideoOff, Mic, MicOff, Phone, FlipHorizontal } from 'lucide-react';
 import { toast } from 'sonner';
 
-const SIGNALING_URL = 'http://localhost:5000';
+const SIGNALING_URL = import.meta.env.VITE_SOCKET_URL || 'http://localhost:5000';
 
 
 export default function VideoCall() {
