@@ -5,7 +5,7 @@ const API = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
-  timeout: 10000, // 10 seconds timeout
+  timeout: 30000, // 30 seconds timeout for Render cold starts
 });
 
 // Request interceptor
@@ -30,7 +30,7 @@ API.interceptors.request.use(
   }
 );
 
-// Response interceptor
+// Response interceptor with retry logic for network errors
 API.interceptors.response.use(
   (response) => {
     console.log('Response:', {
@@ -40,7 +40,28 @@ API.interceptors.response.use(
     });
     return response;
   },
-  (error) => {
+  async (error) => {
+    const originalRequest = error.config;
+    
+    // Retry logic for network errors (no response received)
+    if (error.code === 'ERR_NETWORK' && !originalRequest._retry) {
+      originalRequest._retry = true;
+      
+      // Only retry for critical requests (not file uploads)
+      if (!originalRequest.url?.includes('/photo') && !originalRequest.url?.includes('/video')) {
+        console.log('Retrying request due to network error:', originalRequest.url);
+        
+        // Wait 2 seconds before retry
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        
+        try {
+          return await API(originalRequest);
+        } catch (retryError) {
+          console.error('Retry failed:', retryError);
+        }
+      }
+    }
+    
     if (error.response) {
       // The request was made and the server responded with a status code
       console.error('Response Error:', {

@@ -112,7 +112,8 @@ export default function Header() {
       }
     } catch (error) {
       console.error('Error fetching unread count:', error);
-      // Don't show toast for this, just log
+      // Set to 0 on error to avoid showing stale data
+      setUnreadCount(0);
     }
   };
 
