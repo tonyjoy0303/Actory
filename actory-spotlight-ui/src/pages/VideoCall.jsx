@@ -17,10 +17,14 @@ export default function VideoCall() {
   const [pending, setPending] = useState([]); // [{socketId, name}]
   const [connectedPeers, setConnectedPeers] = useState([]); // socketIds
   const [participants, setParticipants] = useState([]); // [{socketId, name, isAdmin}]
-  const [isVideoOn, setIsVideoOn] = useState(true);
-  const [isMicOn, setIsMicOn] = useState(true);
+  const [isVideoOn, setIsVideoOn] = useState(false); // Start with camera off
+  const [isMicOn, setIsMicOn] = useState(false); // Start with mic off
   const [isInCall, setIsInCall] = useState(false);
   const [isVideoMirrored, setIsVideoMirrored] = useState(true);
+  const [cameraStarted, setCameraStarted] = useState(false); // Track if camera has been started
+  const [roomSettings, setRoomSettings] = useState({
+    maxParticipants: 10
+  });
 
   const socketRef = useRef(null);
   const localVideoRef = useRef(null);
@@ -30,6 +34,7 @@ export default function VideoCall() {
   const remoteStreamsRef = useRef(new Map()); // Map of socketId -> MediaStream
   const [speakingUser, setSpeakingUser] = useState(null);
   const [audioLevels, setAudioLevels] = useState(new Map());
+  const [forceUpdate, setForceUpdate] = useState(0); // Force re-render when streams change
 
   // Initialize socket
   useEffect(() => {
@@ -41,10 +46,13 @@ export default function VideoCall() {
     });
 
     // Room lifecycle
-    socket.on('vc:created', ({ roomId, admin }) => {
-      console.log('Room created:', { roomId, admin });
+    socket.on('vc:created', ({ roomId, admin, settings }) => {
+      console.log('Room created:', { roomId, admin, settings });
       setRoomId(roomId);
       setIsAdmin(!!admin);
+      if (settings) {
+        setRoomSettings(settings);
+      }
       if (admin) {
         // Add admin to participants list
         setParticipants([{ socketId: socket.id, name: getDisplayName(), isAdmin: true }]);
@@ -54,23 +62,18 @@ export default function VideoCall() {
 
     socket.on('vc:join-request', ({ roomId, socketId, user }) => {
       console.log('Join request received:', { roomId, socketId, user });
-      setPending((prev) => [{ socketId, name: user?.name || 'Guest' }, ...prev]);
+      console.log('Current pending before update:', pending);
+      setPending((prev) => {
+        const newPending = [{ socketId, name: user?.name || 'Guest' }, ...prev];
+        console.log('Updated pending list:', newPending);
+        return newPending;
+      });
     });
 
     socket.on('vc:join-approved', async ({ roomId }) => {
       console.log('Join approved, joining room:', roomId);
       setRoomId(roomId);
       toast.success('Approved by host');
-      
-      // Get local media stream for participant
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-        localStreamRef.current = stream;
-        if (localVideoRef.current) localVideoRef.current.srcObject = stream;
-      } catch (error) {
-        console.error('Error getting user media:', error);
-        toast.error('Failed to access camera/microphone');
-      }
       
       // Automatically join the room after approval
       socket.emit('vc:join', { 
@@ -186,11 +189,54 @@ export default function VideoCall() {
       }
     });
 
+    // Room settings update
+    socket.on('vc:settings-updated', ({ settings }) => {
+      console.log('Room settings updated:', settings);
+      setRoomSettings(settings);
+      toast.info('Room settings updated');
+    });
+
     return () => {
       socket.disconnect();
       cleanupMedia();
     };
   }, []);
+
+  // Update video elements when streams change
+  useEffect(() => {
+    // This effect will run when forceUpdate changes, ensuring video elements get updated
+    const updateVideoElements = () => {
+      // Find all video elements and update their srcObject if needed
+      const videoElements = document.querySelectorAll('video[data-socket-id]');
+      videoElements.forEach(video => {
+        const socketId = video.getAttribute('data-socket-id');
+        if (socketId === 'local') {
+          // Handle local video stream
+          if (localStreamRef.current && video.srcObject !== localStreamRef.current) {
+            console.log('Setting local video stream');
+            video.srcObject = localStreamRef.current;
+          }
+        } else if (socketId) {
+          // Handle remote video streams
+          const stream = remoteStreamsRef.current.get(socketId);
+          if (stream && video.srcObject !== stream) {
+            console.log('Setting remote video stream for:', socketId);
+            video.srcObject = stream;
+          }
+        }
+      });
+    };
+    
+    updateVideoElements();
+  }, [forceUpdate, cameraStarted, localStreamRef.current]);
+
+  // Specific effect for local video stream
+  useEffect(() => {
+    if (cameraStarted && localStreamRef.current && localVideoRef.current) {
+      console.log('Setting local video stream via ref');
+      localVideoRef.current.srcObject = localStreamRef.current;
+    }
+  }, [cameraStarted, localStreamRef.current]);
 
   const getUserId = () => {
     try {
@@ -222,32 +268,20 @@ export default function VideoCall() {
       const [stream] = e.streams;
       remoteStreamsRef.current.set(remoteSocketId, stream);
       
-      // Assign the stream to the remote video element
-      if (remoteVideoRef.current) {
-        remoteVideoRef.current.srcObject = stream;
-        console.log('Remote video stream assigned:', stream, 'to element:', remoteVideoRef.current);
-      } else {
-        console.warn('Remote video ref is null, cannot assign stream');
-      }
-      
       // Set up audio level monitoring for speaker detection
       if (stream.getAudioTracks().length > 0) {
         setupAudioLevelMonitoring(remoteSocketId, stream);
       }
+      
+      // Force re-render to update video grid
+      setParticipants(prev => [...prev]);
+      setForceUpdate(prev => prev + 1);
     };
 
-    // Get local media if not already available
-    if (!localStreamRef.current) {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-      localStreamRef.current = stream;
-      if (localVideoRef.current) {
-        localVideoRef.current.srcObject = stream;
-        console.log('Local video stream assigned:', stream);
-      }
+    // Only add local tracks if camera is started
+    if (localStreamRef.current) {
+      localStreamRef.current.getTracks().forEach((t) => pc.addTrack(t, localStreamRef.current));
     }
-
-    // Add local tracks to this peer connection
-    localStreamRef.current.getTracks().forEach((t) => pc.addTrack(t, localStreamRef.current));
 
     pcRef.current.set(remoteSocketId, pc);
     return pc;
@@ -279,14 +313,27 @@ export default function VideoCall() {
 
   async function handleCreateRoom() {
     socketRef.current?.emit('vc:create', { 
-      user: { name: getDisplayName() }
+      user: { name: getDisplayName() },
+      settings: roomSettings
     });
   }
 
   async function handleRequestJoin() {
     if (!roomIdInput) return toast.error('Enter a room code');
     console.log('Requesting to join room:', roomIdInput);
+    console.log('Socket connected:', socketRef.current?.connected);
+    console.log('User info:', { name: getDisplayName() });
     socketRef.current?.emit('vc:request-join', { roomId: roomIdInput, user: { name: getDisplayName() } });
+    toast.info('Requesting to join room...');
+  }
+
+  function updateRoomSettings(newSettings) {
+    if (!roomId || !isAdmin) return;
+    socketRef.current?.emit('vc:update-settings', { 
+      roomId, 
+      settings: newSettings 
+    });
+    setRoomSettings(newSettings);
   }
 
   function getDisplayName() {
@@ -299,20 +346,8 @@ export default function VideoCall() {
 
   async function startCallAsAdmin() {
     if (!roomId) return;
-    try {
-      // Get local media first
-      if (!localStreamRef.current) {
-        const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-        localStreamRef.current = stream;
-        if (localVideoRef.current) localVideoRef.current.srcObject = stream;
-      }
-      
-      setIsInCall(true);
-      toast.success('Call started');
-    } catch (error) {
-      console.error('Error starting call:', error);
-      toast.error('Failed to start call');
-    }
+    setIsInCall(true);
+    toast.success('Call started - Start camera when ready');
   }
 
   function copyRoomCode() {
@@ -324,21 +359,114 @@ export default function VideoCall() {
     });
   }
 
+  async function startCamera() {
+    try {
+      if (localStreamRef.current) {
+        toast.info('Camera is already started');
+        return;
+      }
+      
+      const stream = await navigator.mediaDevices.getUserMedia({ 
+        video: true, 
+        audio: true 
+      });
+      
+      localStreamRef.current = stream;
+      if (localVideoRef.current) {
+        localVideoRef.current.srcObject = stream;
+      }
+      
+      // Also update any video elements in the DOM directly
+      setTimeout(() => {
+        const localVideoElements = document.querySelectorAll('video[data-socket-id="local"]');
+        localVideoElements.forEach(video => {
+          if (video.srcObject !== stream) {
+            console.log('Directly setting local video stream to DOM element');
+            video.srcObject = stream;
+          }
+        });
+      }, 100);
+      
+      // Set initial states based on track availability
+      const videoTrack = stream.getVideoTracks()[0];
+      const audioTrack = stream.getAudioTracks()[0];
+      
+      setIsVideoOn(videoTrack ? videoTrack.enabled : false);
+      setIsMicOn(audioTrack ? audioTrack.enabled : false);
+      setCameraStarted(true);
+      
+      // Force re-render to update video grid
+      setParticipants(prev => [...prev]);
+      setForceUpdate(prev => prev + 1);
+      
+      // Debug: Check video elements
+      setTimeout(() => {
+        const videoElements = document.querySelectorAll('video');
+        console.log('Total video elements found:', videoElements.length);
+        videoElements.forEach((video, index) => {
+          console.log(`Video ${index}:`, {
+            srcObject: !!video.srcObject,
+            socketId: video.getAttribute('data-socket-id'),
+            videoTracks: video.srcObject?.getVideoTracks().length || 0
+          });
+        });
+      }, 200);
+      
+      toast.success('Camera started');
+    } catch (error) {
+      console.error('Error starting camera:', error);
+      toast.error('Failed to start camera. Please check permissions.');
+    }
+  }
+
+  function stopCamera() {
+    if (localStreamRef.current) {
+      localStreamRef.current.getTracks().forEach(track => track.stop());
+      localStreamRef.current = null;
+      if (localVideoRef.current) {
+        localVideoRef.current.srcObject = null;
+      }
+      setIsVideoOn(false);
+      setIsMicOn(false);
+      setCameraStarted(false);
+      
+      // Force re-render to update video grid
+      setParticipants(prev => [...prev]);
+      setForceUpdate(prev => prev + 1);
+      
+      toast.info('Camera stopped');
+    }
+  }
+
   function toggleVideo() {
-    if (!localStreamRef.current) return;
+    if (!localStreamRef.current) {
+      toast.error('Please start camera first');
+      return;
+    }
     const videoTrack = localStreamRef.current.getVideoTracks()[0];
     if (videoTrack) {
       videoTrack.enabled = !isVideoOn;
       setIsVideoOn(!isVideoOn);
+      
+      // Force re-render to update video grid
+      setParticipants(prev => [...prev]);
+      setForceUpdate(prev => prev + 1);
     }
   }
 
   function toggleMic() {
-    if (!localStreamRef.current) return;
+    if (!localStreamRef.current) {
+      toast.error('Please start camera first');
+      return;
+    }
     const audioTrack = localStreamRef.current.getAudioTracks()[0];
     if (audioTrack) {
       audioTrack.enabled = !isMicOn;
       setIsMicOn(!isMicOn);
+      
+      // Force re-render to update video grid
+      setParticipants(prev => [...prev]);
+      setForceUpdate(prev => prev + 1);
     }
   }
 
@@ -400,17 +528,165 @@ export default function VideoCall() {
     setIsInCall(false);
     setParticipants([]);
     setConnectedPeers([]);
+    setCameraStarted(false);
+    setIsVideoOn(false);
+    setIsMicOn(false);
     toast.success('Call ended');
   }
 
   function approve(socketId) {
     console.log('Approving user:', socketId);
+    console.log('Current roomId:', roomId);
+    console.log('Current pending list:', pending);
     socketRef.current?.emit('vc:approve', { roomId, socketId });
-    setPending((prev) => prev.filter((p) => p.socketId !== socketId));
+    setPending((prev) => {
+      const filtered = prev.filter((p) => p.socketId !== socketId);
+      console.log('Pending after approval:', filtered);
+      return filtered;
+    });
   }
   function reject(socketId) {
+    console.log('Rejecting user:', socketId);
+    console.log('Current roomId:', roomId);
     socketRef.current?.emit('vc:reject', { roomId, socketId });
-    setPending((prev) => prev.filter((p) => p.socketId !== socketId));
+    setPending((prev) => {
+      const filtered = prev.filter((p) => p.socketId !== socketId);
+      console.log('Pending after rejection:', filtered);
+      return filtered;
+    });
+  }
+
+  function createVideoGrid() {
+    const allParticipants = [...participants];
+    
+    // Add local user if camera is started
+    if (cameraStarted && localStreamRef.current) {
+      allParticipants.unshift({
+        socketId: 'local',
+        name: getDisplayName(),
+        isAdmin: isAdmin,
+        isLocal: true
+      });
+    }
+
+    if (allParticipants.length === 0) {
+      return React.createElement('div', { className: 'text-center text-muted-foreground py-8' },
+        'No participants with active cameras'
+      );
+    }
+
+    // Determine layout based on number of participants
+    let gridClass = '';
+    let videoSizeClass = '';
+    
+    if (allParticipants.length === 1) {
+      gridClass = 'grid grid-cols-1 max-w-md mx-auto';
+      videoSizeClass = 'aspect-video';
+    } else if (allParticipants.length === 2) {
+      gridClass = 'grid grid-cols-2 gap-4';
+      videoSizeClass = 'aspect-video';
+    } else if (allParticipants.length <= 4) {
+      gridClass = 'grid grid-cols-2 gap-4';
+      videoSizeClass = 'aspect-video';
+    } else {
+      gridClass = 'grid grid-cols-3 gap-4';
+      videoSizeClass = 'aspect-video';
+    }
+
+    return React.createElement('div', { className: gridClass },
+      allParticipants.map((participant, index) => {
+        const isSpeaking = speakingUser === participant.socketId;
+        const audioLevel = audioLevels.get(participant.socketId) || 0;
+        const isHighlighted = isSpeaking && allParticipants.length > 2;
+        const hasRemoteStream = !participant.isLocal && remoteStreamsRef.current.get(participant.socketId);
+        
+        return React.createElement('div', { 
+          key: participant.socketId,
+          className: `relative rounded-lg overflow-hidden border-2 transition-all duration-300 ${
+            isHighlighted 
+              ? 'border-blue-500 shadow-lg scale-105 z-10' 
+              : 'border-gray-300'
+          }`,
+          style: isHighlighted ? { order: -1 } : {}
+        },
+          // Video element
+          React.createElement('video', {
+            ref: participant.isLocal ? localVideoRef : (el) => {
+              if (el && !participant.isLocal) {
+                // Use useEffect-like approach to set stream when element is available
+                const stream = remoteStreamsRef.current.get(participant.socketId);
+                if (stream && el.srcObject !== stream) {
+                  el.srcObject = stream;
+                }
+              }
+            },
+            'data-socket-id': participant.socketId,
+            autoPlay: true,
+            muted: participant.isLocal,
+            playsInline: true,
+            className: `${videoSizeClass} w-full object-cover ${
+              participant.isLocal && isVideoMirrored ? 'scale-x-[-1]' : ''
+            }`,
+            onLoadedMetadata: (e) => {
+              // Ensure video plays when metadata is loaded
+              e.target.play().catch(console.error);
+            },
+            // For local video, ensure the stream is set
+            ...(participant.isLocal && localStreamRef.current ? { srcObject: localStreamRef.current } : {})
+          }),
+          
+          // Participant info overlay
+          React.createElement('div', { 
+            className: 'absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-2'
+          },
+            React.createElement('div', { className: 'flex items-center justify-between' },
+              React.createElement('span', { 
+                className: 'text-white text-sm font-medium truncate' 
+              }, participant.name),
+              React.createElement('div', { className: 'flex items-center space-x-1' },
+                participant.isAdmin && React.createElement(Badge, { 
+                  variant: 'secondary', 
+                  className: 'text-xs' 
+                }, 'Admin'),
+                participant.isLocal && React.createElement(Badge, { 
+                  variant: 'outline', 
+                  className: 'text-xs bg-white/20 text-white border-white/30' 
+                }, 'You')
+              )
+            )
+          ),
+          
+          // Speaking indicator
+          isSpeaking && React.createElement('div', { 
+            className: 'absolute top-2 right-2 w-3 h-3 bg-green-500 rounded-full animate-pulse' 
+          }),
+          
+          // Audio level indicator
+          audioLevel > 10 && React.createElement('div', { 
+            className: 'absolute top-2 left-2 flex space-x-1' 
+          },
+            [...Array(Math.min(Math.floor(audioLevel / 20), 5))].map((_, i) => 
+              React.createElement('div', { 
+                key: i,
+                className: 'w-1 bg-green-500 rounded-full animate-pulse',
+                style: { height: `${(i + 1) * 4}px` }
+              })
+            )
+          ),
+          
+          // Camera off indicator for remote participants without streams
+          (!participant.isLocal && !hasRemoteStream) && 
+          React.createElement('div', { 
+            className: 'absolute inset-0 bg-gray-800 flex items-center justify-center' 
+          },
+            React.createElement('div', { className: 'text-center text-white' },
+              React.createElement(VideoOff, { className: 'h-8 w-8 mx-auto mb-2' }),
+              React.createElement('p', { className: 'text-sm' }, 'Camera off')
+            )
+          )
+        );
+      })
+    );
   }
 
   return (
@@ -464,6 +740,27 @@ export default function VideoCall() {
           )
         ),
 
+        isAdmin && React.createElement(Card, null,
+          React.createElement(CardHeader, null,
+            React.createElement(CardTitle, null, 'Room Settings')
+          ),
+          React.createElement(CardContent, { className: 'space-y-4' },
+            React.createElement('div', { className: 'space-y-2' },
+              React.createElement('label', { className: 'text-sm font-medium' }, 'Max Participants'),
+              React.createElement(Input, { 
+                type: 'number', 
+                min: 2, 
+                max: 20, 
+                value: roomSettings.maxParticipants,
+                onChange: (e) => updateRoomSettings({ ...roomSettings, maxParticipants: parseInt(e.target.value) })
+              })
+            ),
+            React.createElement('div', { className: 'text-sm text-muted-foreground' },
+              'All participants require admin approval to join'
+            )
+          )
+        ),
+
         React.createElement(Card, null,
           React.createElement(CardHeader, null,
             React.createElement(CardTitle, { className: 'flex items-center' },
@@ -490,41 +787,44 @@ export default function VideoCall() {
         React.createElement('h3', { className: 'text-lg font-semibold text-center' }, 
           `Video Call - ${participants.length} participant${participants.length !== 1 ? 's' : ''}`
         ),
-        React.createElement('div', { className: 'grid gap-4 md:grid-cols-2' },
-          React.createElement('div', { className: 'space-y-2' },
-            React.createElement('h4', { className: 'text-sm font-medium text-center' }, 'Your Video'),
-            React.createElement('video', { 
-              ref: localVideoRef, 
-              autoPlay: true, 
-              muted: true, 
-              playsInline: true, 
-              className: `w-full rounded-md border ${isVideoMirrored ? 'scale-x-[-1]' : ''}` 
-            })
-          ),
-          React.createElement('div', { className: 'space-y-2' },
-            React.createElement('h4', { className: 'text-sm font-medium text-center' }, 'Remote Video'),
-            React.createElement('video', { 
-              ref: remoteVideoRef, 
-              autoPlay: true, 
-              playsInline: true, 
-              className: 'w-full rounded-md border' 
-            })
-          )
-        )
+        createVideoGrid()
       ),
 
-      isInCall && React.createElement('div', { className: 'flex justify-center space-x-4' },
-        React.createElement(Button, { variant: isVideoOn ? 'default' : 'destructive', onClick: toggleVideo },
-          isVideoOn ? React.createElement(Video, { className: 'h-4 w-4' }) : React.createElement(VideoOff, { className: 'h-4 w-4' })
+      isInCall && React.createElement('div', { className: 'space-y-4' },
+        // Camera Control Section
+        React.createElement('div', { className: 'flex justify-center space-x-4' },
+          !cameraStarted ? (
+            React.createElement(Button, { onClick: startCamera, className: 'bg-green-600 hover:bg-green-700' },
+              React.createElement(Video, { className: 'h-4 w-4 mr-2' }),
+              'Start Camera'
+            )
+          ) : (
+            React.createElement(Button, { onClick: stopCamera, variant: 'destructive' },
+              React.createElement(VideoOff, { className: 'h-4 w-4 mr-2' }),
+              'Stop Camera'
+            )
+          )
         ),
-        React.createElement(Button, { variant: isMicOn ? 'default' : 'destructive', onClick: toggleMic },
-          isMicOn ? React.createElement(Mic, { className: 'h-4 w-4' }) : React.createElement(MicOff, { className: 'h-4 w-4' })
+        
+        // Media Controls (only show when camera is started)
+        cameraStarted && React.createElement('div', { className: 'flex justify-center space-x-4' },
+          React.createElement(Button, { variant: isVideoOn ? 'default' : 'destructive', onClick: toggleVideo },
+            isVideoOn ? React.createElement(Video, { className: 'h-4 w-4' }) : React.createElement(VideoOff, { className: 'h-4 w-4' })
+          ),
+          React.createElement(Button, { variant: isMicOn ? 'default' : 'destructive', onClick: toggleMic },
+            isMicOn ? React.createElement(Mic, { className: 'h-4 w-4' }) : React.createElement(MicOff, { className: 'h-4 w-4' })
+          ),
+          React.createElement(Button, { variant: isVideoMirrored ? 'default' : 'outline', onClick: toggleVideoMirror, title: 'Toggle Video Mirror' },
+            React.createElement(FlipHorizontal, { className: 'h-4 w-4' })
+          )
         ),
-        React.createElement(Button, { variant: isVideoMirrored ? 'default' : 'outline', onClick: toggleVideoMirror, title: 'Toggle Video Mirror' },
-          React.createElement(FlipHorizontal, { className: 'h-4 w-4' })
-        ),
-        React.createElement(Button, { variant: 'destructive', onClick: endCall },
-          React.createElement(Phone, { className: 'h-4 w-4' })
+        
+        // End Call Button
+        React.createElement('div', { className: 'flex justify-center' },
+          React.createElement(Button, { variant: 'destructive', onClick: endCall },
+            React.createElement(Phone, { className: 'h-4 w-4 mr-2' }),
+            'End Call'
+          )
         )
       )
     )

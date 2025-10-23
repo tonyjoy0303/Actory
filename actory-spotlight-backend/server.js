@@ -68,19 +68,20 @@ async function start() {
     if (io) {
       io.on('connection', (socket) => {
         // Create a room, mark this socket as admin
-        socket.on('vc:create', ({ roomId, user }) => {
+        socket.on('vc:create', ({ roomId, user, settings }) => {
           const id = roomId || Math.random().toString(36).slice(2, 10);
           rooms.set(id, { 
             adminSocketId: socket.id, 
             members: new Set([socket.id]), 
             pending: new Map(),
-            adminUser: user || { name: 'Admin' }
+            adminUser: user || { name: 'Admin' },
+            maxParticipants: settings?.maxParticipants || 10
           });
           socket.join(id);
-          socket.emit('vc:created', { roomId: id, admin: true });
+          socket.emit('vc:created', { roomId: id, admin: true, settings: rooms.get(id) });
         });
 
-        // Request to join a room (requires admin approval)
+        // Request to join a room (auto-approve for late comers)
         socket.on('vc:request-join', ({ roomId, user }) => {
           console.log('Join request received:', { roomId, socketId: socket.id, user });
           const room = rooms.get(roomId);
@@ -89,9 +90,20 @@ async function start() {
             socket.emit('vc:join-rejected', { roomId, reason: 'Room not found' });
             return;
           }
-          // Queue pending request and notify admin
+          
+          // Check if room is full
+          const maxParticipants = room.maxParticipants || 10;
+          
+          if (room.members.size >= maxParticipants) {
+            socket.emit('vc:join-rejected', { roomId, reason: 'Room is full' });
+            return;
+          }
+          
+          // Always require admin approval - no automatic joins
           room.pending.set(socket.id, user || { name: 'Guest' });
-          console.log('Notifying admin:', room.adminSocketId);
+          console.log('Notifying admin of join request:', room.adminSocketId);
+          console.log('Admin socket exists:', io.sockets.sockets.has(room.adminSocketId));
+          console.log('Current pending list for room:', Array.from(room.pending.entries()));
           io.to(room.adminSocketId).emit('vc:join-request', { roomId, socketId: socket.id, user: user || { name: 'Guest' } });
         });
 
@@ -101,15 +113,19 @@ async function start() {
           const room = rooms.get(roomId);
           if (!room || room.adminSocketId !== socket.id) {
             console.log('Approval failed: not admin or room not found');
+            console.log('Room exists:', !!room);
+            console.log('Is admin:', room?.adminSocketId === socket.id);
             return;
           }
           if (!room.pending.has(socketId)) {
             console.log('Approval failed: socket not in pending');
+            console.log('Current pending:', Array.from(room.pending.keys()));
             return;
           }
           const user = room.pending.get(socketId);
           room.pending.delete(socketId);
           console.log('Sending approval to:', socketId);
+          console.log('Target socket exists:', io.sockets.sockets.has(socketId));
           io.to(socketId).emit('vc:join-approved', { roomId });
         });
 
@@ -121,6 +137,22 @@ async function start() {
           const user = room.pending.get(socketId);
           room.pending.delete(socketId);
           io.to(socketId).emit('vc:join-rejected', { roomId, reason: reason || 'Rejected by host' });
+        });
+
+        // Admin updates room settings
+        socket.on('vc:update-settings', ({ roomId, settings }) => {
+          const room = rooms.get(roomId);
+          if (!room || room.adminSocketId !== socket.id) return;
+          
+          // Update room settings (only maxParticipants now)
+          if (settings.maxParticipants !== undefined) {
+            room.maxParticipants = settings.maxParticipants;
+          }
+          
+          // Notify all participants about settings change
+          io.to(roomId).emit('vc:settings-updated', { settings: {
+            maxParticipants: room.maxParticipants
+          }});
         });
 
         // Finalize join after approval
