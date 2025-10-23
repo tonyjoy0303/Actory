@@ -45,7 +45,8 @@ export default function CastingList() {
   const [filters, setFilters] = useState({
     experienceLevel: '',
     genderRequirement: '',
-    location: ''
+    location: '',
+    age: ''
   });
 
   useEffect(() => {
@@ -75,10 +76,17 @@ export default function CastingList() {
         ...(c.skills?.map(s => s.toLowerCase()) || [])
       ].some(field => field?.includes(query.toLowerCase()));
 
+      const ageNumber = Number(filters.age);
+      const matchesAge = !filters.age || (
+        Number.isFinite(ageNumber) &&
+        Number(c?.ageRange?.min) <= ageNumber && ageNumber <= Number(c?.ageRange?.max)
+      );
+
       const matchesFilters = (
         (!filters.experienceLevel || c.experienceLevel === filters.experienceLevel) &&
         (!filters.genderRequirement || c.genderRequirement === filters.genderRequirement) &&
-        (!filters.location || c.location?.toLowerCase().includes(filters.location.toLowerCase()))
+        (!filters.location || c.location?.toLowerCase().includes(filters.location.toLowerCase())) &&
+        matchesAge
       );
 
       return matchesSearch && matchesFilters;
@@ -182,6 +190,16 @@ export default function CastingList() {
             value={filters.location}
             onChange={(e) => setFilters({...filters, location: e.target.value})}
             className="h-9 w-auto max-w-[200px]"
+          />
+
+          <Input
+            type="number"
+            placeholder="by age"
+            value={filters.age}
+            onChange={(e) => setFilters({ ...filters, age: e.target.value })}
+            className="h-9 w-auto max-w-[160px]"
+            min={1}
+            max={120}
           />
         </div>
       </div>
