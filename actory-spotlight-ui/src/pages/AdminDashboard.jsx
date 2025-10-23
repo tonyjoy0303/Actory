@@ -435,9 +435,6 @@ export default function AdminDashboard() {
                       , selectedVideo.weight !== undefined && (
                         React.createElement('div', {__self: this, __source: {fileName: _jsxFileName, lineNumber: 418}}, React.createElement('span', { className: "text-muted-foreground", __self: this, __source: {fileName: _jsxFileName, lineNumber: 418}}, "Weight:"), " " , selectedVideo.weight, " kg" )
                       )
-                      , selectedVideo.skintone && (
-                        React.createElement('div', {__self: this, __source: {fileName: _jsxFileName, lineNumber: 421}}, React.createElement('span', { className: "text-muted-foreground", __self: this, __source: {fileName: _jsxFileName, lineNumber: 421}}, "Skintone:"), " " , selectedVideo.skintone)
-                      )
                     )
                     , selectedVideo.videoUrl && (
                       React.createElement('div', { className: "space-y-2", __self: this, __source: {fileName: _jsxFileName, lineNumber: 425}}

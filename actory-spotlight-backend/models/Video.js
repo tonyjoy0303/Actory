@@ -55,10 +55,39 @@ const VideoSchema = new mongoose.Schema({
     min: [1, 'Age seems too low'],
     max: [120, 'Age seems too high'],
   },
-  skintone: {
+  skills: {
+    type: [String],
+    required: function() { return this.type === 'audition'; },
+    validate: {
+      validator: function(v) {
+        return v && v.length > 0;
+      },
+      message: 'Please add at least one skill',
+    },
+  },
+  permanentAddress: {
     type: String,
     required: function() { return this.type === 'audition'; },
     trim: true,
+  },
+  livingCity: {
+    type: String,
+    required: function() { return this.type === 'audition'; },
+    trim: true,
+  },
+  dateOfBirth: {
+    type: Date,
+    required: function() { return this.type === 'audition'; },
+  },
+  phoneNumber: {
+    type: String,
+    required: function() { return this.type === 'audition'; },
+    trim: true,
+  },
+  email: {
+    type: String,
+    trim: true,
+    lowercase: true,
   },
   status: {
     type: String,

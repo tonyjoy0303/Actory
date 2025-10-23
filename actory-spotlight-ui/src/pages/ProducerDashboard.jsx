@@ -6,6 +6,7 @@ import SEO from "@/components/SEO";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 export default function ProducerDashboard() {
   const [castingCalls, setCastingCalls] = useState([]);
@@ -18,6 +19,51 @@ export default function ProducerDashboard() {
   const [submissions, setSubmissions] = useState([]);
   const [submissionsLoading, setSubmissionsLoading] = useState(false);
   const [updatingId, setUpdatingId] = useState(null);
+  const [sortBy, setSortBy] = useState('date-desc');
+
+  // Sorting function
+  const sortSubmissions = (submissions, sortBy) => {
+    const sorted = [...submissions];
+    
+    switch (sortBy) {
+      case 'date-desc':
+        return sorted.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+      case 'date-asc':
+        return sorted.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+      case 'name-asc':
+        return sorted.sort((a, b) => (a.actor?.name || '').localeCompare(b.actor?.name || ''));
+      case 'name-desc':
+        return sorted.sort((a, b) => (b.actor?.name || '').localeCompare(a.actor?.name || ''));
+      case 'status-accepted':
+        return sorted.sort((a, b) => {
+          if (a.status === 'Accepted' && b.status !== 'Accepted') return -1;
+          if (b.status === 'Accepted' && a.status !== 'Accepted') return 1;
+          return new Date(b.createdAt) - new Date(a.createdAt);
+        });
+      case 'status-rejected':
+        return sorted.sort((a, b) => {
+          if (a.status === 'Rejected' && b.status !== 'Rejected') return -1;
+          if (b.status === 'Rejected' && a.status !== 'Rejected') return 1;
+          return new Date(b.createdAt) - new Date(a.createdAt);
+        });
+      case 'status-pending':
+        return sorted.sort((a, b) => {
+          if (a.status === 'Pending' && b.status !== 'Pending') return -1;
+          if (b.status === 'Pending' && a.status !== 'Pending') return 1;
+          return new Date(b.createdAt) - new Date(a.createdAt);
+        });
+      case 'age-asc':
+        return sorted.sort((a, b) => (a.age || 0) - (b.age || 0));
+      case 'age-desc':
+        return sorted.sort((a, b) => (b.age || 0) - (a.age || 0));
+      case 'height-asc':
+        return sorted.sort((a, b) => (a.height || 0) - (b.height || 0));
+      case 'height-desc':
+        return sorted.sort((a, b) => (b.height || 0) - (a.height || 0));
+      default:
+        return sorted;
+    }
+  };
 
   useEffect(() => {
     // Get user from local storage
@@ -86,17 +132,60 @@ export default function ProducerDashboard() {
       return <p className="text-center text-sm">Loading submissions...</p>;
     }
     if (submissions.length) {
+      const sortedSubmissions = sortSubmissions(submissions, sortBy);
       return (
-        <div className="space-y-3 max-h-[60vh] overflow-auto">
-          {submissions.map((s) => (
+        <div className="space-y-4">
+          <div className="flex items-center gap-2">
+            <label className="text-sm font-medium">Sort by:</label>
+            <Select value={sortBy} onValueChange={setSortBy}>
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="Sort submissions" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="date-desc">Newest First</SelectItem>
+                <SelectItem value="date-asc">Oldest First</SelectItem>
+                <SelectItem value="name-asc">Name A-Z</SelectItem>
+                <SelectItem value="name-desc">Name Z-A</SelectItem>
+                <SelectItem value="status-accepted">Accepted First</SelectItem>
+                <SelectItem value="status-rejected">Rejected First</SelectItem>
+                <SelectItem value="status-pending">Pending First</SelectItem>
+                <SelectItem value="age-asc">Age (Youngest)</SelectItem>
+                <SelectItem value="age-desc">Age (Oldest)</SelectItem>
+                <SelectItem value="height-asc">Height (Shortest)</SelectItem>
+                <SelectItem value="height-desc">Height (Tallest)</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-3 max-h-[60vh] overflow-auto">
+            {sortedSubmissions.map((s) => (
             <div key={s._id} className="p-3 rounded-md border flex items-center justify-between gap-3">
               <div>
                 <p className="font-medium">{s.actor?.name || 'Unknown actor'}</p>
                 <p className="text-xs text-muted-foreground">{s.actor?.email}</p>
                 <p className="text-xs text-muted-foreground">Title: {s.title}</p>
                 <p className="text-xs text-muted-foreground">
-                  Height: {s.height} cm • Weight: {s.weight} kg • Age: {s.age} • Skintone: {s.skintone}
+                  Height: {s.height} cm • Weight: {s.weight} kg • Age: {s.age}
                 </p>
+                <p className="text-xs text-muted-foreground">
+                  Address: {s.permanentAddress}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  City: {s.livingCity} • DOB: {new Date(s.dateOfBirth).toLocaleDateString()} • Phone: {s.phoneNumber}
+                </p>
+                {s.email && (
+                  <p className="text-xs text-muted-foreground">
+                    Email: {s.email}
+                  </p>
+                )}
+                {s.skills && s.skills.length > 0 && (
+                  <div className="flex flex-wrap gap-1 mt-1">
+                    {s.skills.map((skill) => (
+                      <span key={skill} className="px-2 py-0.5 rounded-full bg-secondary text-xs">
+                        {skill}
+                      </span>
+                    ))}
+                  </div>
+                )}
                 <p className="text-xs text-muted-foreground">
                   Submitted: {new Date(s.createdAt).toLocaleString()}
                 </p>
@@ -137,6 +226,7 @@ export default function ProducerDashboard() {
               </div>
             </div>
           ))}
+          </div>
         </div>
       );
     }

@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Bell, Video, Upload as UploadIcon, PlayCircle, MessageCircle } from "lucide-react";
 import VideoUploadForm from "@/components/profile/VideoUploadForm";
 import VideoList from "@/components/profile/VideoList";
@@ -222,7 +223,48 @@ export default function ActorDashboard() {
   const [castingCalls, setCastingCalls] = useState([]);
   const [submissions, setSubmissions] = useState([]);
   const [submissionsLoading, setSubmissionsLoading] = useState(true);
+  const [sortBy, setSortBy] = useState('date-desc');
   const [selectedVideo, setSelectedVideo] = useState(null);
+
+  // Sorting function for submissions
+  const sortSubmissions = (submissions, sortBy) => {
+    const sorted = [...submissions];
+    
+    switch (sortBy) {
+      case 'date-desc':
+        return sorted.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+      case 'date-asc':
+        return sorted.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+      case 'title-asc':
+        return sorted.sort((a, b) => (a.title || '').localeCompare(b.title || ''));
+      case 'title-desc':
+        return sorted.sort((a, b) => (b.title || '').localeCompare(a.title || ''));
+      case 'status-accepted':
+        return sorted.sort((a, b) => {
+          if (a.status === 'Accepted' && b.status !== 'Accepted') return -1;
+          if (b.status === 'Accepted' && a.status !== 'Accepted') return 1;
+          return new Date(b.createdAt) - new Date(a.createdAt);
+        });
+      case 'status-rejected':
+        return sorted.sort((a, b) => {
+          if (a.status === 'Rejected' && b.status !== 'Rejected') return -1;
+          if (b.status === 'Rejected' && a.status !== 'Rejected') return 1;
+          return new Date(b.createdAt) - new Date(a.createdAt);
+        });
+      case 'status-pending':
+        return sorted.sort((a, b) => {
+          if (a.status === 'Pending' && b.status !== 'Pending') return -1;
+          if (b.status === 'Pending' && a.status !== 'Pending') return 1;
+          return new Date(b.createdAt) - new Date(a.createdAt);
+        });
+      case 'casting-title-asc':
+        return sorted.sort((a, b) => (a.castingTitle || '').localeCompare(b.castingTitle || ''));
+      case 'casting-title-desc':
+        return sorted.sort((a, b) => (b.castingTitle || '').localeCompare(a.castingTitle || ''));
+      default:
+        return sorted;
+    }
+  };
   const [playingVideo, setPlayingVideo] = useState(null);
   const [showVideoPlayer, setShowVideoPlayer] = useState(false);
   const videoRef = useRef(null);
@@ -463,10 +505,35 @@ export default function ActorDashboard() {
         <TabsContent value="submissions">
           <Card>
             <CardHeader>
-              <CardTitle>My Submissions</CardTitle>
-              <CardDescription>
-                Track your audition submissions and their status
-              </CardDescription>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle>My Submissions</CardTitle>
+                  <CardDescription>
+                    Track your audition submissions and their status
+                  </CardDescription>
+                </div>
+                {submissions.length > 0 && (
+                  <div className="flex items-center gap-2">
+                    <label className="text-sm font-medium">Sort by:</label>
+                    <Select value={sortBy} onValueChange={setSortBy}>
+                      <SelectTrigger className="w-[180px]">
+                        <SelectValue placeholder="Sort submissions" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="date-desc">Newest First</SelectItem>
+                        <SelectItem value="date-asc">Oldest First</SelectItem>
+                        <SelectItem value="title-asc">Title A-Z</SelectItem>
+                        <SelectItem value="title-desc">Title Z-A</SelectItem>
+                        <SelectItem value="status-accepted">Accepted First</SelectItem>
+                        <SelectItem value="status-rejected">Rejected First</SelectItem>
+                        <SelectItem value="status-pending">Pending First</SelectItem>
+                        <SelectItem value="casting-title-asc">Casting A-Z</SelectItem>
+                        <SelectItem value="casting-title-desc">Casting Z-A</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+              </div>
             </CardHeader>
             <CardContent>
               {submissionsLoading ? (
@@ -482,7 +549,7 @@ export default function ActorDashboard() {
                 </div>
               ) : (
                 <div className="space-y-4">
-                  {submissions.map((submission) => (
+                  {sortSubmissions(submissions, sortBy).map((submission) => (
                     <Card key={submission._id} className="mb-4">
                       <CardContent className="p-4">
                         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -499,6 +566,22 @@ export default function ActorDashboard() {
                                 minute: '2-digit'
                               })}
                             </p>
+                            <div className="text-xs text-muted-foreground mt-2 space-y-1">
+                              <p>Address: {submission.permanentAddress}</p>
+                              <p>City: {submission.livingCity} • DOB: {new Date(submission.dateOfBirth).toLocaleDateString()} • Phone: {submission.phoneNumber}</p>
+                              {submission.email && (
+                                <p>Email: {submission.email}</p>
+                              )}
+                            </div>
+                            {submission.skills && submission.skills.length > 0 && (
+                              <div className="flex flex-wrap gap-1 mt-2">
+                                {submission.skills.map((skill) => (
+                                  <span key={skill} className="px-2 py-0.5 rounded-full bg-secondary text-xs">
+                                    {skill}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
                           </div>
                           <div className="flex items-center gap-2">
                             <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${

@@ -9,6 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from '@/components/ui/input';
 import { Progress } from '@/components/ui/progress';
+import { Plus, X } from 'lucide-react';
 
 // Define types
 
@@ -22,12 +23,31 @@ export default function AuditionSubmit() {
   const [height, setHeight] = useState(''); // cm
   const [weight, setWeight] = useState(''); // kg
   const [age, setAge] = useState('');
-  const [skintone, setSkintone] = useState('');
+  const [skills, setSkills] = useState([]);
+  const [skillInput, setSkillInput] = useState('');
+  const [permanentAddress, setPermanentAddress] = useState('');
+  const [livingCity, setLivingCity] = useState('');
+  const [dateOfBirth, setDateOfBirth] = useState('');
+  const [phoneNumber, setPhoneNumber] = useState('');
+  const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [portfolioFile, setPortfolioFile] = useState(null);
   const [portfolioUploadProgress, setPortfolioUploadProgress] = useState(0);
   const videoRef = useRef(null);
+
+  // Skills handling functions
+  const handleAddSkill = (e) => {
+    e.preventDefault();
+    if (skillInput.trim() && !skills.includes(skillInput.trim())) {
+      setSkills([...skills, skillInput.trim()]);
+      setSkillInput('');
+    }
+  };
+
+  const handleRemoveSkill = (skillToRemove) => {
+    setSkills(skills.filter(skill => skill !== skillToRemove));
+  };
 
   useEffect(() => {
     const fetchCastingCall = async () => {
@@ -85,8 +105,9 @@ export default function AuditionSubmit() {
     const w = Number(weight);
     const a = Number(age);
 
-    if (!file || !portfolioFile || !title || !height || !weight || !age || !skintone) {
-      toast.error('Please fill all fields, select a video, and upload your portfolio PDF.');
+    if (!file || !portfolioFile || !title || !height || !weight || !age || skills.length === 0 || 
+        !permanentAddress || !livingCity || !dateOfBirth || !phoneNumber) {
+      toast.error('Please fill all fields, select a video, upload your portfolio PDF, and add at least one skill.');
       return;
     }
     if (portfolioFile && portfolioFile.size > 500 * 1024) {
@@ -155,7 +176,12 @@ export default function AuditionSubmit() {
           height: h,
           weight: w,
           age: a,
-          skintone,
+          skills,
+          permanentAddress,
+          livingCity,
+          dateOfBirth,
+          phoneNumber,
+          email,
           portfolioUrl,
         }
       );
@@ -259,14 +285,57 @@ export default function AuditionSubmit() {
                   , React.createElement('label', { className: "block text-sm mb-1"  , __self: this, __source: {fileName: _jsxFileName, lineNumber: 216}}, "Age")
                   , React.createElement(Input, { type: "number", inputMode: "numeric", min: 1, max: 120, step: 1, placeholder: "e.g., 26" , value: age, onChange: (e) => setAge(e.target.value), disabled: loading, __self: this, __source: {fileName: _jsxFileName, lineNumber: 217}} )
                 )
-                , React.createElement('div', {__self: this, __source: {fileName: _jsxFileName, lineNumber: 219}}
-                  , React.createElement('label', { className: "block text-sm mb-1"  , __self: this, __source: {fileName: _jsxFileName, lineNumber: 220}}, "Skintone")
-                  , React.createElement(Input, { type: "text", placeholder: "e.g., Fair, Medium, Dark" , value: skintone, onChange: (e) => setSkintone(e.target.value), disabled: loading, __self: this, __source: {fileName: _jsxFileName, lineNumber: 221}} )
+              )
+
+              /* Personal Information Fields */
+              , React.createElement('div', { className: "grid grid-cols-1 sm:grid-cols-2 gap-4"   , __self: this, __source: {fileName: _jsxFileName, lineNumber: 220}}
+                , React.createElement('div', {__self: this, __source: {fileName: _jsxFileName, lineNumber: 221}}
+                  , React.createElement('label', { className: "block text-sm mb-1"  , __self: this, __source: {fileName: _jsxFileName, lineNumber: 222}}, "Permanent Address *")
+                  , React.createElement(Input, { type: "text", placeholder: "Enter your permanent address" , value: permanentAddress, onChange: (e) => setPermanentAddress(e.target.value), disabled: loading, __self: this, __source: {fileName: _jsxFileName, lineNumber: 223}} )
                 )
-                  , React.createElement('div', {__self: this, __source: {fileName: _jsxFileName, lineNumber: 222}}
-                    , React.createElement('label', { className: "block text-sm mb-1"  , __self: this, __source: {fileName: _jsxFileName, lineNumber: 223}}, "Portfolio (PDF)")
-                    , React.createElement(Input, { type: "file", accept: "application/pdf", onChange: onSelectPortfolio, disabled: loading, __self: this, __source: {fileName: _jsxFileName, lineNumber: 224}} )
-                    , portfolioFile ? React.createElement('p', { className: "text-xs text-muted-foreground mt-1" , __self: this, __source: {fileName: _jsxFileName, lineNumber: 225}}, _optionalChain([portfolioFile, 'access', _ => _.name])) : null
+                , React.createElement('div', {__self: this, __source: {fileName: _jsxFileName, lineNumber: 225}}
+                  , React.createElement('label', { className: "block text-sm mb-1"  , __self: this, __source: {fileName: _jsxFileName, lineNumber: 226}}, "Living City *")
+                  , React.createElement(Input, { type: "text", placeholder: "Enter your current city" , value: livingCity, onChange: (e) => setLivingCity(e.target.value), disabled: loading, __self: this, __source: {fileName: _jsxFileName, lineNumber: 227}} )
+                )
+                , React.createElement('div', {__self: this, __source: {fileName: _jsxFileName, lineNumber: 229}}
+                  , React.createElement('label', { className: "block text-sm mb-1"  , __self: this, __source: {fileName: _jsxFileName, lineNumber: 230}}, "Date of Birth *")
+                  , React.createElement(Input, { type: "date", value: dateOfBirth, onChange: (e) => setDateOfBirth(e.target.value), disabled: loading, __self: this, __source: {fileName: _jsxFileName, lineNumber: 231}} )
+                )
+                , React.createElement('div', {__self: this, __source: {fileName: _jsxFileName, lineNumber: 233}}
+                  , React.createElement('label', { className: "block text-sm mb-1"  , __self: this, __source: {fileName: _jsxFileName, lineNumber: 234}}, "Phone Number *")
+                  , React.createElement(Input, { type: "tel", placeholder: "Enter your phone number" , value: phoneNumber, onChange: (e) => setPhoneNumber(e.target.value), disabled: loading, __self: this, __source: {fileName: _jsxFileName, lineNumber: 235}} )
+                )
+                , React.createElement('div', { className: "sm:col-span-2" , __self: this, __source: {fileName: _jsxFileName, lineNumber: 237}}
+                  , React.createElement('label', { className: "block text-sm mb-1"  , __self: this, __source: {fileName: _jsxFileName, lineNumber: 238}}, "Email Address (Optional)")
+                  , React.createElement(Input, { type: "email", placeholder: "Enter your email address (optional)" , value: email, onChange: (e) => setEmail(e.target.value), disabled: loading, __self: this, __source: {fileName: _jsxFileName, lineNumber: 239}} )
+                )
+              )
+
+              /* Skills Section */
+              , React.createElement('div', { className: "grid grid-cols-1"   , __self: this, __source: {fileName: _jsxFileName, lineNumber: 241}}
+                  , React.createElement('div', { className: "md:col-span-2" , __self: this, __source: {fileName: _jsxFileName, lineNumber: 222}}
+                    , React.createElement('label', { className: "block text-sm mb-1"  , __self: this, __source: {fileName: _jsxFileName, lineNumber: 223}}, "Skills *")
+                    , React.createElement('div', { className: "flex gap-2" , __self: this, __source: {fileName: _jsxFileName, lineNumber: 224}}
+                      , React.createElement(Input, { placeholder: "Add a skill (e.g., Dancing, Martial Arts)" , value: skillInput, onChange: (e) => setSkillInput(e.target.value), onKeyDown: (e) => e.key === 'Enter' && handleAddSkill(e), disabled: loading, __self: this, __source: {fileName: _jsxFileName, lineNumber: 225}} )
+                      , React.createElement(Button, { type: "button", variant: "outline", size: "icon", onClick: handleAddSkill, disabled: loading, __self: this, __source: {fileName: _jsxFileName, lineNumber: 226}}
+                        , React.createElement(Plus, { className: "h-4 w-4" , __self: this, __source: {fileName: _jsxFileName, lineNumber: 227}} )
+                      )
+                    )
+                    , React.createElement('div', { className: "flex flex-wrap gap-2 mt-2" , __self: this, __source: {fileName: _jsxFileName, lineNumber: 228}}
+                      , skills.map((skill) => (
+                        React.createElement('div', { key: skill, className: "flex items-center gap-1 bg-secondary px-2 py-1 rounded-md text-sm"  , __self: this, __source: {fileName: _jsxFileName, lineNumber: 230}}
+                          , skill
+                          , React.createElement('button', { type: "button", onClick: () => handleRemoveSkill(skill), className: "text-muted-foreground hover:text-foreground" , __self: this, __source: {fileName: _jsxFileName, lineNumber: 231}}
+                            , React.createElement(X, { className: "h-3 w-3" , __self: this, __source: {fileName: _jsxFileName, lineNumber: 232}} )
+                          )
+                        )
+                      ))
+                    )
+                  )
+                  , React.createElement('div', {__self: this, __source: {fileName: _jsxFileName, lineNumber: 235}}
+                    , React.createElement('label', { className: "block text-sm mb-1"  , __self: this, __source: {fileName: _jsxFileName, lineNumber: 236}}, "Portfolio (PDF)")
+                    , React.createElement(Input, { type: "file", accept: "application/pdf", onChange: onSelectPortfolio, disabled: loading, __self: this, __source: {fileName: _jsxFileName, lineNumber: 237}} )
+                    , portfolioFile ? React.createElement('p', { className: "text-xs text-muted-foreground mt-1" , __self: this, __source: {fileName: _jsxFileName, lineNumber: 238}}, _optionalChain([portfolioFile, 'access', _ => _.name])) : null
                   )
               )
 
