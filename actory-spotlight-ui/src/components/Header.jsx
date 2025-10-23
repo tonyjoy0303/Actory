@@ -14,7 +14,17 @@ import recruiterImg from "@/assets/recruiter.jpg";
 import actorImg from "@/assets/actor.jpg";
 import { toast } from 'sonner';
 
-const API_ORIGIN = API.defaults.baseURL.replace(/\/api\/v1$/, "");
+// Helper function to get image URL (handles both local uploads and Cloudinary)
+const getImageUrl = (imagePath) => {
+  if (!imagePath) return '';
+  // If it's already a full URL (Cloudinary), return as is
+  if (imagePath.startsWith('http')) {
+    return imagePath;
+  }
+  // If it's a local path, prepend backend origin
+  const API_ORIGIN = API.defaults.baseURL.replace(/\/api\/v1$/, "");
+  return `${API_ORIGIN}${imagePath}`;
+};
 
 export default function Header() {
   const navigate = useNavigate();
@@ -230,7 +240,7 @@ export default function Header() {
                     />
                   ) : _optionalChain([user, 'optionalAccess', _3 => _3.photo]) ? (
                     <img 
-                      src={`${API_ORIGIN}${_optionalChain([user, 'optionalAccess', _4 => _4.photo])}`}
+                      src={getImageUrl(_optionalChain([user, 'optionalAccess', _4 => _4.photo]))}
                       alt="Avatar" 
                       className="w-8 h-8 rounded-full object-cover border" 
                     />

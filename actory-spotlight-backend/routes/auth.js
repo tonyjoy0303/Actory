@@ -19,36 +19,21 @@ const fs = require('fs');
 
 const router = express.Router();
 
-// Configure uploads directory
-const uploadDir = path.join(__dirname, '..', 'uploads');
-if (!fs.existsSync(uploadDir)) {
-  fs.mkdirSync(uploadDir);
-}
-
-// Multer storage configuration
-const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    cb(null, uploadDir);
-  },
-  filename: function (req, file, cb) {
-    const ext = path.extname(file.originalname);
-    const safeExt = ext && ext.length <= 8 ? ext : '.jpg';
-    cb(null, `photo_${req.user.id}_${Date.now()}${safeExt}`);
-  }
-});
+// Multer storage configuration - using memory storage for Cloudinary
+const storage = multer.memoryStorage();
 
 const upload = multer({
   storage,
-  limits: { fileSize: 2 * 1024 * 1024 }, // 2MB
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB (increased for better quality)
   fileFilter: function (req, file, cb) {
-    const filetypes = /jpe?g|png/;
+    const filetypes = /jpe?g|png|webp/;
     const mimetype = filetypes.test(file.mimetype);
     const extname = filetypes.test(path.extname(file.originalname).toLowerCase());
     
     if (mimetype && extname) {
       return cb(null, true);
     }
-    cb(new Error('Only .png, .jpg and .jpeg format allowed!'));
+    cb(new Error('Only .png, .jpg, .jpeg and .webp format allowed!'));
   }
 });
 

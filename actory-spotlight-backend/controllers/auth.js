@@ -315,11 +315,45 @@ exports.uploadPhoto = async (req, res) => {
       return res.status(400).json({ success: false, message: 'No file uploaded' });
     }
 
-    const filePath = `/uploads/${req.file.filename}`;
+    // Upload to Cloudinary
+    const cloudinary = require('cloudinary').v2;
+    const { v4: uuidv4 } = require('uuid');
+
+    // Configure Cloudinary
+    cloudinary.config({
+      cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+      api_key: process.env.CLOUDINARY_API_KEY,
+      api_secret: process.env.CLOUDINARY_API_SECRET
+    });
+
+    // Upload image to Cloudinary
+    const result = await new Promise((resolve, reject) => {
+      const stream = cloudinary.uploader.upload_stream(
+        {
+          resource_type: 'image',
+          folder: `actory/profile-photos/${req.user.id}`,
+          public_id: `profile_${uuidv4()}_${Date.now()}`,
+          transformation: [
+            { width: 400, height: 400, crop: 'fill', gravity: 'face' },
+            { quality: 'auto' }
+          ]
+        },
+        (error, result) => {
+          if (error) {
+            console.error('Cloudinary upload error:', error);
+            reject(error);
+          } else {
+            resolve(result);
+          }
+        }
+      );
+
+      stream.end(req.file.buffer);
+    });
 
     const user = await User.findByIdAndUpdate(
       req.user.id,
-      { profileImage: filePath },
+      { profileImage: result.secure_url },
       { new: true }
     );
 
@@ -346,7 +380,8 @@ exports.uploadPhoto = async (req, res) => {
 
     return res.status(200).json({ success: true, user: userResponse });
   } catch (err) {
-    return res.status(400).json({ success: false, message: err.message });
+    console.error('Profile photo upload error:', err);
+    return res.status(400).json({ success: false, message: err.message || 'Failed to upload photo' });
   }
 };
 

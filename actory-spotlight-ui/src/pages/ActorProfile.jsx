@@ -35,8 +35,17 @@ export default function ActorProfile() {
   const [minZoom, setMinZoom] = useState(1);
   const cropContainerRef = useRef(null);
 
-  // Compute backend origin (without /api/v1) to serve static uploads
-  const API_ORIGIN = API.defaults.baseURL.replace(/\/api\/v1$/, "");
+  // Helper function to get image URL (handles both local uploads and Cloudinary)
+  const getImageUrl = (imagePath) => {
+    if (!imagePath) return '';
+    // If it's already a full URL (Cloudinary), return as is
+    if (imagePath.startsWith('http')) {
+      return imagePath;
+    }
+    // If it's a local path, prepend backend origin
+    const API_ORIGIN = API.defaults.baseURL.replace(/\/api\/v1$/, "");
+    return `${API_ORIGIN}${imagePath}`;
+  };
 
   useEffect(() => {
     console.log('User state updated:', { 
@@ -285,7 +294,7 @@ export default function ActorProfile() {
                   , React.createElement('div', { className: "flex items-center gap-4" , __self: this, __source: {fileName: _jsxFileName, lineNumber: 71}}
                     , React.createElement('div', { className: "w-24 h-24 rounded-full bg-muted overflow-hidden flex items-center justify-center" , __self: this, __source: {fileName: _jsxFileName, lineNumber: 72}}
                       , _optionalChain([user, 'optionalAccess', _8 => _8.photo]) ? (
-                        React.createElement('img', { src: `${API_ORIGIN}${_optionalChain([user, 'optionalAccess', _9 => _9.photo])}`, alt: "Profile", className: "w-full h-full object-cover" , __self: this, __source: {fileName: _jsxFileName, lineNumber: 74}} )
+                        React.createElement('img', { src: getImageUrl(_optionalChain([user, 'optionalAccess', _9 => _9.photo])), alt: "Profile", className: "w-full h-full object-cover" , __self: this, __source: {fileName: _jsxFileName, lineNumber: 74}} )
                       ) : (
                         React.createElement('span', { className: "text-xs text-muted-foreground" , __self: this, __source: {fileName: _jsxFileName, lineNumber: 76}}, "No photo")
                       )
