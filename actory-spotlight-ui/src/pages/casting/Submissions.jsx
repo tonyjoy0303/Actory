@@ -16,6 +16,11 @@ export default function Submissions() {
   const [loading, setLoading] = useState(true);
   const [updatingId, setUpdatingId] = useState(null);
   const [castingTitle, setCastingTitle] = useState('');
+  const [castingSkills, setCastingSkills] = useState([]);
+  const [castingGender, setCastingGender] = useState('any');
+  const [castingAgeRange, setCastingAgeRange] = useState({ min: null, max: null });
+  const [fitById, setFitById] = useState({}); // { [submissionId]: 'Good Fit' | 'Partial Fit' | 'Poor Fit' }
+  const [fitLoading, setFitLoading] = useState(false);
   const [portfolioOpen, setPortfolioOpen] = useState(false);
   const [portfolioSrc, setPortfolioSrc] = useState('');
   const [sortBy, setSortBy] = useState('date-desc');
@@ -33,41 +38,52 @@ export default function Submissions() {
 
   const sortSubmissions = (items, sort) => {
     const sorted = [...items];
+    const byDateDesc = (a, b) => new Date(b.createdAt) - new Date(a.createdAt);
+    const norm = (s) => String(s || '').trim().toLowerCase();
     switch (sort) {
       case 'date-desc':
-        return sorted.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+        return sorted.sort(byDateDesc);
       case 'date-asc':
         return sorted.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
       case 'name-asc':
         return sorted.sort((a, b) => (a.actor?.name || '').localeCompare(b.actor?.name || ''));
       case 'name-desc':
         return sorted.sort((a, b) => (b.actor?.name || '').localeCompare(a.actor?.name || ''));
-      case 'status-accepted':
+      case 'status-accepted': {
+        const rank = { accepted: 0, pending: 1, rejected: 2 };
         return sorted.sort((a, b) => {
-          if (a.status === 'Accepted' && b.status !== 'Accepted') return -1;
-          if (b.status === 'Accepted' && a.status !== 'Accepted') return 1;
-          return new Date(b.createdAt) - new Date(a.createdAt);
+          const ra = rank[norm(a.status)] ?? 3;
+          const rb = rank[norm(b.status)] ?? 3;
+          if (ra !== rb) return ra - rb;
+          return byDateDesc(a, b);
         });
-      case 'status-rejected':
+      }
+      case 'status-rejected': {
+        const rank = { rejected: 0, pending: 1, accepted: 2 };
         return sorted.sort((a, b) => {
-          if (a.status === 'Rejected' && b.status !== 'Rejected') return -1;
-          if (b.status === 'Rejected' && a.status !== 'Rejected') return 1;
-          return new Date(b.createdAt) - new Date(a.createdAt);
+          const ra = rank[norm(a.status)] ?? 3;
+          const rb = rank[norm(b.status)] ?? 3;
+          if (ra !== rb) return ra - rb;
+          return byDateDesc(a, b);
         });
-      case 'status-pending':
+      }
+      case 'status-pending': {
+        const rank = { pending: 0, accepted: 1, rejected: 2 };
         return sorted.sort((a, b) => {
-          if (a.status === 'Pending' && b.status !== 'Pending') return -1;
-          if (b.status === 'Pending' && a.status !== 'Pending') return 1;
-          return new Date(b.createdAt) - new Date(a.createdAt);
+          const ra = rank[norm(a.status)] ?? 3;
+          const rb = rank[norm(b.status)] ?? 3;
+          if (ra !== rb) return ra - rb;
+          return byDateDesc(a, b);
         });
+      }
       case 'age-asc':
-        return sorted.sort((a, b) => (a.age || 0) - (b.age || 0));
+        return sorted.sort((a, b) => (Number(a.age) || 0) - (Number(b.age) || 0));
       case 'age-desc':
-        return sorted.sort((a, b) => (b.age || 0) - (a.age || 0));
+        return sorted.sort((a, b) => (Number(b.age) || 0) - (Number(a.age) || 0));
       case 'height-asc':
-        return sorted.sort((a, b) => (a.height || 0) - (b.height || 0));
+        return sorted.sort((a, b) => (Number(a.height) || 0) - (Number(b.height) || 0));
       case 'height-desc':
-        return sorted.sort((a, b) => (b.height || 0) - (a.height || 0));
+        return sorted.sort((a, b) => (Number(b.height) || 0) - (Number(a.height) || 0));
       default:
         return sorted;
     }
@@ -119,6 +135,12 @@ export default function Submissions() {
         ]);
         setSubmissions(videosRes.data.data || []);
         setCastingTitle(castingRes.data.data?.roleTitle || castingRes.data.data?.roleName || 'Casting');
+        setCastingSkills(Array.isArray(castingRes.data.data?.skills) ? castingRes.data.data.skills : []);
+        setCastingGender(String(castingRes.data.data?.genderRequirement || 'any').toLowerCase());
+        setCastingAgeRange({
+          min: Number(castingRes.data.data?.ageRange?.min ?? null),
+          max: Number(castingRes.data.data?.ageRange?.max ?? null),
+        });
       } catch (error) {
         const msg = error?.response?.data?.message || 'Failed to load submissions.';
         toast.error(msg);
@@ -128,6 +150,82 @@ export default function Submissions() {
     };
     if (id) fetchData();
   }, [id]);
+
+  const jaccard = (a = [], b = []) => {
+    const A = new Set((a || []).map((x) => String(x).toLowerCase()));
+    const B = new Set((b || []).map((x) => String(x).toLowerCase()));
+    const inter = new Set([...A].filter(x => B.has(x))).size;
+    const uni = new Set([...A, ...B]).size;
+    return uni === 0 ? 0 : inter / uni;
+  };
+
+  const evaluateFits = async () => {
+    try {
+      setFitLoading(true);
+      const results = {};
+      for (const s of submissions) {
+        const userSkills = Array.isArray(s.skills) ? s.skills : [];
+        const skillsJ = Number(jaccard(userSkills, castingSkills || []));
+        const ageNum = Number(s.age || 0);
+        const withinAge = (Number.isFinite(castingAgeRange.min) && Number.isFinite(castingAgeRange.max)) ? (ageNum >= castingAgeRange.min && ageNum <= castingAgeRange.max) : false;
+        const actorGender = String(s.actor?.gender || '').toLowerCase();
+        const genderOk = castingGender === 'any' || !castingGender || actorGender === castingGender || (castingGender === 'other' && !['male','female'].includes(actorGender));
+
+        // If gender doesn't match a specific requirement, force Poor Fit
+        if (!genderOk && castingGender && castingGender !== 'any') {
+          results[s._id] = 'Poor Fit';
+          continue;
+        }
+
+        // Compute genreMatch boosted by requirement matches
+        let genre = skillsJ;
+        if (withinAge) genre += 0.2;
+        if (genderOk) genre += 0.2;
+        genre = Math.max(0, Math.min(1, genre));
+
+        const candidate = {
+          age: ageNum,
+          height: Number(s.height || 0),
+          skillsEncoded: skillsJ,
+          expYears: Number(s.experienceYears || s.expYears || 0),
+          callbackRate: Number(s.callbackRate || 0),
+          portfolioVideos: Number(s.portfolioCount || 0),
+          genreMatch: genre
+        };
+
+        // Slightly more discriminative demo training set
+        const trainingSet = [
+          { features: { age: 26, height: 175, skillsEncoded: 0.85, expYears: 3, callbackRate: 0.3, portfolioVideos: 3, genreMatch: 0.95 }, label: 'Good Fit' },
+          { features: { age: 30, height: 180, skillsEncoded: 0.75, expYears: 6, callbackRate: 0.5, portfolioVideos: 8, genreMatch: 0.85 }, label: 'Good Fit' },
+          { features: { age: 27, height: 175, skillsEncoded: 0.6, expYears: 3, callbackRate: 0.25, portfolioVideos: 3, genreMatch: 0.6 }, label: 'Partial Fit' },
+          { features: { age: 29, height: 176, skillsEncoded: 0.7, expYears: 4, callbackRate: 0.35, portfolioVideos: 5, genreMatch: 0.7 }, label: 'Partial Fit' },
+          { features: { age: 24, height: 170, skillsEncoded: 0.3, expYears: 1, callbackRate: 0.1, portfolioVideos: 1, genreMatch: 0.2 }, label: 'Poor Fit' },
+          { features: { age: 40, height: 168, skillsEncoded: 0.2, expYears: 1, callbackRate: 0.05, portfolioVideos: 0, genreMatch: 0.1 }, label: 'Poor Fit' }
+        ];
+
+        try {
+          const { data } = await API.post('/fit/knn', { candidate, trainingSet, k: 3 });
+          if (data?.success) {
+            let cat = data.category || '';
+            // Optional post-processing overrides
+            if (!genderOk && castingGender && castingGender !== 'any') {
+              cat = 'Poor Fit';
+            } else if (skillsJ >= 0.8 && withinAge && genderOk) {
+              cat = 'Good Fit';
+            } else if (skillsJ < 0.3) {
+              cat = 'Poor Fit';
+            }
+            results[s._id] = cat;
+          }
+        } catch (e) {
+          // Ignore per-row errors
+        }
+      }
+      setFitById(results);
+    } finally {
+      setFitLoading(false);
+    }
+  };
 
   const updateSubmissionStatus = async (submissionId, status) => {
     try {
@@ -251,6 +349,7 @@ export default function Submissions() {
                 )
               )
               , React.createElement(Button, { variant: "outline", onClick: () => setFilterOpen(true) }, "Filter")
+              , React.createElement(Button, { variant: "secondary", disabled: fitLoading || !submissions.length, onClick: evaluateFits }, fitLoading ? 'Evaluating Fits...' : 'Evaluate Fits')
             )
           )
           , React.createElement(CardContent, null
@@ -264,7 +363,10 @@ export default function Submissions() {
                       , React.createElement('p', { className: "font-medium" }, s.actor?.name || 'Unknown actor')
                       , React.createElement('p', { className: "text-xs text-muted-foreground" }, s.actor?.email)
                       , React.createElement('p', { className: "text-xs text-muted-foreground" }, `Title: ${s.title}`)
-                      , React.createElement('p', { className: "text-xs text-muted-foreground" }, `Height: ${s.height} cm • Weight: ${s.weight} kg • Age: ${s.age}`)
+                      , React.createElement('div', { className: "flex items-center gap-2" }
+                        , React.createElement('p', { className: "text-xs text-muted-foreground" }, `Height: ${s.height} cm • Weight: ${s.weight} kg • Age: ${s.age}`)
+                        , fitById[s._id] ? React.createElement('span', { className: `text-xxs px-2 py-0.5 rounded-full border ${fitById[s._id] === 'Good Fit' ? 'bg-green-600/20 text-green-600' : fitById[s._id] === 'Partial Fit' ? 'bg-yellow-600/20 text-yellow-700' : 'bg-red-600/20 text-red-600'}` }, fitById[s._id]) : null
+                      )
                       , React.createElement('p', { className: "text-xs text-muted-foreground" }, `Address: ${s.permanentAddress}`)
                       , React.createElement('p', { className: "text-xs text-muted-foreground" }, `City: ${s.livingCity} • DOB: ${new Date(s.dateOfBirth).toLocaleDateString()} • Phone: ${s.phoneNumber}`)
                       , s.email && (

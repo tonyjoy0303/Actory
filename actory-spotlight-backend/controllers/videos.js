@@ -28,7 +28,7 @@ exports.getVideos = async (req, res, next) => {
       return res.status(401).json({ success: false, message: 'Not authorized to view these submissions' });
     }
 
-    const videos = await Video.find({ castingCall: req.params.castingCallId }).populate('actor', 'name email');
+    const videos = await Video.find({ castingCall: req.params.castingCallId }).populate('actor', 'name email gender');
     res.status(200).json({ success: true, count: videos.length, data: videos });
   } catch (err) {
     res.status(400).json({ success: false, message: err.message });
@@ -219,6 +219,10 @@ exports.getMyProfileVideos = async (req, res, next) => {
       thumbnailUrl: v.thumbnailUrl,
       duration: v.duration,
       views: v.views,
+      // propagate reaction fields so profile reflects feed actions
+      likes: typeof v.likes === 'number' ? v.likes : 0,
+      comments: typeof v.comments === 'number' ? v.comments : 0,
+      likedBy: Array.isArray(v.likedBy) ? v.likedBy : [],
       uploadedAt: v.uploadedAt,
       category: v.category,
       type: 'profile',
@@ -253,6 +257,9 @@ exports.getMyProfileVideos = async (req, res, next) => {
         video.videoUrl.replace(/\.(mp4|mov|avi|wmv|flv|webm)$/i, '.jpg') : 
         'https://via.placeholder.com/300x169?text=No+Thumbnail'),
       views: video.views || 0,
+      likes: video.likes || 0,
+      comments: video.comments || 0,
+      likedBy: Array.isArray(video.likedBy) ? video.likedBy : [],
       duration: video.duration || 0,
       uploadedAt: video.uploadedAt || video.createdAt || new Date(),
       category: video.category || 'Profile Video'

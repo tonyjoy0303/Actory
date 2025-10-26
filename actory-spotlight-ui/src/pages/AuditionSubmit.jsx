@@ -99,6 +99,18 @@ export default function AuditionSubmit() {
     }
   };
 
+  function computeAge(d) {
+    try {
+      if (!d) return NaN;
+      const dob = new Date(d);
+      const today = new Date();
+      let age = today.getFullYear() - dob.getFullYear();
+      const m = today.getMonth() - dob.getMonth();
+      if (m < 0 || (m === 0 && today.getDate() < dob.getDate())) age--;
+      return age;
+    } catch { return NaN; }
+  }
+
   const handleSubmit = async () => {
     // Basic validation
     const h = Number(height);
@@ -116,6 +128,21 @@ export default function AuditionSubmit() {
     }
     if (Number.isNaN(h) || Number.isNaN(w) || Number.isNaN(a) || h <= 0 || w <= 0 || a <= 0) {
       toast.error('Please enter valid numeric values for height, weight, and age.');
+      return;
+    }
+    const todayStr = new Date().toISOString().split('T')[0];
+    if (!dateOfBirth || dateOfBirth > todayStr) {
+      toast.error('Please enter a valid date of birth (not in the future).');
+      return;
+    }
+    const derivedAge = computeAge(dateOfBirth);
+    if (!Number.isFinite(derivedAge) || derivedAge <= 0 || derivedAge > 120) {
+      toast.error('Please enter a valid date of birth.');
+      return;
+    }
+    if (a !== derivedAge) {
+      setAge(String(derivedAge));
+      toast.error('Age does not match date of birth. It was auto-corrected.');
       return;
     }
 
@@ -299,7 +326,7 @@ export default function AuditionSubmit() {
                 )
                 , React.createElement('div', {__self: this, __source: {fileName: _jsxFileName, lineNumber: 229}}
                   , React.createElement('label', { className: "block text-sm mb-1"  , __self: this, __source: {fileName: _jsxFileName, lineNumber: 230}}, "Date of Birth *")
-                  , React.createElement(Input, { type: "date", value: dateOfBirth, onChange: (e) => setDateOfBirth(e.target.value), disabled: loading, __self: this, __source: {fileName: _jsxFileName, lineNumber: 231}} )
+                  , React.createElement(Input, { type: "date", value: dateOfBirth, max: new Date().toISOString().split('T')[0], onChange: (e) => { setDateOfBirth(e.target.value); const ag = computeAge(e.target.value); if (Number.isFinite(ag)) setAge(String(ag)); }, disabled: loading, __self: this, __source: {fileName: _jsxFileName, lineNumber: 231}} )
                 )
                 , React.createElement('div', {__self: this, __source: {fileName: _jsxFileName, lineNumber: 233}}
                   , React.createElement('label', { className: "block text-sm mb-1"  , __self: this, __source: {fileName: _jsxFileName, lineNumber: 234}}, "Phone Number *")

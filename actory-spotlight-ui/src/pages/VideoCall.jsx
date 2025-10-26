@@ -89,12 +89,29 @@ export default function VideoCall() {
       toast.error(reason || 'Join request rejected');
     });
 
+    // Placeholder for newly approved users (show tile with name, camera off)
+    socket.on('vc:user-approved', ({ roomId, socketId, user }) => {
+      setParticipants((prev) => {
+        const exists = prev.some((p) => p.socketId === socketId);
+        if (exists) {
+          return prev.map((p) => p.socketId === socketId ? { ...p, name: user?.name || p.name, isAdmin: false } : p);
+        }
+        return [...prev, { socketId, name: user?.name || 'Guest', isAdmin: false }];
+      });
+    });
+
     socket.on('vc:user-joined', async ({ socketId, userId, user }) => {
       console.log('User joined:', socketId, userId, user);
       setConnectedPeers((prev) => Array.from(new Set([...prev, socketId])));
-      // Use the user name from the backend or fallback to default
       const userName = user?.name || 'Guest';
-      setParticipants((prev) => [...prev, { socketId, name: userName, isAdmin: false }]);
+      // Update placeholder if exists, otherwise add new participant
+      setParticipants((prev) => {
+        const exists = prev.some((p) => p.socketId === socketId);
+        if (exists) {
+          return prev.map((p) => p.socketId === socketId ? { ...p, name: userName, isAdmin: false } : p);
+        }
+        return [...prev, { socketId, name: userName, isAdmin: false }];
+      });
       toast.success('User joined the room');
       
       // Initiate WebRTC connection if we're in a call (admin side)

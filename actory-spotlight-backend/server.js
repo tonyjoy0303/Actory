@@ -32,6 +32,96 @@ app.use('/api/v1/admin', require('./routes/admin'));
 app.use('/api/v1/profile', require('./routes/profile'));
 app.use('/api/v1/messages', require('./routes/messages'));
 
+// KNN Role Fit Classification
+// POST /api/v1/fit/knn
+// Body: {
+//   candidate: { age, height, skillsEncoded, expYears, callbackRate, portfolioVideos, genreMatch },
+//   trainingSet: [
+//     { features: { age, height, skillsEncoded, expYears, callbackRate, portfolioVideos, genreMatch }, label: 'Good Fit' | 'Partial Fit' | 'Poor Fit' },
+//     ...
+//   ],
+//   k?: number
+// }
+// Returns: { category, neighbors }
+app.post('/api/v1/fit/knn', (req, res) => {
+  try {
+    const { candidate, trainingSet, k = 5 } = req.body || {};
+    if (!candidate || !Array.isArray(trainingSet) || trainingSet.length === 0) {
+      return res.status(400).json({ success: false, message: 'candidate and non-empty trainingSet are required' });
+    }
+
+    const featureKeys = ['age','height','skillsEncoded','expYears','callbackRate','portfolioVideos','genreMatch'];
+
+    // Build vectors and compute min/max for normalization
+    const train = trainingSet.map((row) => ({
+      x: featureKeys.map((k) => Number((row.features || {})[k] ?? 0)),
+      label: row.label || 'Partial Fit'
+    }));
+    const cand = featureKeys.map((k) => Number(candidate[k] ?? 0));
+
+    const mins = Array(featureKeys.length).fill(Infinity);
+    const maxs = Array(featureKeys.length).fill(-Infinity);
+    for (const r of train) {
+      r.x.forEach((v, i) => {
+        if (v < mins[i]) mins[i] = v;
+        if (v > maxs[i]) maxs[i] = v;
+      });
+    }
+    // Include candidate in range to avoid divide by zero when dataset has constants
+    cand.forEach((v, i) => {
+      if (v < mins[i]) mins[i] = v;
+      if (v > maxs[i]) maxs[i] = v;
+    });
+
+    const norm = (vec) => vec.map((v, i) => {
+      const range = maxs[i] - mins[i];
+      if (!isFinite(range) || range === 0) return 0; // constant feature -> 0
+      return (v - mins[i]) / range;
+    });
+
+    const candN = norm(cand);
+    const trainN = train.map((r) => ({ x: norm(r.x), label: r.label }));
+
+    const dist = (a, b) => {
+      let s = 0;
+      for (let i = 0; i < a.length; i++) {
+        const d = (a[i] - b[i]);
+        s += d * d;
+      }
+      return Math.sqrt(s);
+    };
+
+    const neighbors = trainN
+      .map((r, idx) => ({ idx, d: dist(candN, r.x), label: r.label }))
+      .sort((a, b) => a.d - b.d)
+      .slice(0, Math.max(1, Math.min(k, trainN.length)));
+
+    // Majority vote with tie-breaker by average distance
+    const tally = new Map();
+    const distSum = new Map();
+    for (const n of neighbors) {
+      tally.set(n.label, (tally.get(n.label) || 0) + 1);
+      distSum.set(n.label, (distSum.get(n.label) || 0) + n.d);
+    }
+    let bestLabel = null;
+    let bestCount = -1;
+    let bestAvg = Infinity;
+    for (const [label, count] of tally.entries()) {
+      const avg = (distSum.get(label) || 0) / count;
+      if (count > bestCount || (count === bestCount && avg < bestAvg)) {
+        bestLabel = label;
+        bestCount = count;
+        bestAvg = avg;
+      }
+    }
+
+    return res.json({ success: true, category: bestLabel, neighbors });
+  } catch (e) {
+    console.error('KNN classification error', e);
+    return res.status(500).json({ success: false, message: 'KNN classification failed' });
+  }
+});
+
 app.get('/', (req, res) => {
     res.send('Actory API is running...');
 });
@@ -126,7 +216,10 @@ async function start() {
           room.pending.delete(socketId);
           console.log('Sending approval to:', socketId);
           console.log('Target socket exists:', io.sockets.sockets.has(socketId));
+          // Notify the approved user to proceed to join
           io.to(socketId).emit('vc:join-approved', { roomId });
+          // Broadcast a placeholder to current room members so they can render the user tile immediately (camera off)
+          io.to(roomId).emit('vc:user-approved', { roomId, socketId, user: user || { name: 'Guest' } });
         });
 
         // Admin rejects a waiting participant

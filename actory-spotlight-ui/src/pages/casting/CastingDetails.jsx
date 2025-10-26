@@ -100,6 +100,12 @@ function CastingDetailsContent() {
     }
   };
 
+  const formatGender = (g) => {
+    if (!g) return 'Any';
+    const s = String(g).toLowerCase();
+    return s.charAt(0).toUpperCase() + s.slice(1);
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
@@ -107,6 +113,8 @@ function CastingDetailsContent() {
       </div>
     );
   }
+
+
 
   if (error || !casting) {
     return (
@@ -174,7 +182,7 @@ function CastingDetailsContent() {
                 <div>
                   <h4 className="font-medium">Gender</h4>
                   <p className="text-sm text-muted-foreground">
-                    {casting.gender || 'Any'}
+                    {formatGender(casting.genderRequirement)}
                   </p>
                 </div>
               </div>
@@ -279,13 +287,10 @@ function CastingDetailsContent() {
           </Button>
           <Button 
             onClick={() => {
-              // Check if user is logged in by looking for token in localStorage
               const token = localStorage.getItem('token');
               if (!token) {
-                // If not logged in, redirect to login-required page
                 navigate('/login-required', { state: { from: `/casting/${id}` } });
               } else {
-                // If logged in, proceed to audition submission
                 navigate(`/audition/submit/${casting._id}`);
               }
             }}
