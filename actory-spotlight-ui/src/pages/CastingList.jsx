@@ -251,6 +251,15 @@ export default function CastingList() {
                       {casting.ageRange?.min} - {casting.ageRange?.max} years
                     </span>
                   </div>
+                  {casting.heightRange?.min != null || casting.heightRange?.max != null ? (
+                    <div className="flex items-center">
+                      <Users className="h-4 w-4 mr-2 text-muted-foreground" />
+                      <span className="font-medium">Height Range:</span>
+                      <span className="ml-1">
+                        {casting.heightRange?.min ?? '—'} - {casting.heightRange?.max ?? '—'} cm
+                      </span>
+                    </div>
+                  ) : null}
                   <div className="flex items-center">
                     <Calendar className="h-4 w-4 mr-2 text-muted-foreground" />
                     <span className="font-medium">Audition:</span>

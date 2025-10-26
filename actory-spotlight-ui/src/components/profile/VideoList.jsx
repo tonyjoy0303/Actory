@@ -10,14 +10,27 @@ const VideoList = ({ videos = [], user, onVideoDeleted, ownerName, ownerAvatar, 
   const [open, setOpen] = useState(false);
   const [activeSrc, setActiveSrc] = useState('');
   const [deletingVideoId, setDeletingVideoId] = useState(null);
+  const [items, setItems] = useState(videos || []);
+  const [currentUserId, setCurrentUserId] = useState(null);
   const videoRef = useRef(null);
+
+  // Load current user id and keep items in sync with props
+  useEffect(() => {
+    try {
+      const u = JSON.parse(localStorage.getItem('user') || '{}');
+      if (u && (u._id || u.id)) setCurrentUserId(String(u._id || u.id));
+    } catch {}
+  }, []);
+
+  useEffect(() => {
+    setItems(Array.isArray(videos) ? videos : []);
+  }, [videos]);
 
   // Handle keyboard shortcuts for video playback
   useEffect(() => {
     const handleKeyPress = (e) => {
       if (!open || !videoRef.current) return;
 
-      // Only handle arrow keys when modal is open
       if (e.key === 'ArrowRight' || e.key === '>') {
         e.preventDefault();
         const video = videoRef.current;
@@ -59,6 +72,35 @@ const VideoList = ({ videos = [], user, onVideoDeleted, ownerName, ownerAvatar, 
     } else {
       navigator.clipboard.writeText(src);
       toast.success('Video link copied');
+    }
+  };
+
+  const handleToggleLike = async (videoId) => {
+    if (!videoId) return;
+    if (!currentUserId) {
+      toast.error('Please login to like videos');
+      return;
+    }
+    try {
+      const { data } = await API.put(`/videos/${videoId}/like`, { userId: currentUserId });
+      if (data?.success) {
+        setItems((prev) => prev.map(v => (
+          v._id === videoId ? {
+            ...v,
+            likes: data.likes,
+            // flip isLiked locally
+            isLiked: data.isLiked,
+            // update likedBy for future checks
+            likedBy: (() => {
+              const set = new Set((v.likedBy || []).map(x => String(x)));
+              if (data.isLiked) set.add(String(currentUserId)); else set.delete(String(currentUserId));
+              return Array.from(set);
+            })()
+          } : v
+        )));
+      }
+    } catch (e) {
+      toast.error('Failed to like video');
     }
   };
 
@@ -110,13 +152,14 @@ const VideoList = ({ videos = [], user, onVideoDeleted, ownerName, ownerAvatar, 
   return (
     <>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        {videos.map((video) => {
+        {items.map((video) => {
           const src = video?.videoUrl || video?.url || '';
           const poster = video?.thumbnailUrl || '';
           if (!src) return null;
 
           const showDeleteButton = canDeleteVideo(video);
           const isDeleting = deletingVideoId === video._id;
+          const isLiked = video.isLiked || (currentUserId && (video.likedBy || []).some(id => String(id) === String(currentUserId)));
 
           return (
             <div
@@ -158,12 +201,18 @@ const VideoList = ({ videos = [], user, onVideoDeleted, ownerName, ownerAvatar, 
               {/* Actions */}
               <div className="px-3 pt-2 pb-3">
                 <div className="flex items-center gap-3 mb-1">
-                  <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => toast.success('Liked')}>
-                    <Heart className="h-5 w-5" />
-                  </Button>
-                  <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => openModal(src)}>
-                    <MessageCircle className="h-5 w-5" />
-                  </Button>
+                  <div className="flex items-center gap-1">
+                    <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => handleToggleLike(video._id)}>
+                      <Heart className={`h-5 w-5 ${isLiked ? 'fill-red-500 text-red-500' : ''}`} />
+                    </Button>
+                    <span className="text-xs text-muted-foreground">{video.likes || 0}</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => openModal(src)}>
+                      <MessageCircle className="h-5 w-5" />
+                    </Button>
+                    <span className="text-xs text-muted-foreground">{video.comments || 0}</span>
+                  </div>
                   <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => handleShare(src)}>
                     <Share2 className="h-5 w-5" />
                   </Button>

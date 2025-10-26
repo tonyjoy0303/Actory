@@ -44,6 +44,19 @@ const formSchema = z.object({
     message: 'Maximum age must be greater than or equal to minimum age',
     path: ['max']
   }),
+  // Optional height requirement (cm)
+  heightRange: z.object({
+    min: z.number().min(50, { message: 'Minimum height must be at least 50 cm' }).max(300, { message: 'Maximum height is 300 cm' }).optional(),
+    max: z.number().min(50, { message: 'Maximum height must be at least 50 cm' }).max(300, { message: 'Maximum height is 300 cm' }).optional(),
+  }).refine(data => {
+    const hasMin = typeof data.min === 'number';
+    const hasMax = typeof data.max === 'number';
+    if (hasMin && hasMax) return data.max >= data.min;
+    return true;
+  }, {
+    message: 'Maximum height must be greater than or equal to minimum height',
+    path: ['max']
+  }),
   genderRequirement: z.enum(['male', 'female', 'any', 'other'], {
     required_error: 'Please select a gender requirement',
   }),
@@ -89,6 +102,7 @@ export default function CastingCallForm({ castingCall, onSubmit, isSubmitting })
       roleTitle: '',
       description: '',
       ageRange: { min: 18, max: 60 },
+      heightRange: { min: undefined, max: undefined },
       genderRequirement: 'any',
       experienceLevel: 'beginner',
       location: '',
@@ -166,10 +180,10 @@ export default function CastingCallForm({ castingCall, onSubmit, isSubmitting })
                       min={1}
                       max={120}
                       placeholder="Min"
-                      value={field.value?.min || ''}
+                      value={field.value?.min ?? ''}
                       onChange={(e) => field.onChange({
                         ...field.value,
-                        min: parseInt(e.target.value) || 0
+                        min: e.target.value === '' ? undefined : parseInt(e.target.value)
                       })}
                     />
                   </FormControl>
@@ -180,14 +194,56 @@ export default function CastingCallForm({ castingCall, onSubmit, isSubmitting })
                       min={field.value?.min || 1}
                       max={120}
                       placeholder="Max"
-                      value={field.value?.max || ''}
+                      value={field.value?.max ?? ''}
                       onChange={(e) => field.onChange({
                         ...field.value,
-                        max: parseInt(e.target.value) || 0
+                        max: e.target.value === '' ? undefined : parseInt(e.target.value)
                       })}
                     />
                   </FormControl>
                 </div>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          {/* Height Range (optional, cm) */}
+          <FormField
+            control={form.control}
+            name="heightRange"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Height Range (cm)</FormLabel>
+                <div className="flex gap-2">
+                  <FormControl>
+                    <Input
+                      type="number"
+                      min={50}
+                      max={300}
+                      placeholder="Min"
+                      value={field.value?.min ?? ''}
+                      onChange={(e) => field.onChange({
+                        ...field.value,
+                        min: e.target.value === '' ? undefined : parseInt(e.target.value)
+                      })}
+                    />
+                  </FormControl>
+                  <span className="flex items-center">to</span>
+                  <FormControl>
+                    <Input
+                      type="number"
+                      min={50}
+                      max={300}
+                      placeholder="Max"
+                      value={field.value?.max ?? ''}
+                      onChange={(e) => field.onChange({
+                        ...field.value,
+                        max: e.target.value === '' ? undefined : parseInt(e.target.value)
+                      })}
+                    />
+                  </FormControl>
+                </div>
+                <FormDescription>Optional. Leave blank if no specific height is required.</FormDescription>
                 <FormMessage />
               </FormItem>
             )}

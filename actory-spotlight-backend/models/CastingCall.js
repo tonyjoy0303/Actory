@@ -48,6 +48,30 @@ const CastingCallSchema = new mongoose.Schema({
       message: 'Experience level must be one of: beginner, intermediate, professional',
     },
   },
+  // Height requirement (in cm)
+  heightRange: {
+    min: {
+      type: Number,
+      required: false,
+      min: [50, 'Minimum height must be at least 50 cm'],
+      max: [300, 'Minimum height cannot exceed 300 cm'],
+    },
+    max: {
+      type: Number,
+      required: false,
+      min: [50, 'Maximum height must be at least 50 cm'],
+      max: [300, 'Maximum height cannot exceed 300 cm'],
+      validate: {
+        validator: function (v) {
+          // only validate if both present
+          if (typeof v !== 'number') return true;
+          if (typeof this.heightRange?.min !== 'number') return true;
+          return v >= this.heightRange.min;
+        },
+        message: 'Maximum height must be greater than or equal to minimum height',
+      },
+    },
+  },
   location: {
     type: String,
     required: [true, 'Please add a location'],

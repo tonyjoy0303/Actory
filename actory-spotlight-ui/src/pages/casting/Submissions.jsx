@@ -19,6 +19,7 @@ export default function Submissions() {
   const [castingSkills, setCastingSkills] = useState([]);
   const [castingGender, setCastingGender] = useState('any');
   const [castingAgeRange, setCastingAgeRange] = useState({ min: null, max: null });
+  const [castingHeightRange, setCastingHeightRange] = useState({ min: null, max: null });
   const [fitById, setFitById] = useState({}); // { [submissionId]: 'Good Fit' | 'Partial Fit' | 'Poor Fit' }
   const [fitLoading, setFitLoading] = useState(false);
   const [portfolioOpen, setPortfolioOpen] = useState(false);
@@ -141,6 +142,10 @@ export default function Submissions() {
           min: Number(castingRes.data.data?.ageRange?.min ?? null),
           max: Number(castingRes.data.data?.ageRange?.max ?? null),
         });
+        setCastingHeightRange({
+          min: castingRes.data.data?.heightRange?.min != null ? Number(castingRes.data.data.heightRange.min) : null,
+          max: castingRes.data.data?.heightRange?.max != null ? Number(castingRes.data.data.heightRange.max) : null,
+        });
       } catch (error) {
         const msg = error?.response?.data?.message || 'Failed to load submissions.';
         toast.error(msg);
@@ -171,8 +176,21 @@ export default function Submissions() {
         const actorGender = String(s.actor?.gender || '').toLowerCase();
         const genderOk = castingGender === 'any' || !castingGender || actorGender === castingGender || (castingGender === 'other' && !['male','female'].includes(actorGender));
 
+        // Height requirement check (if provided)
+        const hVal = Number(s.height || 0);
+        let withinHeight = true;
+        const hasHMin = Number.isFinite(castingHeightRange.min);
+        const hasHMax = Number.isFinite(castingHeightRange.max);
+        if (hasHMin && hVal < castingHeightRange.min) withinHeight = false;
+        if (hasHMax && hVal > castingHeightRange.max) withinHeight = false;
+
         // If gender doesn't match a specific requirement, force Poor Fit
         if (!genderOk && castingGender && castingGender !== 'any') {
+          results[s._id] = 'Poor Fit';
+          continue;
+        }
+        // If height requirement exists and is not satisfied, force Poor Fit
+        if ((hasHMin || hasHMax) && !withinHeight) {
           results[s._id] = 'Poor Fit';
           continue;
         }
@@ -181,6 +199,7 @@ export default function Submissions() {
         let genre = skillsJ;
         if (withinAge) genre += 0.2;
         if (genderOk) genre += 0.2;
+        if ((hasHMin || hasHMax) && withinHeight) genre += 0.15;
         genre = Math.max(0, Math.min(1, genre));
 
         const candidate = {

@@ -26,6 +26,22 @@ export default function Login() {
     setPassword("");
   }, []);
 
+  // If already authenticated, redirect from login page
+  useEffect(() => {
+    try {
+      const token = localStorage.getItem('token');
+      const u = JSON.parse(localStorage.getItem('user') || '{}');
+      if (token && u && (u._id || u.id)) {
+        if (u.role === 'Admin') {
+          navigate('/dashboard/admin');
+        } else {
+          const uid = String(u._id || u.id);
+          navigate(`/profile/${uid}`);
+        }
+      }
+    } catch {}
+  }, [navigate]);
+
   const handleLogin = async (e) => {
     e.preventDefault();
     setLoading(true);
@@ -49,15 +65,13 @@ export default function Login() {
 
       toast.success("Login successful! Redirecting...");
 
-      // Redirect based on role
+      // Redirect after login
       if (data.user.role === 'Admin') {
         navigate('/dashboard/admin');
-      } else if (data.user.role === 'Actor') {
-        navigate('/dashboard/actor');
-      } else if (data.user.role === 'Producer') {
-        navigate('/dashboard/producer');
       } else {
-        navigate('/'); // Fallback redirect
+        const uid = String(data.user._id || data.user.id || '').trim();
+        if (uid) navigate(`/profile/${uid}`);
+        else navigate('/');
       }
 
     } catch (err) {

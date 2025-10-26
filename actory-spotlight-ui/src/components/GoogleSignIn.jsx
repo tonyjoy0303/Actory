@@ -71,11 +71,14 @@ export default function GoogleSignIn({
         localStorage.setItem('token', data.token);
         localStorage.setItem('user', JSON.stringify(data.user));
         window.dispatchEvent(new Event('authChange'));
-        // Redirect based on role like email/password flow
-        if (data.user.role === 'Admin') navigate('/dashboard/admin');
-        else if (data.user.role === 'Actor') navigate('/dashboard/actor');
-        else if (data.user.role === 'Producer') navigate('/dashboard/producer');
-        else navigate('/');
+        // Redirect after Google sign-in
+        if (data.user.role === 'Admin') {
+          navigate('/dashboard/admin');
+        } else {
+          const uid = String(data.user._id || data.user.id || '').trim();
+          if (uid) navigate(`/profile/${uid}`);
+          else navigate('/');
+        }
       } catch (err) {
         // eslint-disable-next-line no-console
         console.error('Google sign-in failed', err);
