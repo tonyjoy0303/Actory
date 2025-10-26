@@ -216,15 +216,25 @@ async function start() {
           if (to) io.to(to).emit('vc:candidate', { from: socket.id, candidate });
         });
 
-        // Leave room and notify peers
+        // Leave room and notify peers (using rooms map state)
         const leaveAll = () => {
-          for (const roomId of socket.rooms) {
-            if (roomId === socket.id) continue;
-            socket.to(roomId).emit('vc:user-left', { socketId: socket.id });
-            const set = roomMembers.get(roomId);
-            if (set) {
-              set.delete(socket.id);
-              if (set.size === 0) roomMembers.delete(roomId);
+          for (const [id, state] of rooms.entries()) {
+            if (state.members.has(socket.id)) {
+              socket.to(id).emit('vc:user-left', { socketId: socket.id });
+              state.members.delete(socket.id);
+              state.pending.delete(socket.id);
+              // If admin leaves, promote first remaining member to admin
+              if (state.adminSocketId === socket.id) {
+                const nextAdmin = [...state.members][0];
+                if (nextAdmin) {
+                  state.adminSocketId = nextAdmin;
+                  io.to(nextAdmin).emit('vc:promoted-admin', { roomId: id });
+                }
+              }
+              // Remove empty room
+              if (state.members.size === 0) {
+                rooms.delete(id);
+              }
             }
           }
         };

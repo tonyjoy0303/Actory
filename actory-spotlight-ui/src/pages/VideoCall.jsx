@@ -348,6 +348,16 @@ export default function VideoCall() {
     if (!roomId) return;
     setIsInCall(true);
     toast.success('Call started - Start camera when ready');
+    // Proactively initiate WebRTC with existing participants
+    try {
+      for (const p of participants) {
+        if (p.socketId && p.socketId !== socketRef.current?.id) {
+          await initiateWebRTCConnection(p.socketId);
+        }
+      }
+    } catch (e) {
+      console.error('Error initiating connections on start:', e);
+    }
   }
 
   function copyRoomCode() {
@@ -391,9 +401,31 @@ export default function VideoCall() {
       const videoTrack = stream.getVideoTracks()[0];
       const audioTrack = stream.getAudioTracks()[0];
       
-      setIsVideoOn(videoTrack ? videoTrack.enabled : false);
-      setIsMicOn(audioTrack ? audioTrack.enabled : false);
+      setIsVideoOn(!!videoTrack && videoTrack.enabled);
+      setIsMicOn(!!audioTrack && audioTrack.enabled);
       setCameraStarted(true);
+      
+      // Add/replace tracks on all existing peer connections and renegotiate
+      for (const [remoteSocketId, pc] of pcRef.current.entries()) {
+        try {
+          const senders = pc.getSenders ? pc.getSenders() : [];
+          // Replace or add tracks
+          stream.getTracks().forEach(track => {
+            const sender = senders.find(s => s.track && s.track.kind === track.kind);
+            if (sender && sender.replaceTrack) {
+              sender.replaceTrack(track);
+            } else {
+              pc.addTrack(track, stream);
+            }
+          });
+          // Renegotiate
+          const offer = await pc.createOffer();
+          await pc.setLocalDescription(offer);
+          socketRef.current?.emit('vc:offer', { to: remoteSocketId, description: offer });
+        } catch (err) {
+          console.error('Error renegotiating with peer', remoteSocketId, err);
+        }
+      }
       
       // Force re-render to update video grid
       setParticipants(prev => [...prev]);
@@ -569,7 +601,12 @@ export default function VideoCall() {
       });
     }
 
-    if (allParticipants.length === 0) {
+    // Filter out current socket's own participant entry to avoid duplicate/empty tile
+    const renderedParticipants = allParticipants.filter(
+      (p) => p.socketId !== socketRef.current?.id
+    );
+
+    if (renderedParticipants.length === 0) {
       return React.createElement('div', { className: 'text-center text-muted-foreground py-8' },
         'No participants with active cameras'
       );
@@ -579,13 +616,13 @@ export default function VideoCall() {
     let gridClass = '';
     let videoSizeClass = '';
     
-    if (allParticipants.length === 1) {
+    if (renderedParticipants.length === 1) {
       gridClass = 'grid grid-cols-1 max-w-md mx-auto';
       videoSizeClass = 'aspect-video';
-    } else if (allParticipants.length === 2) {
+    } else if (renderedParticipants.length === 2) {
       gridClass = 'grid grid-cols-2 gap-4';
       videoSizeClass = 'aspect-video';
-    } else if (allParticipants.length <= 4) {
+    } else if (renderedParticipants.length <= 4) {
       gridClass = 'grid grid-cols-2 gap-4';
       videoSizeClass = 'aspect-video';
     } else {
@@ -594,10 +631,10 @@ export default function VideoCall() {
     }
 
     return React.createElement('div', { className: gridClass },
-      allParticipants.map((participant, index) => {
+      renderedParticipants.map((participant, index) => {
         const isSpeaking = speakingUser === participant.socketId;
         const audioLevel = audioLevels.get(participant.socketId) || 0;
-        const isHighlighted = isSpeaking && allParticipants.length > 2;
+        const isHighlighted = isSpeaking && renderedParticipants.length > 2;
         const hasRemoteStream = !participant.isLocal && remoteStreamsRef.current.get(participant.socketId);
         
         return React.createElement('div', { 
