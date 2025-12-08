@@ -6,6 +6,12 @@ const sendEmail = async (options) => {
   const preferEthereal = process.env.USE_ETHEREAL === 'true';
   const forceGmail = process.env.FORCE_GMAIL === 'true';
 
+  // In production, require Gmail credentials
+  if (!isDevelopment && !hasGmailCredentials) {
+    console.error('[Email] Production mode requires EMAIL_USER and EMAIL_PASS environment variables');
+    throw new Error('Email service not configured. Please contact support.');
+  }
+
   // Default to Ethereal only when running locally without Gmail creds unless explicitly requested.
   const useEthereal = !forceGmail && (preferEthereal || (!hasGmailCredentials && isDevelopment));
 
@@ -13,6 +19,7 @@ const sendEmail = async (options) => {
 
   try {
     if (useEthereal) {
+      console.log('[Email] Using Ethereal test SMTP account');
       const testAccount = await Promise.race([
         nodemailer.createTestAccount(),
         new Promise((_, reject) =>
@@ -34,9 +41,8 @@ const sendEmail = async (options) => {
         connectionTimeout: 5000,
         greetingTimeout: 5000,
       });
-
-      console.log('[Email] Using Ethereal test SMTP account');
     } else {
+      console.log('[Email] Configuring Gmail SMTP with user:', process.env.EMAIL_USER ? process.env.EMAIL_USER.substring(0, 5) + '...' : 'undefined');
       transporter = nodemailer.createTransport({
         service: 'gmail',
         auth: {
@@ -49,8 +55,7 @@ const sendEmail = async (options) => {
         connectionTimeout: 10000,
         greetingTimeout: 10000,
       });
-
-      console.log('[Email] Using Gmail SMTP account for delivery');
+      console.log('[Email] Gmail SMTP configured successfully');
     }
 
     const message = {
@@ -61,18 +66,23 @@ const sendEmail = async (options) => {
       html: options.html,
     };
 
+    console.log('[Email] Sending email to:', options.email);
+    
     const info = await Promise.race([
       transporter.sendMail(message),
       new Promise((_, reject) =>
-        setTimeout(() => reject(new Error('Email send timeout')), 10000)
+        setTimeout(() => reject(new Error('Email send timeout after 10s')), 10000)
       )
     ]);
 
+    console.log('[Email] Email sent successfully. Message ID:', info.messageId);
+    
     if (useEthereal) {
-      console.log('Preview URL: %s', nodemailer.getTestMessageUrl(info));
+      console.log('[Email] Preview URL: %s', nodemailer.getTestMessageUrl(info));
     }
   } catch (error) {
-    console.error('Email service error:', error.message);
+    console.error('[Email] Email service error:', error.message);
+    console.error('[Email] Error details:', error);
     throw error;
   }
 };

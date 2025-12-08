@@ -126,28 +126,43 @@ exports.register = async (req, res, next) => {
         },
         { upsert: true, new: true, setDefaultsOnInsert: true }
       );
+      console.log('Pending user created/updated for email:', normalizedEmail);
     } catch (dbErr) {
-      console.error('Database error storing pending user:', dbErr);
-      return res.status(500).json({ success: false, message: 'Failed to process registration' });
+      console.error('Database error storing pending user:', dbErr.message);
+      console.error('Error code:', dbErr.code);
+      return res.status(500).json({ success: false, message: 'Failed to process registration: ' + dbErr.message });
     }
 
     try {
       await sendVerificationEmail({ email: normalizedEmail }, otp);
-    } catch (err) {
-      console.error('Email verification error:', err.message);
+      
+      // Send response without token (user must verify email first)
+      res.status(201).json({
+        success: true,
+        message: 'Registration received. We emailed a 6-digit code valid for 5 minutes.',
+        email: normalizedEmail,
+        expiresInMinutes: 5
+      });
+    } catch (emailErr) {
+      console.error('Email sending error:', emailErr.message);
+      
+      // In development, allow registration to proceed with OTP shown
+      if (process.env.NODE_ENV === 'development') {
+        return res.status(201).json({
+          success: true,
+          message: 'Registration received. Email service unavailable. Your code: ' + otp,
+          email: normalizedEmail,
+          otp: otp,
+          expiresInMinutes: 5
+        });
+      }
+      
+      // In production, fail with helpful message
       return res.status(500).json({
         success: false,
         message: 'Could not send verification email. Please try again in a moment.'
       });
     }
-    
-    // Send response without token (user must verify email first)
-    res.status(201).json({
-      success: true,
-      message: 'Registration received. We emailed a 6-digit code valid for 5 minutes.',
-      email: normalizedEmail,
-      expiresInMinutes: 5
-    });
   } catch (err) {
     console.error('Registration error:', err);
     res.status(500).json({ 
