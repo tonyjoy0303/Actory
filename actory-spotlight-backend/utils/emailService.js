@@ -117,7 +117,7 @@ const sendPasswordResetEmail = async (user, resetToken, resetUrl) => {
 };
 
 const sendVerificationEmail = async (user, otp) => {
-  const message = `Your email verification code is: ${otp}. This code will expire in 10 minutes.`;
+  const message = `Your email verification code is: ${otp}. This code will expire in 5 minutes.`;
 
   const html = `
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
@@ -130,7 +130,7 @@ const sendVerificationEmail = async (user, otp) => {
         <h1 style="margin: 0; color: #4f46e5; letter-spacing: 5px; font-size: 32px;">${otp}</h1>
       </div>
       
-      <p style="color: #6b7280;">This code will expire in 10 minutes.</p>
+      <p style="color: #6b7280;">This code will expire in 5 minutes.</p>
       <p>If you did not create this account, please ignore this email.</p>
       <p style="color: #6b7280; font-size: 0.875rem; margin-top: 2rem;">
         Do not share this code with anyone. Actory will never ask for your code.
