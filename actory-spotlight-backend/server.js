@@ -12,9 +12,20 @@ const app = express();
 // Body parser
 app.use(express.json());
 
-// Enable CORS
+// Enable CORS with allowlist for local and hosted frontends
+const allowedOrigins = [
+  process.env.FRONTEND_URL || 'http://localhost:8080',
+  'http://localhost:8080',
+  'https://actory-1ci4.onrender.com'
+];
+
 const corsOptions = {
-  origin: process.env.FRONTEND_URL || 'http://localhost:8080',
+  origin: function(origin, callback) {
+    // Allow non-browser requests (like curl/postman) which have no origin
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.includes(origin)) return callback(null, true);
+    return callback(new Error('Not allowed by CORS')); // blocks unexpected origins
+  },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
@@ -31,7 +42,10 @@ app.use((req, res, next) => {
   );
 
   // CORS headers
-  res.setHeader('Access-Control-Allow-Origin', process.env.FRONTEND_URL || 'http://localhost:8080');
+  const requestOrigin = req.headers.origin;
+  if (allowedOrigins.includes(requestOrigin)) {
+    res.setHeader('Access-Control-Allow-Origin', requestOrigin);
+  }
   res.setHeader('Access-Control-Allow-Credentials', 'true');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
