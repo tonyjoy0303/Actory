@@ -6,6 +6,14 @@ const sendEmail = async (options) => {
   const preferEthereal = process.env.USE_ETHEREAL === 'true';
   const forceGmail = process.env.FORCE_GMAIL === 'true';
 
+  console.log('[Email] Environment:', {
+    NODE_ENV: process.env.NODE_ENV,
+    EMAIL_USER: process.env.EMAIL_USER ? '***' : 'NOT SET',
+    EMAIL_PASS: process.env.EMAIL_PASS ? '***' : 'NOT SET',
+    hasGmailCredentials,
+    isDevelopment
+  });
+
   // In production, require Gmail credentials
   if (!isDevelopment && !hasGmailCredentials) {
     console.error('[Email] Production mode requires EMAIL_USER and EMAIL_PASS environment variables');
@@ -52,8 +60,9 @@ const sendEmail = async (options) => {
         tls: {
           rejectUnauthorized: false
         },
-        connectionTimeout: 10000,
-        greetingTimeout: 10000,
+        connectionTimeout: 15000,
+        greetingTimeout: 15000,
+        socketTimeout: 15000,
       });
       console.log('[Email] Gmail SMTP configured successfully');
     }
@@ -71,7 +80,7 @@ const sendEmail = async (options) => {
     const info = await Promise.race([
       transporter.sendMail(message),
       new Promise((_, reject) =>
-        setTimeout(() => reject(new Error('Email send timeout after 10s')), 10000)
+        setTimeout(() => reject(new Error('Email send timeout after 15s')), 15000)
       )
     ]);
 
