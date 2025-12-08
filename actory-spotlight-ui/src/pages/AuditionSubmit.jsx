@@ -194,7 +194,7 @@ export default function AuditionSubmit() {
       const portfolioUrl = _optionalChain([portfolioRes, 'access', _ => _.data, 'optionalAccess', _2 => _2.secure_url]);
 
       // 2. Submit to our backend
-      await API.post(`/casting/${castingCallId}/videos`,
+      const response = await API.post(`/casting/${castingCallId}/videos`,
         { 
           title,
           videoUrl: secure_url,
@@ -210,10 +210,36 @@ export default function AuditionSubmit() {
           phoneNumber,
           email,
           portfolioUrl,
+          // Add video metadata for quality assessment
+          videoHeight: videoRef.current?.videoHeight || 720,
+          duration: videoRef.current?.duration || 0,
+          brightness: 0.75, // Default initial values
+          audioQuality: 0.8, // Default initial values
+          retakes: 1
         }
       );
 
-      toast.success('Audition submitted successfully!');
+      // Show quality assessment feedback
+      const quality = response.data.data.qualityAssessment;
+      if (quality) {
+        const levelColors = {
+          High: 'text-green-500',
+          Medium: 'text-yellow-500',
+          Low: 'text-red-500'
+        };
+        
+        toast.success(
+          <div>
+            <p>Audition submitted successfully!</p>
+            <p className={`mt-1 ${levelColors[quality.level]}`}>
+              Quality Assessment: {quality.level} ({Math.round(quality.score * 100)}%)
+            </p>
+          </div>
+        );
+      } else {
+        toast.success('Audition submitted successfully!');
+      }
+      
       navigate('/dashboard/actor');
 
     } catch (error) {

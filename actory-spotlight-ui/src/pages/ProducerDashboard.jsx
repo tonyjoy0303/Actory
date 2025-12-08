@@ -34,6 +34,18 @@ export default function ProducerDashboard() {
         return sorted.sort((a, b) => (a.actor?.name || '').localeCompare(b.actor?.name || ''));
       case 'name-desc':
         return sorted.sort((a, b) => (b.actor?.name || '').localeCompare(a.actor?.name || ''));
+      case 'quality-high':
+        return sorted.sort((a, b) => {
+          const scoreA = a.qualityAssessment?.score || 0;
+          const scoreB = b.qualityAssessment?.score || 0;
+          return scoreB - scoreA;
+        });
+      case 'quality-low':
+        return sorted.sort((a, b) => {
+          const scoreA = a.qualityAssessment?.score || 0;
+          const scoreB = b.qualityAssessment?.score || 0;
+          return scoreA - scoreB;
+        });
       case 'status-accepted':
         return sorted.sort((a, b) => {
           if (a.status === 'Accepted' && b.status !== 'Accepted') return -1;
@@ -142,6 +154,8 @@ export default function ProducerDashboard() {
                 <SelectValue placeholder="Sort submissions" />
               </SelectTrigger>
               <SelectContent>
+                <SelectItem value="quality-high">Highest Quality First</SelectItem>
+                <SelectItem value="quality-low">Lowest Quality First</SelectItem>
                 <SelectItem value="date-desc">Newest First</SelectItem>
                 <SelectItem value="date-asc">Oldest First</SelectItem>
                 <SelectItem value="name-asc">Name A-Z</SelectItem>
@@ -190,39 +204,73 @@ export default function ProducerDashboard() {
                   Submitted: {new Date(s.createdAt).toLocaleString()}
                 </p>
                 <div className="mt-1">
-                  <span 
-                    className={`inline-block px-2 py-0.5 rounded text-xs ${
-                      s.status === 'Accepted' 
-                        ? 'bg-green-600/20 text-green-500' 
-                        : s.status === 'Rejected' 
-                          ? 'bg-red-600/20 text-red-500' 
-                          : 'bg-yellow-600/20 text-yellow-500'
-                    }`}
-                  >
-                    {s.status || 'Pending'}
-                  </span>
+                  <div className="flex gap-2">
+                    <span 
+                      className={`inline-block px-2 py-0.5 rounded text-xs ${
+                        s.status === 'Accepted' 
+                          ? 'bg-green-600/20 text-green-500' 
+                          : s.status === 'Rejected' 
+                            ? 'bg-red-600/20 text-red-500' 
+                            : 'bg-yellow-600/20 text-yellow-500'
+                      }`}
+                    >
+                      {s.status || 'Pending'}
+                    </span>
+                    {s.qualityAssessment && (
+                      <span 
+                        className={`inline-block px-2 py-0.5 rounded text-xs ${
+                          s.qualityAssessment.level === 'High' 
+                            ? 'bg-green-600/20 text-green-500' 
+                            : s.qualityAssessment.level === 'Medium'
+                              ? 'bg-yellow-600/20 text-yellow-500' 
+                              : 'bg-red-600/20 text-red-500'
+                        }`}
+                      >
+                        Quality: {s.qualityAssessment.level} ({Math.round(s.qualityAssessment.score * 100)}%)
+                      </span>
+                    )}
+                  </div>
                 </div>
               </div>
               <div className="flex items-center gap-2">
-                <a href={s.videoUrl} target="_blank" rel="noreferrer">
-                  <Button size="sm" variant="outline">View Video</Button>
-                </a>
-                <Button 
-                  size="sm" 
-                  variant="secondary" 
-                  disabled={updatingId === s._id} 
-                  onClick={() => updateSubmissionStatus(s._id, 'Accepted')}
-                >
-                  {updatingId === s._id ? 'Updating...' : 'Accept'}
-                </Button>
-                <Button 
-                  size="sm" 
-                  variant="ghost" 
-                  disabled={updatingId === s._id} 
-                  onClick={() => updateSubmissionStatus(s._id, 'Rejected')}
-                >
-                  Reject
-                </Button>
+                <video 
+                  className="w-64 h-36 rounded"
+                  src={s.videoUrl}
+                  controls
+                  onTimeUpdate={(e) => {
+                    const video = e.target;
+                    // Update metrics when video is watched
+                    if (video.currentTime > 0 && !video.paused && !video.ended) {
+                      const watchTimePercentage = (video.currentTime / video.duration) * 100;
+                      // Update metrics after significant watch time
+                      if (watchTimePercentage > 30) {
+                        API.put(`/videos/${s._id}/metrics`, {
+                          watchTime: watchTimePercentage,
+                          brightness: 0.8,
+                          audioQuality: 0.85
+                        }).catch(console.error);
+                      }
+                    }
+                  }}
+                />
+                <div className="flex flex-col gap-2">
+                  <Button 
+                    size="sm" 
+                    variant="secondary" 
+                    disabled={updatingId === s._id} 
+                    onClick={() => updateSubmissionStatus(s._id, 'Accepted')}
+                  >
+                    {updatingId === s._id ? 'Updating...' : 'Accept'}
+                  </Button>
+                  <Button 
+                    size="sm" 
+                    variant="ghost" 
+                    disabled={updatingId === s._id} 
+                    onClick={() => updateSubmissionStatus(s._id, 'Rejected')}
+                  >
+                    Reject
+                  </Button>
+                </div>
               </div>
             </div>
           ))}

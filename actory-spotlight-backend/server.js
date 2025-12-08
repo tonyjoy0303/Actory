@@ -14,14 +14,41 @@ app.use(express.json());
 
 // Enable CORS
 const corsOptions = {
-  origin: process.env.CLIENT_ORIGIN || 'http://localhost:8080',
+  origin: process.env.FRONTEND_URL || 'http://localhost:8080',
   credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
   optionsSuccessStatus: 200
 };
 app.use(cors(corsOptions));
 
+// Set security headers
+app.use((req, res, next) => {
+  // Set Content Security Policy
+  res.setHeader(
+    'Content-Security-Policy',
+    "default-src 'self'; font-src 'self' data: http://localhost:5000; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: http://localhost:5000; connect-src 'self' http://localhost:5000 ws://localhost:5000 http://localhost:8080"
+  );
+
+  // CORS headers
+  res.setHeader('Access-Control-Allow-Origin', process.env.FRONTEND_URL || 'http://localhost:8080');
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+
+  // Cross-Origin headers
+  res.setHeader('Cross-Origin-Opener-Policy', 'same-origin-allow-popups');
+  res.setHeader('Cross-Origin-Embedder-Policy', 'require-corp');
+  res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+
+  next();
+});
+
 // Static files for uploads (profile photos, etc.)
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+
+// Serve assets (including fonts) from the frontend's assets directory
+app.use('/assets', express.static(path.join(__dirname, '../actory-spotlight-ui/dist/assets')));
 
 // Mount routers
 app.use('/api/v1/auth', require('./routes/auth'));
@@ -31,6 +58,10 @@ app.use('/api/v1/actor', require('./routes/actor'));
 app.use('/api/v1/admin', require('./routes/admin'));
 app.use('/api/v1/profile', require('./routes/profile'));
 app.use('/api/v1/messages', require('./routes/messages'));
+app.use('/api', require('./routes/prediction'));
+
+// Handle OPTIONS preflight requests
+app.options('*', cors(corsOptions));
 
 // KNN Role Fit Classification
 // POST /api/v1/fit/knn

@@ -3,7 +3,7 @@ import { test, expect } from '@playwright/test';
 const ACTOR = { email: 'jesly@gmail.com', password: 'jesly123' };
 const RECRUITER = { email: 'tonyjoyjp@gmail.com', password: 'tony123' };
 
-async function doLogin(page, creds: { email: string; password: string }) {
+export async function doLogin(page, creds: { email: string; password: string }) {
   // Capture console logs to aid debugging if login fails
   const logs: string[] = [];
   page.on('console', (msg) => logs.push(`[${msg.type()}] ${msg.text()}`));

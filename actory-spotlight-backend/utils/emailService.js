@@ -1,53 +1,79 @@
 const nodemailer = require('nodemailer');
 
 const sendEmail = async (options) => {
-  // Create a test account if in development
   const isDevelopment = process.env.NODE_ENV === 'development';
+  const hasGmailCredentials = Boolean(process.env.EMAIL_USER && process.env.EMAIL_PASS);
+  const preferEthereal = process.env.USE_ETHEREAL === 'true';
+  const forceGmail = process.env.FORCE_GMAIL === 'true';
+
+  // Default to Ethereal only when running locally without Gmail creds unless explicitly requested.
+  const useEthereal = !forceGmail && (preferEthereal || (!hasGmailCredentials && isDevelopment));
+
   let transporter;
 
-  if (isDevelopment) {
-    // Use ethereal.email for testing in development
-    const testAccount = await nodemailer.createTestAccount();
-    
-    transporter = nodemailer.createTransport({
-      host: 'smtp.ethereal.email',
-      port: 587,
-      secure: false,
-      auth: {
-        user: testAccount.user,
-        pass: testAccount.pass,
-      },
-      tls: {
-        rejectUnauthorized: false
-      }
-    });
-  } else {
-    // Use Gmail in production
-    transporter = nodemailer.createTransport({
-      service: 'gmail',
-      auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS,
-      },
-      tls: {
-        rejectUnauthorized: false
-      }
-    });
-  }
+  try {
+    if (useEthereal) {
+      const testAccount = await Promise.race([
+        nodemailer.createTestAccount(),
+        new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('Ethereal timeout')), 5000)
+        )
+      ]);
 
-  // Send mail with defined transport object
-  const message = {
-    from: `"Actory" <${isDevelopment ? 'noreply@actory.com' : process.env.EMAIL_USER}>`,
-    to: options.email,
-    subject: options.subject,
-    text: options.message,
-    html: options.html,
-  };
+      transporter = nodemailer.createTransport({
+        host: 'smtp.ethereal.email',
+        port: 587,
+        secure: false,
+        auth: {
+          user: testAccount.user,
+          pass: testAccount.pass,
+        },
+        tls: {
+          rejectUnauthorized: false
+        },
+        connectionTimeout: 5000,
+        greetingTimeout: 5000,
+      });
 
-  const info = await transporter.sendMail(message);
+      console.log('[Email] Using Ethereal test SMTP account');
+    } else {
+      transporter = nodemailer.createTransport({
+        service: 'gmail',
+        auth: {
+          user: process.env.EMAIL_USER,
+          pass: process.env.EMAIL_PASS,
+        },
+        tls: {
+          rejectUnauthorized: false
+        },
+        connectionTimeout: 10000,
+        greetingTimeout: 10000,
+      });
 
-  if (isDevelopment) {
-    console.log('Preview URL: %s', nodemailer.getTestMessageUrl(info));
+      console.log('[Email] Using Gmail SMTP account for delivery');
+    }
+
+    const message = {
+      from: `"Actory" <${useEthereal ? 'noreply@actory.test' : process.env.EMAIL_USER}>`,
+      to: options.email,
+      subject: options.subject,
+      text: options.message,
+      html: options.html,
+    };
+
+    const info = await Promise.race([
+      transporter.sendMail(message),
+      new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('Email send timeout')), 10000)
+      )
+    ]);
+
+    if (useEthereal) {
+      console.log('Preview URL: %s', nodemailer.getTestMessageUrl(info));
+    }
+  } catch (error) {
+    console.error('Email service error:', error.message);
+    throw error;
   }
 };
 
@@ -90,7 +116,43 @@ const sendPasswordResetEmail = async (user, resetToken, resetUrl) => {
   }
 };
 
+const sendVerificationEmail = async (user, otp) => {
+  const message = `Your email verification code is: ${otp}. This code will expire in 10 minutes.`;
+
+  const html = `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+      <h2 style="color: #4f46e5;">Welcome to Actory!</h2>
+      <p>Thank you for registering. Please verify your email address to activate your account.</p>
+      <p>Your email verification code is:</p>
+      
+      <div style="display: inline-block; background-color: #f3f4f6; border: 2px solid #4f46e5; 
+                  padding: 20px 30px; border-radius: 8px; margin: 20px 0; text-align: center;">
+        <h1 style="margin: 0; color: #4f46e5; letter-spacing: 5px; font-size: 32px;">${otp}</h1>
+      </div>
+      
+      <p style="color: #6b7280;">This code will expire in 10 minutes.</p>
+      <p>If you did not create this account, please ignore this email.</p>
+      <p style="color: #6b7280; font-size: 0.875rem; margin-top: 2rem;">
+        Do not share this code with anyone. Actory will never ask for your code.
+      </p>
+    </div>
+  `;
+
+  try {
+    await sendEmail({
+      email: user.email,
+      subject: 'Your Actory Email Verification Code',
+      message,
+      html,
+    });
+  } catch (err) {
+    console.error('Error sending verification email:', err);
+    throw new Error('Verification email could not be sent');
+  }
+};
+
 module.exports = {
   sendEmail,
   sendPasswordResetEmail,
+  sendVerificationEmail,
 };

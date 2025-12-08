@@ -49,8 +49,56 @@ exports.addVideo = async (req, res, next) => {
       return res.status(404).json({ success: false, message: 'Casting call not found' });
     }
 
+    // Get the quality assessment utility
+    const { evaluateAuditionQuality } = require('../utils/auditionQuality');
+
+    // Extract video metadata from the request
+    const videoMetadata = {
+      height: req.body.videoHeight || 720, // Default to 720p if not provided
+      duration: req.body.duration || 0,
+      brightness: req.body.brightness || 0.75,
+      audioQuality: req.body.audioQuality || 0.8
+    };
+
+    // Prepare audition metadata
+    const auditionMetadata = {
+      description: req.body.description || '',
+      retakes: req.body.retakes || 1
+    };
+
+    // Get previous shortlist history for the actor
+    const previousShortlists = await Video.countDocuments({
+      actor: req.user.id,
+      status: 'Accepted'
+    });
+
+    // Evaluate the audition quality
+    const qualityAssessment = evaluateAuditionQuality({
+      videoMetadata,
+      auditionMetadata,
+      roleDescription: castingCall.roleDescription || '',
+      producerWatchTime: 0, // Initial watch time is 0
+      previousShortlists
+    });
+
+    // Add quality assessment to the video data
+    req.body.qualityAssessment = {
+      level: qualityAssessment.quality,
+      score: qualityAssessment.score,
+      details: qualityAssessment.details
+    };
+
     const video = await Video.create(req.body);
-    res.status(201).json({ success: true, data: video });
+    res.status(201).json({ 
+      success: true, 
+      data: {
+        ...video.toObject(),
+        qualityAssessment: {
+          level: qualityAssessment.quality,
+          score: qualityAssessment.score
+        }
+      } 
+    });
   } catch (err) {
     res.status(400).json({ success: false, message: err.message });
   }
@@ -1040,5 +1088,77 @@ exports.addVideoComment = async (req, res) => {
       message: 'Server error', 
       error: error.message 
     });
+  }
+};
+
+// @desc    Update video metrics and recalculate quality
+// @route   PUT /api/v1/videos/:id/metrics
+// @access  Private (Producer only)
+exports.updateVideoMetrics = async (req, res, next) => {
+  try {
+    const { watchTime, brightness, audioQuality } = req.body;
+    
+    const video = await Video.findById(req.params.id).populate('castingCall');
+    
+    if (!video) {
+      return res.status(404).json({ success: false, message: 'Video not found' });
+    }
+
+    // Ensure current user is the producer who owns the casting call
+    if (video.castingCall.producer.toString() !== req.user.id) {
+      return res.status(401).json({ success: false, message: 'Not authorized to update metrics for this video' });
+    }
+
+    const { evaluateAuditionQuality } = require('../utils/auditionQuality');
+
+    // Get previous shortlist history for the actor
+    const previousShortlists = await Video.countDocuments({
+      actor: video.actor,
+      status: 'Accepted'
+    });
+
+    // Update video metadata with new metrics
+    const videoMetadata = {
+      height: video.videoHeight || 720,
+      duration: video.duration || 0,
+      brightness: brightness || video.qualityAssessment?.details?.scores?.video?.lighting || 0.75,
+      audioQuality: audioQuality || video.qualityAssessment?.details?.scores?.video?.audio || 0.8
+    };
+
+    const auditionMetadata = {
+      description: video.description || '',
+      retakes: video.retakes || 1
+    };
+
+    // Recalculate quality with updated metrics
+    const qualityAssessment = evaluateAuditionQuality({
+      videoMetadata,
+      auditionMetadata,
+      roleDescription: video.castingCall.roleDescription || '',
+      producerWatchTime: watchTime || 0,
+      previousShortlists
+    });
+
+    // Update video with new quality assessment
+    video.qualityAssessment = {
+      level: qualityAssessment.quality,
+      score: qualityAssessment.score,
+      details: qualityAssessment.details
+    };
+
+    await video.save();
+
+    res.status(200).json({
+      success: true,
+      data: {
+        ...video.toObject(),
+        qualityAssessment: {
+          level: qualityAssessment.quality,
+          score: qualityAssessment.score
+        }
+      }
+    });
+  } catch (err) {
+    res.status(400).json({ success: false, message: err.message });
   }
 };

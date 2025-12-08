@@ -92,7 +92,22 @@ export default function EditCastingCall() {
       </div>
 
       <div className="bg-card rounded-lg border p-6 shadow-sm">
-        <CastingCallForm castingCall={castingCall} onSuccess={handleSuccess} />
+        <CastingCallForm 
+          castingCall={castingCall} 
+          onSubmit={async (formData) => {
+            try {
+              await API.put(`/casting/${id}`, formData);
+              handleSuccess();
+            } catch (error) {
+              console.error('Error updating casting call:', error);
+              toast({
+                title: 'Error',
+                description: error.response?.data?.message || 'Failed to update casting call.',
+                variant: 'destructive',
+              });
+            }
+          }}
+        />
       </div>
     </div>
   );

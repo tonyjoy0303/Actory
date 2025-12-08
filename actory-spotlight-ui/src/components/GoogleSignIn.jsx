@@ -31,10 +31,6 @@ export default function GoogleSignIn({
   const btnRef = useRef(null);
   const [loaded, setLoaded] = useState(false);
   const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
-  
-  // Debug logging
-  console.log('Google Client ID:', clientId);
-  console.log('All env vars:', import.meta.env);
 
   useEffect(() => {
     if (!clientId) {

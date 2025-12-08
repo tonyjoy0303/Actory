@@ -140,6 +140,26 @@ export default function RegisterActor() {
       console.log('Registration response:', response.data);
       
       if (response.data && response.data.success) {
+        // Check if email verification is required
+        if (response.data.email && !response.data.token) {
+          // Email verification required
+          localStorage.setItem('registrationEmail', response.data.email);
+          
+          // If OTP is included in response (development mode), show it
+          if (response.data.otp) {
+            toast.success(`${response.data.message}\n\nYour verification code: ${response.data.otp}`, {
+              duration: 15000
+            });
+          } else {
+            toast.success(response.data.message || "Registration successful! Please check your email for the verification code.");
+          }
+          
+          setTimeout(() => {
+            navigate('/auth/verify-email');
+          }, 1000);
+          return;
+        }
+        
         const { token, user } = response.data;
         
         if (!token || !user) {

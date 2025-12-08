@@ -77,7 +77,21 @@ export default function Login() {
     } catch (err) {
       const errorMessage = _optionalChain([err, 'access', _ => _.response, 'optionalAccess', _2 => _2.data, 'optionalAccess', _3 => _3.message]) || "An unexpected error occurred.";
       setError(errorMessage);
-      toast.error(errorMessage);
+      
+      // Check if error is due to unverified email
+      if (err?.response?.status === 403 || errorMessage.toLowerCase().includes('verify your email')) {
+        toast.error(
+          <div>
+            <p>{errorMessage}</p>
+            <a href="/auth/resend-verification" className="underline text-white">
+              Resend verification email
+            </a>
+          </div>,
+          { duration: 6000 }
+        );
+      } else {
+        toast.error(errorMessage);
+      }
     } finally {
       setLoading(false);
     }

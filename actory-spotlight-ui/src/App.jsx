@@ -34,6 +34,7 @@ import Submissions from "./pages/casting/Submissions";
 import ActorProfile from "./pages/ActorProfile";
 import PublicProfile from "./pages/PublicProfile";
 import AuditionSubmit from "./pages/AuditionSubmit";
+import NoShowPrediction from "./pages/audition/NoShowPrediction";
 
 // Pages - Messaging
 import Messages from "./pages/Messages";
@@ -48,6 +49,8 @@ import RegisterActor from "./pages/auth/RegisterActor";
 import RegisterProducer from "./pages/auth/RegisterProducer";
 import ForgotPassword from "./pages/auth/ForgotPassword";
 import ResetPassword from "./pages/auth/ResetPassword";
+import VerifyEmail from "./pages/auth/VerifyEmail";
+import ResendVerification from "./pages/auth/ResendVerification";
 import LoginRequired from "./pages/LoginRequired";
 
 // Pages - Marketing
@@ -179,6 +182,14 @@ const App = () => (
                 })
               
               , React.createElement(Route, {
+                path: "/audition/prediction",
+                element: 
+                  React.createElement(MainLayout, null
+                    , React.createElement(NoShowPrediction, null )
+                  )
+                })
+              
+              , React.createElement(Route, {
                 path: "/auth/login",
                 element: 
                   React.createElement(MainLayout, null
@@ -223,6 +234,22 @@ const App = () => (
                 element: 
                   React.createElement(MainLayout, null
                     , React.createElement(ResetPassword, null )
+                  )
+                })
+              
+              , React.createElement(Route, {
+                path: "/auth/verify-email",
+                element: 
+                  React.createElement(MainLayout, null
+                    , React.createElement(VerifyEmail, null )
+                  )
+                })
+              
+              , React.createElement(Route, {
+                path: "/auth/resend-verification",
+                element: 
+                  React.createElement(MainLayout, null
+                    , React.createElement(ResendVerification, null )
                   )
                 })
               

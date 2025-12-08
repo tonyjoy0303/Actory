@@ -1,7 +1,7 @@
 import React from 'react'
 const _jsxFileName = ""; function _nullishCoalesce(lhs, rhsFn) { if (lhs != null) { return lhs; } else { return rhsFn(); } } function _optionalChain(ops) { let lastAccessLHS = undefined; let value = ops[0]; let i = 1; while (i < ops.length) { const op = ops[i]; const fn = ops[i + 1]; i += 2; if ((op === 'optionalAccess' || op === 'optionalCall') && value == null) { return undefined; } if (op === 'access' || op === 'optionalAccess') { lastAccessLHS = value; value = fn(value); } else if (op === 'call' || op === 'optionalCall') { value = fn((...args) => value.call(lastAccessLHS, ...args)); lastAccessLHS = undefined; } } return value; }import { NavLink, useNavigate, useLocation } from "react-router-dom";
 import { useEffect, useState } from "react";
-import { Search, User, Video } from "lucide-react";
+import { Search, User, Video, Menu, X, LogOut } from "lucide-react";
 import ThemeToggle from "@/components/ThemeToggle";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -39,6 +39,7 @@ export default function Header() {
   const [reason, setReason] = useState('');
   const [isRequesting, setIsRequesting] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const dashboardPathFor = (role) => {
     if (role === 'Actor') return '/dashboard/actor';
@@ -203,14 +204,24 @@ export default function Header() {
     <>
       <header className="sticky top-0 z-40 w-full border-b bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <nav className="container h-16 flex items-center justify-between gap-4">
-          <NavLink to="/" className="flex items-center gap-2" aria-label="Actory home">
-            <Logo />
-          </NavLink>
+          <div className="flex items-center gap-2">
+            <NavLink to="/" className="flex items-center gap-2" aria-label="Actory home">
+              <Logo />
+            </NavLink>
+            
+            {/* Menu Button */}
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              className="h-12 w-12"
+              onClick={() => setSidebarOpen(true)}
+            >
+              <Menu className="h-8 w-8" />
+            </Button>
+          </div>
 
           <div className="hidden md:flex items-center gap-6">
             <NavLink to="/casting" className={linkCls} end={true}>Castings</NavLink>
-            {user && <NavLink to="/feeds" className={linkCls} end={true}>Feeds</NavLink>}
-            {user && <NavLink to="/call" className={linkCls} end={true}>Video Call</NavLink>}
             {_optionalChain([user, 'optionalAccess', _ => _.role]) === 'Actor' && <NavLink to="/dashboard/actor" className={linkCls} end={true}>Dashboard</NavLink>}
             {_optionalChain([user, 'optionalAccess', _2 => _2.role]) === 'Producer' && <NavLink to="/dashboard/producer" className={linkCls} end={true}>Dashboard</NavLink>}
             {user && (
@@ -403,6 +414,153 @@ export default function Header() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Sidebar Menu */}
+      {sidebarOpen && (
+        <div 
+          className="fixed inset-0 bg-black/50 z-50 transition-opacity"
+          onClick={() => setSidebarOpen(false)}
+        >
+          <div 
+            className="fixed left-0 top-0 bottom-0 w-80 bg-background border-r shadow-lg transform transition-transform duration-300 ease-in-out overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between p-4 border-b">
+              <h2 className="font-semibold text-lg">Menu</h2>
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                onClick={() => setSidebarOpen(false)}
+              >
+                <X className="h-5 w-5" />
+              </Button>
+            </div>
+            
+            <div className="py-2">
+              <button
+                onClick={() => {
+                  navigate('/');
+                  setSidebarOpen(false);
+                }}
+                className="w-full px-4 py-3 text-left hover:bg-accent transition-colors flex items-center gap-3"
+              >
+                <span>Home</span>
+              </button>
+              
+              <button
+                onClick={() => {
+                  navigate('/casting');
+                  setSidebarOpen(false);
+                }}
+                className="w-full px-4 py-3 text-left hover:bg-accent transition-colors flex items-center gap-3"
+              >
+                <span>Castings</span>
+              </button>
+
+              {user && (
+                <>
+                  <button
+                    onClick={() => {
+                      navigate('/audition/prediction');
+                      setSidebarOpen(false);
+                    }}
+                    className="w-full px-4 py-3 text-left hover:bg-accent transition-colors flex items-center gap-3"
+                  >
+                    <span>No-Show Predictor</span>
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      navigate('/feeds');
+                      setSidebarOpen(false);
+                    }}
+                    className="w-full px-4 py-3 text-left hover:bg-accent transition-colors flex items-center gap-3"
+                  >
+                    <span>Feeds</span>
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      navigate('/call');
+                      setSidebarOpen(false);
+                    }}
+                    className="w-full px-4 py-3 text-left hover:bg-accent transition-colors flex items-center gap-3"
+                  >
+                    <span>Video Call</span>
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      navigate(`/profile/${user._id}`);
+                      setSidebarOpen(false);
+                    }}
+                    className="w-full px-4 py-3 text-left hover:bg-accent transition-colors flex items-center gap-3"
+                  >
+                    <span>Profile</span>
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      navigate('/messages');
+                      setSidebarOpen(false);
+                    }}
+                    className="w-full px-4 py-3 text-left hover:bg-accent transition-colors flex items-center gap-3 relative"
+                  >
+                    <span>Messages</span>
+                    {unreadCount > 0 && (
+                      <Badge variant="destructive" className="ml-auto h-5 w-5 p-0 flex items-center justify-center text-xs">
+                        {unreadCount > 99 ? '99+' : unreadCount}
+                      </Badge>
+                    )}
+                  </button>
+
+                  <div className="border-t my-2"></div>
+
+                  <button
+                    onClick={() => {
+                      localStorage.removeItem('token');
+                      localStorage.removeItem('user');
+                      setUser(null);
+                      setSidebarOpen(false);
+                      navigate('/');
+                      toast.success('Logged out successfully');
+                    }}
+                    className="w-full px-4 py-3 text-left hover:bg-destructive/10 text-destructive transition-colors flex items-center gap-3"
+                  >
+                    <LogOut className="h-4 w-4" />
+                    <span>Logout</span>
+                  </button>
+                </>
+              )}
+
+              {!user && (
+                <>
+                  <div className="border-t my-2"></div>
+                  <button
+                    onClick={() => {
+                      navigate('/auth/login');
+                      setSidebarOpen(false);
+                    }}
+                    className="w-full px-4 py-3 text-left hover:bg-accent transition-colors flex items-center gap-3"
+                  >
+                    <span>Login</span>
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      setRegisterOpen(true);
+                      setSidebarOpen(false);
+                    }}
+                    className="w-full px-4 py-3 text-left hover:bg-accent transition-colors flex items-center gap-3"
+                  >
+                    <span>Sign Up</span>
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }

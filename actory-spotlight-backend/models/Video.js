@@ -110,6 +110,65 @@ const VideoSchema = new mongoose.Schema({
     type: mongoose.Schema.ObjectId,
     ref: 'User',
   }],
+  qualityAssessment: {
+    level: {
+      type: String,
+      enum: ['High', 'Medium', 'Low'],
+      default: 'Medium'
+    },
+    score: {
+      type: Number,
+      default: 0
+    },
+    details: {
+      scores: {
+        video: {
+          resolution: Number,
+          duration: Number,
+          lighting: Number,
+          audio: Number
+        },
+        engagement: {
+          watchTimePercentage: Number,
+          retakes: Number,
+          shortlistHistory: Number
+        },
+        relevance: {
+          keywordMatch: Number
+        }
+      },
+      weights: {
+        video: {
+          resolution: Number,
+          duration: Number,
+          lighting: Number,
+          audio: Number
+        },
+        engagement: {
+          watchTimePercentage: Number,
+          retakes: Number,
+          shortlistHistory: Number
+        },
+        relevance: {
+          keywordMatch: Number
+        }
+      }
+    }
+  },
+  videoMetrics: {
+    height: Number,
+    duration: Number,
+    brightness: Number,
+    audioQuality: Number,
+    retakes: {
+      type: Number,
+      default: 1
+    },
+    watchTime: {
+      type: Number,
+      default: 0
+    }
+  },
   createdAt: {
     type: Date,
     default: Date.now,

@@ -14,7 +14,8 @@ const {
   incrementVideoView,
   toggleVideoLike,
   addVideoComment,
-  getVideoComments
+  getVideoComments,
+  updateVideoMetrics
 } = require('../controllers/videos');
 
 const { protect, authorize, optionalAuth } = require('../middleware/auth');
@@ -88,6 +89,11 @@ router.get('/mine', protect, authorize('Actor'), getMyVideos);
 // @desc    Update submission status (Accept/Reject)
 // @access  Private (Producer)
 router.patch('/:id/status', protect, authorize('Producer'), updateStatus);
+
+// @route   PUT /api/v1/videos/:id/metrics
+// @desc    Update video metrics and recalculate quality
+// @access  Private (Producer)
+router.put('/:id/metrics', protect, authorize('Producer'), updateVideoMetrics);
 
 // @route   DELETE /api/v1/videos/:id
 // @desc    Delete a video

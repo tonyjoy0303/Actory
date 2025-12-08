@@ -93,6 +93,12 @@ const UserSchema = new mongoose.Schema({
       'Please add a valid email',
     ],
   },
+  isEmailVerified: {
+    type: Boolean,
+    default: false
+  },
+  emailVerificationOTP: String,
+  emailVerificationOTPExpire: Date,
   phone: {
     type: String,
     required: false, // Will be conditionally required below using custom validator

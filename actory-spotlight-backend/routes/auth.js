@@ -10,7 +10,9 @@ const {
   checkEmail,
   forgotPassword,
   resetPassword,
-  checkResetToken
+  checkResetToken,
+  verifyEmail,
+  resendVerificationEmail
 } = require('../controllers/auth');
 const { protect } = require('../middleware/auth');
 const multer = require('multer');
@@ -45,6 +47,8 @@ router.get('/check-email', checkEmail);
 router.post('/forgotpassword', forgotPassword);
 router.get('/check-reset-token/:resettoken', checkResetToken);
 router.put('/resetpassword/:resettoken', resetPassword);
+router.post('/verify-email', verifyEmail);
+router.post('/resend-verification', resendVerificationEmail);
 
 // Protected routes (require authentication)
 router.use(protect);
