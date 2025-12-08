@@ -102,23 +102,34 @@ exports.register = async (req, res, next) => {
     }
 
     // Hash the password for temporary storage
-    const passwordHash = await bcrypt.hash(password, 10);
+    let passwordHash;
+    try {
+      passwordHash = await bcrypt.hash(password, 10);
+    } catch (hashErr) {
+      console.error('Password hashing error:', hashErr);
+      return res.status(500).json({ success: false, message: 'Failed to process password' });
+    }
 
     // Generate 6-digit OTP and 5 minute expiry
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
     const expireAt = new Date(Date.now() + 5 * 60 * 1000);
 
     // Upsert pending registration (resetting TTL and OTP each time)
-    await PendingUser.findOneAndUpdate(
-      { email: normalizedEmail },
-      {
-        ...registrationData,
-        passwordHash,
-        otp,
-        expireAt
-      },
-      { upsert: true, new: true, setDefaultsOnInsert: true }
-    );
+    try {
+      await PendingUser.findOneAndUpdate(
+        { email: normalizedEmail },
+        {
+          ...registrationData,
+          passwordHash,
+          otp,
+          expireAt
+        },
+        { upsert: true, new: true, setDefaultsOnInsert: true }
+      );
+    } catch (dbErr) {
+      console.error('Database error storing pending user:', dbErr);
+      return res.status(500).json({ success: false, message: 'Failed to process registration' });
+    }
 
     try {
       await sendVerificationEmail({ email: normalizedEmail }, otp);
@@ -138,8 +149,11 @@ exports.register = async (req, res, next) => {
       expiresInMinutes: 5
     });
   } catch (err) {
-    console.error(err);
-    res.status(400).json({ success: false, message: err.message });
+    console.error('Registration error:', err);
+    res.status(500).json({ 
+      success: false, 
+      message: err.message || 'An unexpected error occurred during registration' 
+    });
   }
 };
 
