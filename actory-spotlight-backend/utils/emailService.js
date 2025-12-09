@@ -52,7 +52,9 @@ const sendEmail = async (options) => {
     } else {
       console.log('[Email] Configuring Gmail SMTP with user:', process.env.EMAIL_USER ? process.env.EMAIL_USER.substring(0, 5) + '...' : 'undefined');
       transporter = nodemailer.createTransport({
-        service: 'gmail',
+        host: 'smtp.gmail.com',
+        port: 465,
+        secure: true, // Use SSL
         auth: {
           user: process.env.EMAIL_USER,
           pass: process.env.EMAIL_PASS,
@@ -60,9 +62,13 @@ const sendEmail = async (options) => {
         tls: {
           rejectUnauthorized: false
         },
-        connectionTimeout: 15000,
-        greetingTimeout: 15000,
-        socketTimeout: 15000,
+        pool: true, // Use connection pooling
+        maxConnections: 5,
+        connectionTimeout: 30000,
+        greetingTimeout: 30000,
+        socketTimeout: 30000,
+        debug: true, // Enable debug logs
+        logger: true // Enable logging
       });
       console.log('[Email] Gmail SMTP configured successfully');
     }
@@ -77,18 +83,37 @@ const sendEmail = async (options) => {
 
     console.log('[Email] Sending email to:', options.email);
     
-    const info = await Promise.race([
-      transporter.sendMail(message),
-      new Promise((_, reject) =>
-        setTimeout(() => reject(new Error('Email send timeout after 15s')), 15000)
-      )
-    ]);
+    // Retry logic for email sending (up to 2 retries)
+    let lastError;
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      try {
+        console.log(`[Email] Send attempt ${attempt}/2`);
+        const info = await Promise.race([
+          transporter.sendMail(message),
+          new Promise((_, reject) =>
+            setTimeout(() => reject(new Error('Email send timeout after 30s')), 30000)
+          )
+        ]);
 
-    console.log('[Email] Email sent successfully. Message ID:', info.messageId);
-    
-    if (useEthereal) {
-      console.log('[Email] Preview URL: %s', nodemailer.getTestMessageUrl(info));
+        console.log('[Email] Email sent successfully. Message ID:', info.messageId);
+        
+        if (useEthereal) {
+          console.log('[Email] Preview URL: %s', nodemailer.getTestMessageUrl(info));
+        }
+        
+        return; // Success - exit function
+      } catch (sendError) {
+        lastError = sendError;
+        console.error(`[Email] Attempt ${attempt} failed:`, sendError.message);
+        if (attempt < 2) {
+          console.log('[Email] Retrying in 2 seconds...');
+          await new Promise(resolve => setTimeout(resolve, 2000));
+        }
+      }
     }
+    
+    // All retries failed
+    throw lastError;
   } catch (error) {
     console.error('[Email] Email service error:', error.message);
     console.error('[Email] Error details:', error);
