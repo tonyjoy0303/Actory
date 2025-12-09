@@ -133,31 +133,25 @@ exports.register = async (req, res, next) => {
       return res.status(500).json({ success: false, message: 'Failed to process registration: ' + dbErr.message });
     }
 
-    try {
-      await sendVerificationEmail({ email: normalizedEmail }, otp);
-      
-      res.status(201).json({
-        success: true,
-        message: 'Registration received. We emailed a 6-digit code valid for 5 minutes.',
-        email: normalizedEmail,
-        expiresInMinutes: 5
+    // Send email asynchronously (don't wait for it to complete)
+    // This prevents timeout issues when email service is slow
+    sendVerificationEmail({ email: normalizedEmail }, otp)
+      .then(() => {
+        console.log('[Registration] Verification email sent successfully to:', normalizedEmail);
+      })
+      .catch((emailErr) => {
+        console.error('[Registration] Email sending failed (non-blocking):', emailErr.message);
       });
-    } catch (emailErr) {
-      console.error('Email sending error:', emailErr.message);
-      
-      // IMPORTANT: Even if email fails, the OTP is stored in the database
-      // Allow user to proceed and verify using the OTP via UI
-      console.log('Email failed but OTP is stored in database. User can still verify.');
-      
-      res.status(201).json({
-        success: true,
-        message: 'Registration received. We attempted to email your code. If you don\'t receive it, you can still verify using the code we provided.',
-        email: normalizedEmail,
-        expiresInMinutes: 5,
-        // In development, show the OTP for testing
-        ...(process.env.NODE_ENV === 'development' && { otp })
-      });
-    }
+
+    // Respond immediately without waiting for email
+    res.status(201).json({
+      success: true,
+      message: 'Registration successful! Please check your email for the verification code.',
+      email: normalizedEmail,
+      expiresInMinutes: 5,
+      // In development, show the OTP for testing
+      ...(process.env.NODE_ENV === 'development' && { otp })
+    });
   } catch (err) {
     console.error('Registration error:', err);
     res.status(500).json({ 
@@ -822,16 +816,16 @@ exports.resendVerificationEmail = async (req, res, next) => {
       await user.save();
     }
 
-    try {
-      await sendVerificationEmail({ email: normalizedEmail }, otp);
-    } catch (err) {
-      console.error('Error sending verification email:', err.message);
-      return res.status(500).json({ 
-        success: false, 
-        message: 'Failed to send verification email. Please try again shortly.' 
+    // Send email asynchronously (don't block response)
+    sendVerificationEmail({ email: normalizedEmail }, otp)
+      .then(() => {
+        console.log('[Resend] Verification email sent successfully to:', normalizedEmail);
+      })
+      .catch((err) => {
+        console.error('[Resend] Email sending failed (non-blocking):', err.message);
       });
-    }
     
+    // Respond immediately
     res.status(200).json({
       success: true,
       message: 'Verification code sent! It is valid for 5 minutes.',
