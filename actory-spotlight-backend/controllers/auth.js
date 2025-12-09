@@ -46,22 +46,6 @@ exports.register = async (req, res, next) => {
       return res.status(409).json({ success: false, message: 'Email already in use' });
     }
 
-    const payload = {
-      name,
-      email,
-      password,
-      role,
-      phone,
-      location,
-      profileImage,
-      website,
-      companyName,
-      age,
-      gender,
-      experienceLevel,
-      bio
-    };
-
     // Role-specific required checks
     if (role === 'Actor') {
       if (age === undefined || age === null || Number(age) < 1 || Number(age) > 120) {
@@ -98,6 +82,25 @@ exports.register = async (req, res, next) => {
       }
     }
 
+    // Create user payload
+    const payload = {
+      name,
+      email,
+      password,
+      role,
+      phone,
+      location,
+      profileImage,
+      website,
+      companyName,
+      age,
+      gender,
+      experienceLevel,
+      bio,
+      isEmailVerified: false  // User is not verified yet
+    };
+
+    // Create user with unverified status
     const user = await User.create(payload);
 
     // Generate 6-digit OTP
@@ -453,6 +456,15 @@ exports.googleLogin = async (req, res) => {
         // Generate a random password since not used for Google auth
         password: Math.random().toString(36).slice(-12),
         role: desiredRole,
+        isEmailVerified: true, // Auto-verify for Google accounts
+      });
+    }
+
+    // Check if email is verified (skip for Admin users)
+    if (!user.isEmailVerified && user.role !== 'Admin') {
+      return res.status(403).json({ 
+        success: false, 
+        message: 'Please verify your email address before logging in. Check your inbox for the verification link.' 
       });
     }
 
