@@ -6,20 +6,6 @@ const sendEmail = async (options) => {
   const preferEthereal = process.env.USE_ETHEREAL === 'true';
   const forceGmail = process.env.FORCE_GMAIL === 'true';
 
-  console.log('[Email] Environment:', {
-    NODE_ENV: process.env.NODE_ENV,
-    EMAIL_USER: process.env.EMAIL_USER ? '***' : 'NOT SET',
-    EMAIL_PASS: process.env.EMAIL_PASS ? '***' : 'NOT SET',
-    hasGmailCredentials,
-    isDevelopment
-  });
-
-  // In production, require Gmail credentials
-  if (!isDevelopment && !hasGmailCredentials) {
-    console.error('[Email] Production mode requires EMAIL_USER and EMAIL_PASS environment variables');
-    throw new Error('Email service not configured. Please contact support.');
-  }
-
   // Default to Ethereal only when running locally without Gmail creds unless explicitly requested.
   const useEthereal = !forceGmail && (preferEthereal || (!hasGmailCredentials && isDevelopment));
 
@@ -27,7 +13,6 @@ const sendEmail = async (options) => {
 
   try {
     if (useEthereal) {
-      console.log('[Email] Using Ethereal test SMTP account');
       const testAccount = await Promise.race([
         nodemailer.createTestAccount(),
         new Promise((_, reject) =>
@@ -49,12 +34,11 @@ const sendEmail = async (options) => {
         connectionTimeout: 5000,
         greetingTimeout: 5000,
       });
+
+      console.log('[Email] Using Ethereal test SMTP account');
     } else {
-      console.log('[Email] Configuring Gmail SMTP with user:', process.env.EMAIL_USER ? process.env.EMAIL_USER.substring(0, 5) + '...' : 'undefined');
       transporter = nodemailer.createTransport({
-        host: 'smtp.gmail.com',
-        port: 465,
-        secure: true, // Use SSL
+        service: 'gmail',
         auth: {
           user: process.env.EMAIL_USER,
           pass: process.env.EMAIL_PASS,
@@ -62,15 +46,11 @@ const sendEmail = async (options) => {
         tls: {
           rejectUnauthorized: false
         },
-        pool: true, // Use connection pooling
-        maxConnections: 5,
-        connectionTimeout: 30000,
-        greetingTimeout: 30000,
-        socketTimeout: 30000,
-        debug: true, // Enable debug logs
-        logger: true // Enable logging
+        connectionTimeout: 10000,
+        greetingTimeout: 10000,
       });
-      console.log('[Email] Gmail SMTP configured successfully');
+
+      console.log('[Email] Using Gmail SMTP account for delivery');
     }
 
     const message = {
@@ -81,42 +61,18 @@ const sendEmail = async (options) => {
       html: options.html,
     };
 
-    console.log('[Email] Sending email to:', options.email);
-    
-    // Retry logic for email sending (up to 2 retries)
-    let lastError;
-    for (let attempt = 1; attempt <= 2; attempt++) {
-      try {
-        console.log(`[Email] Send attempt ${attempt}/2`);
-        const info = await Promise.race([
-          transporter.sendMail(message),
-          new Promise((_, reject) =>
-            setTimeout(() => reject(new Error('Email send timeout after 30s')), 30000)
-          )
-        ]);
+    const info = await Promise.race([
+      transporter.sendMail(message),
+      new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('Email send timeout')), 10000)
+      )
+    ]);
 
-        console.log('[Email] Email sent successfully. Message ID:', info.messageId);
-        
-        if (useEthereal) {
-          console.log('[Email] Preview URL: %s', nodemailer.getTestMessageUrl(info));
-        }
-        
-        return; // Success - exit function
-      } catch (sendError) {
-        lastError = sendError;
-        console.error(`[Email] Attempt ${attempt} failed:`, sendError.message);
-        if (attempt < 2) {
-          console.log('[Email] Retrying in 2 seconds...');
-          await new Promise(resolve => setTimeout(resolve, 2000));
-        }
-      }
+    if (useEthereal) {
+      console.log('Preview URL: %s', nodemailer.getTestMessageUrl(info));
     }
-    
-    // All retries failed
-    throw lastError;
   } catch (error) {
-    console.error('[Email] Email service error:', error.message);
-    console.error('[Email] Error details:', error);
+    console.error('Email service error:', error.message);
     throw error;
   }
 };
@@ -161,7 +117,7 @@ const sendPasswordResetEmail = async (user, resetToken, resetUrl) => {
 };
 
 const sendVerificationEmail = async (user, otp) => {
-  const message = `Your email verification code is: ${otp}. This code will expire in 5 minutes.`;
+  const message = `Your email verification code is: ${otp}. This code will expire in 10 minutes.`;
 
   const html = `
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
@@ -174,7 +130,7 @@ const sendVerificationEmail = async (user, otp) => {
         <h1 style="margin: 0; color: #4f46e5; letter-spacing: 5px; font-size: 32px;">${otp}</h1>
       </div>
       
-      <p style="color: #6b7280;">This code will expire in 5 minutes.</p>
+      <p style="color: #6b7280;">This code will expire in 10 minutes.</p>
       <p>If you did not create this account, please ignore this email.</p>
       <p style="color: #6b7280; font-size: 0.875rem; margin-top: 2rem;">
         Do not share this code with anyone. Actory will never ask for your code.

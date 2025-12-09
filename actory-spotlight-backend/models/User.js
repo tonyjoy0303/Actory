@@ -236,14 +236,8 @@ UserSchema.methods.incrementVideoViews = async function(videoId) {
   }
 };
 
-// Encrypt password using bcrypt unless a pre-hashed password was intentionally provided
+// Encrypt password using bcrypt
 UserSchema.pre('save', async function (next) {
-  if (this.skipPasswordHash) {
-    // Ensure the flag never persists on the document
-    this.skipPasswordHash = undefined;
-    return next();
-  }
-
   if (!this.isModified('password')) {
     return next();
   }

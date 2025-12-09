@@ -1,6 +1,4 @@
 const User = require('../models/User');
-const PendingUser = require('../models/PendingUser');
-const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { OAuth2Client } = require('google-auth-library');
 const crypto = require('crypto');
@@ -43,16 +41,15 @@ exports.register = async (req, res, next) => {
       return res.status(400).json({ success: false, message: 'Password must be at least 6 characters' });
     }
 
-    const normalizedEmail = email.toLowerCase().trim();
-
-    const existing = await User.findOne({ email: normalizedEmail });
+    const existing = await User.findOne({ email });
     if (existing) {
       return res.status(409).json({ success: false, message: 'Email already in use' });
     }
 
-    const registrationData = {
+    const payload = {
       name,
-      email: normalizedEmail,
+      email,
+      password,
       role,
       phone,
       location,
@@ -101,63 +98,40 @@ exports.register = async (req, res, next) => {
       }
     }
 
-    // Hash the password for temporary storage
-    let passwordHash;
-    try {
-      passwordHash = await bcrypt.hash(password, 10);
-    } catch (hashErr) {
-      console.error('Password hashing error:', hashErr);
-      return res.status(500).json({ success: false, message: 'Failed to process password' });
-    }
+    const user = await User.create(payload);
 
-    // Generate 6-digit OTP and 5 minute expiry
+    // Generate 6-digit OTP
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
-    const expireAt = new Date(Date.now() + 5 * 60 * 1000);
+    
+    // Set OTP and expiration (10 minutes)
+    user.emailVerificationOTP = otp;
+    user.emailVerificationOTPExpire = Date.now() + 10 * 60 * 1000;
+    
+    await user.save();
 
-    // Upsert pending registration (resetting TTL and OTP each time)
+    // Try to send verification email, but don't block registration if it fails
+    let emailSent = false;
     try {
-      await PendingUser.findOneAndUpdate(
-        { email: normalizedEmail },
-        {
-          ...registrationData,
-          passwordHash,
-          otp,
-          expireAt
-        },
-        { upsert: true, new: true, setDefaultsOnInsert: true }
-      );
-      console.log('Pending user created/updated for email:', normalizedEmail);
-    } catch (dbErr) {
-      console.error('Database error storing pending user:', dbErr.message);
-      console.error('Error code:', dbErr.code);
-      return res.status(500).json({ success: false, message: 'Failed to process registration: ' + dbErr.message });
+      await sendVerificationEmail(user, otp);
+      emailSent = true;
+      console.log('Verification email sent successfully');
+    } catch (err) {
+      console.error('Email verification error (non-blocking):', err.message);
+      // Keep the OTP in database so user can still verify later
     }
-
-    // Send email asynchronously (don't wait for it to complete)
-    // This prevents timeout issues when email service is slow
-    sendVerificationEmail({ email: normalizedEmail }, otp)
-      .then(() => {
-        console.log('[Registration] Verification email sent successfully to:', normalizedEmail);
-      })
-      .catch((emailErr) => {
-        console.error('[Registration] Email sending failed (non-blocking):', emailErr.message);
-      });
-
-    // Respond immediately without waiting for email
+    
+    // Send response without token (user must verify email first)
     res.status(201).json({
       success: true,
-      message: 'Registration successful! Please check your email for the verification code.',
-      email: normalizedEmail,
-      expiresInMinutes: 5,
-      // In development, show the OTP for testing
-      ...(process.env.NODE_ENV === 'development' && { otp })
+      message: emailSent 
+        ? 'Registration successful! Please check your email for the verification code.'
+        : 'Registration successful! Your verification code is: ' + otp + ' (Email service temporarily unavailable)',
+      email: user.email,
+      ...(process.env.NODE_ENV === 'development' && !emailSent ? { otp } : {})
     });
   } catch (err) {
-    console.error('Registration error:', err);
-    res.status(500).json({ 
-      success: false, 
-      message: err.message || 'An unexpected error occurred during registration' 
-    });
+    console.error(err);
+    res.status(400).json({ success: false, message: err.message });
   }
 };
 
@@ -696,50 +670,9 @@ exports.verifyEmail = async (req, res, next) => {
       });
     }
 
-    const normalizedEmail = email.toLowerCase().trim();
-
-    // Prefer pending registrations (new flow)
-    const pending = await PendingUser.findOne({
-      email: normalizedEmail,
-      otp,
-      expireAt: { $gt: new Date() }
-    });
-
-    if (pending) {
-      // Create the real user with the pre-hashed password and mark as verified
-      const user = new User({
-        name: pending.name,
-        email: pending.email,
-        role: pending.role,
-        phone: pending.phone,
-        location: pending.location,
-        profileImage: pending.profileImage,
-        website: pending.website,
-        companyName: pending.companyName,
-        age: pending.age,
-        gender: pending.gender,
-        experienceLevel: pending.experienceLevel,
-        bio: pending.bio,
-        password: pending.passwordHash,
-        isEmailVerified: true
-      });
-
-      // Prevent double-hashing the stored password
-      user.skipPasswordHash = true;
-      await user.save();
-
-      // Remove the pending record now that the account is created
-      await PendingUser.deleteOne({ _id: pending._id });
-
-      return res.status(200).json({
-        success: true,
-        message: 'Email verified successfully! Your account is now active.'
-      });
-    }
-
-    // Fallback for legacy users that may still have OTP on the user document
+    // Find user and check if OTP matches and not expired
     const user = await User.findOne({
-      email: normalizedEmail,
+      email,
       emailVerificationOTP: otp,
       emailVerificationOTPExpire: { $gt: Date.now() }
     });
@@ -751,6 +684,7 @@ exports.verifyEmail = async (req, res, next) => {
       });
     }
 
+    // Mark email as verified
     user.isEmailVerified = true;
     user.emailVerificationOTP = undefined;
     user.emailVerificationOTPExpire = undefined;
@@ -784,52 +718,48 @@ exports.resendVerificationEmail = async (req, res, next) => {
       });
     }
 
-    const normalizedEmail = email.toLowerCase().trim();
+    const user = await User.findOne({ email });
 
-    // Prefer pending registration records (new flow)
-    let pending = await PendingUser.findOne({ email: normalizedEmail });
-    let user = null;
-
-    // Fallback to legacy unverified users
-    if (!pending) {
-      user = await User.findOne({ email: normalizedEmail, isEmailVerified: false });
-    }
-
-    if (!pending && !user) {
+    if (!user) {
       return res.status(404).json({ 
         success: false, 
-        message: 'No pending or unverified account found with that email address' 
+        message: 'No account found with that email address' 
       });
     }
 
-    // Generate new 6-digit OTP and extend validity to 5 minutes from now
+    if (user.isEmailVerified) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'This email is already verified' 
+      });
+    }
+
+    // Generate new 6-digit OTP
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
-    const expireAt = new Date(Date.now() + 5 * 60 * 1000);
-
-    if (pending) {
-      pending.otp = otp;
-      pending.expireAt = expireAt;
-      await pending.save();
-    } else if (user) {
-      user.emailVerificationOTP = otp;
-      user.emailVerificationOTPExpire = expireAt;
-      await user.save();
-    }
-
-    // Send email asynchronously (don't block response)
-    sendVerificationEmail({ email: normalizedEmail }, otp)
-      .then(() => {
-        console.log('[Resend] Verification email sent successfully to:', normalizedEmail);
-      })
-      .catch((err) => {
-        console.error('[Resend] Email sending failed (non-blocking):', err.message);
-      });
     
-    // Respond immediately
+    // Set OTP and expiration (10 minutes)
+    user.emailVerificationOTP = otp;
+    user.emailVerificationOTPExpire = Date.now() + 10 * 60 * 1000;
+    
+    await user.save();
+
+    // Try to send verification email, but don't block if it fails
+    let emailSent = false;
+    try {
+      await sendVerificationEmail(user, otp);
+      emailSent = true;
+      console.log('Resend verification email sent successfully');
+    } catch (err) {
+      console.error('Error sending verification email (non-blocking):', err.message);
+      // Keep the OTP in database so user can still verify later
+    }
+    
     res.status(200).json({
       success: true,
-      message: 'Verification code sent! It is valid for 5 minutes.',
-      expiresInMinutes: 5
+      message: emailSent 
+        ? 'Verification code sent! Check your email. Code expires in 10 minutes.'
+        : 'New verification code generated: ' + otp + ' (Email service temporarily unavailable)',
+      ...(process.env.NODE_ENV === 'development' && !emailSent ? { otp } : {})
     });
   } catch (err) {
     console.error('Resend verification error:', err);
