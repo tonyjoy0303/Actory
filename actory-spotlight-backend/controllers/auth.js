@@ -50,7 +50,8 @@ exports.register = async (req, res, next) => {
     // Check if email exists in PendingUser collection
     const existingPendingUser = await PendingUser.findOne({ email });
     if (existingPendingUser) {
-      return res.status(409).json({ success: false, message: 'Email already in use' });
+      // Delete the old pending user record to allow re-registration
+      await PendingUser.deleteOne({ email });
     }
 
     // Role-specific required checks

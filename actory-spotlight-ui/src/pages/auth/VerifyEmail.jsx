@@ -125,6 +125,9 @@ export default function VerifyEmail() {
                 <p className="text-xs text-muted-foreground mt-2">
                   Check your email for the verification code. It expires in 10 minutes.
                 </p>
+                <p className="text-xs text-orange-600 font-semibold mt-2">
+                  ⚠️ Important: Your registration will be automatically deleted if not verified within 5 minutes.
+                </p>
               </div>
 
               {error && (

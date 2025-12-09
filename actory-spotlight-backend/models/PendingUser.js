@@ -56,8 +56,8 @@ const PendingUserSchema = new mongoose.Schema({
   createdAt: {
     type: Date,
     default: Date.now,
-    // Auto-delete after 24 hours if not verified
-    expires: 86400
+    // Auto-delete after 5 minutes if not verified
+    expires: 300
   }
 });
 
