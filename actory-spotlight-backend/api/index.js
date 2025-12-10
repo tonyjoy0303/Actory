@@ -1,10 +1,10 @@
 const express = require('express');
 const dotenv = require('dotenv');
 const cors = require('cors');
-const connectDB = require('./config/db');
+const connectDB = require('../config/db');
 
 // Load env vars
-dotenv.config({ path: './.env' });
+dotenv.config();
 
 // Initialize Express app
 const app = express();
@@ -20,59 +20,49 @@ const allowedOrigins = [
   'https://actory-1ci4.onrender.com'
 ];
 
-const corsOptions = {
-  origin: function(origin, callback) {
-    if (!origin) return callback(null, true);
-    if (allowedOrigins.includes(origin)) return callback(null, true);
-    return callback(new Error('Not allowed by CORS'));
-  },
+app.use(cors({
+  origin: allowedOrigins,
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
-  optionsSuccessStatus: 200
-};
-app.use(cors(corsOptions));
+  allowedHeaders: ['Content-Type', 'Authorization']
+}));
 
-// Set security headers
-app.use((req, res, next) => {
-  const requestOrigin = req.headers.origin;
-  if (allowedOrigins.includes(requestOrigin)) {
-    res.setHeader('Access-Control-Allow-Origin', requestOrigin);
+// DB Connection cache
+let cachedDb = null;
+
+async function connectToDatabase() {
+  if (cachedDb) {
+    return cachedDb;
   }
-  res.setHeader('Access-Control-Allow-Credentials', 'true');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-  next();
-});
-
-// Connect to DB (on first request, cached after)
-let dbConnected = false;
-
-const ensureDBConnection = async () => {
-  if (!dbConnected) {
-    try {
-      await connectDB();
-      dbConnected = true;
-    } catch (err) {
-      console.error('Database connection failed:', err.message);
-      throw err;
-    }
+  
+  try {
+    await connectDB();
+    cachedDb = true;
+    console.log('✅ Database connected');
+    return cachedDb;
+  } catch (error) {
+    console.error('❌ Database connection error:', error.message);
+    throw error;
   }
-};
-
-// Routes
-const authRoutes = require('./routes/auth');
-const actorRoutes = require('./routes/actor');
-const castingRoutes = require('./routes/casting');
-const videoRoutes = require('./routes/videos');
-const messageRoutes = require('./routes/messages');
-const profileRoutes = require('./routes/profile');
-const adminRoutes = require('./routes/admin');
+}
 
 // Health check
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', message: 'Backend is running!' });
 });
+
+app.get('/', (req, res) => {
+  res.json({ status: 'ok', message: 'Actory Backend API' });
+});
+
+// Routes
+const authRoutes = require('../routes/auth');
+const actorRoutes = require('../routes/actor');
+const castingRoutes = require('../routes/casting');
+const videoRoutes = require('../routes/videos');
+const messageRoutes = require('../routes/messages');
+const profileRoutes = require('../routes/profile');
+const adminRoutes = require('../routes/admin');
 
 // API Routes
 app.use('/api/v1/auth', authRoutes);
@@ -90,12 +80,26 @@ app.use((req, res) => {
 
 // Error handler
 app.use((err, req, res, next) => {
-  console.error('Error:', err);
+  console.error('Error:', err.message);
   res.status(err.status || 500).json({
     success: false,
     message: err.message || 'Internal server error'
   });
 });
 
-// Export for Vercel serverless function
-module.exports = app;
+// Vercel serverless handler
+module.exports = async (req, res) => {
+  try {
+    await connectToDatabase();
+    return app(req, res);
+  } catch (error) {
+    console.error('Handler error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Database connection failed'
+    });
+  }
+};
+
+// Export app for local development
+module.exports.app = app;
