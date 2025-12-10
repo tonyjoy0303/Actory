@@ -724,7 +724,8 @@ exports.verifyEmail = async (req, res, next) => {
       gender: pendingUser.gender,
       experienceLevel: pendingUser.experienceLevel,
       bio: pendingUser.bio,
-      isEmailVerified: true  // Mark as verified
+      isEmailVerified: true,  // Mark as verified
+      isVerified: true        // Mark as fully verified for login
     };
 
     // Create the actual user
