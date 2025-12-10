@@ -89,14 +89,28 @@ app.use((err, req, res, next) => {
 
 // Vercel serverless handler
 module.exports = async (req, res) => {
+  // Set CORS headers
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
+  res.setHeader('Access-Control-Allow-Origin', req.headers.origin || '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
+  res.setHeader('Access-Control-Allow-Headers', 'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version, Authorization');
+  
+  // Handle preflight
+  if (req.method === 'OPTIONS') {
+    res.status(200).end();
+    return;
+  }
+
   try {
+    console.log('🚀 Incoming request:', req.method, req.url);
     await connectToDatabase();
+    console.log('✅ Database connected, forwarding to Express');
     return app(req, res);
   } catch (error) {
-    console.error('Handler error:', error);
+    console.error('❌ Handler error:', error.message, error.stack);
     return res.status(500).json({
       success: false,
-      message: 'Database connection failed'
+      message: 'Server error: ' + error.message
     });
   }
 };
