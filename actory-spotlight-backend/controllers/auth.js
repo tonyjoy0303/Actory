@@ -125,9 +125,14 @@ exports.register = async (req, res, next) => {
     try {
       await sendVerificationEmail(pendingUser, otp);
       emailSent = true;
-      console.log('Verification email sent successfully');
+      console.log('✅ Verification email sent successfully to:', pendingUser.email);
     } catch (err) {
-      console.error('Email verification error (non-blocking):', err.message);
+      console.error('❌ Email verification error:', {
+        message: err.message,
+        code: err.code,
+        command: err.command,
+        responseCode: err.responseCode
+      });
       // Keep the OTP in database so user can still verify later
     }
     

@@ -46,8 +46,9 @@ const sendEmail = async (options) => {
         tls: {
           rejectUnauthorized: false
         },
-        connectionTimeout: 10000,
-        greetingTimeout: 10000,
+        connectionTimeout: 30000,  // Increased from 10s to 30s
+        greetingTimeout: 30000,    // Increased from 10s to 30s
+        socketTimeout: 60000       // Added 60s socket timeout
       });
 
       console.log('[Email] Using Gmail SMTP account for delivery');
@@ -64,7 +65,7 @@ const sendEmail = async (options) => {
     const info = await Promise.race([
       transporter.sendMail(message),
       new Promise((_, reject) =>
-        setTimeout(() => reject(new Error('Email send timeout')), 10000)
+        setTimeout(() => reject(new Error('Email send timeout')), 45000)  // Increased from 10s to 45s
       )
     ]);
 
