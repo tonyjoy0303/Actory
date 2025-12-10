@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const multer = require('multer');
-const { v4: uuidv4 } = require('uuid');
+const { randomUUID } = require('crypto');
 const cloudinary = require('cloudinary').v2;
 const User = require('../models/User');
 const { protect } = require('../middleware/auth');
@@ -51,7 +51,7 @@ router.post('/videos', protect, upload.single('video'), async (req, res) => {
         {
           resource_type: 'video',
           folder: `actory/videos/${req.user._id}`,
-          public_id: `${uuidv4()}-${Date.now()}`,
+          public_id: `${randomUUID()}-${Date.now()}`,
           eager: [
             { width: 300, height: 300, crop: 'thumb', format: 'jpg' }
           ]

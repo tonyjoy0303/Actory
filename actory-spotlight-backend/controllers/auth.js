@@ -369,7 +369,7 @@ exports.uploadPhoto = async (req, res) => {
 
     // Upload to Cloudinary
     const cloudinary = require('cloudinary').v2;
-    const { v4: uuidv4 } = require('uuid');
+    const { randomUUID } = require('crypto');
 
     // Configure Cloudinary
     cloudinary.config({
@@ -384,7 +384,7 @@ exports.uploadPhoto = async (req, res) => {
         {
           resource_type: 'image',
           folder: `actory/profile-photos/${req.user.id}`,
-          public_id: `profile_${uuidv4()}_${Date.now()}`,
+          public_id: `profile_${randomUUID()}_${Date.now()}`,
           transformation: [
             { width: 400, height: 400, crop: 'fill', gravity: 'face' },
             { quality: 'auto' }
