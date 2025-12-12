@@ -61,15 +61,8 @@ const PendingUserSchema = new mongoose.Schema({
   }
 });
 
-// Encrypt password before saving
-PendingUserSchema.pre('save', async function (next) {
-  if (!this.isModified('password')) {
-    return next();
-  }
-
-  const salt = await bcrypt.genSalt(10);
-  this.password = await bcrypt.hash(this.password, salt);
-  next();
-});
+// NOTE: Password is NOT hashed here in PendingUser.
+// The User model's pre-save hook will hash it when the verified user is created.
+// This prevents double-hashing and ensures password verification works correctly.
 
 module.exports = mongoose.model('PendingUser', PendingUserSchema);
