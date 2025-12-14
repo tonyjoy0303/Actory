@@ -271,6 +271,8 @@ export default function VideoCall() {
     const pc = new RTCPeerConnection({
       iceServers: [
         { urls: 'stun:stun.l.google.com:19302' },
+        // Optional TURN (uncomment and configure if STUN-only fails across networks)
+        // { urls: 'turn:relay.metered.ca:80', username: import.meta.env.VITE_TURN_USERNAME, credential: import.meta.env.VITE_TURN_CREDENTIAL }
       ],
     });
 
@@ -297,7 +299,14 @@ export default function VideoCall() {
 
     // Only add local tracks if camera is started
     if (localStreamRef.current) {
-      localStreamRef.current.getTracks().forEach((t) => pc.addTrack(t, localStreamRef.current));
+      // Avoid adding duplicate tracks if senders already exist
+      const existingSenders = pc.getSenders();
+      const existingKinds = new Set(existingSenders.map(s => s.track?.kind));
+      localStreamRef.current.getTracks().forEach((t) => {
+        if (!existingKinds.has(t.kind)) {
+          pc.addTrack(t, localStreamRef.current);
+        }
+      });
     }
 
     pcRef.current.set(remoteSocketId, pc);
@@ -559,7 +568,11 @@ export default function VideoCall() {
       const pc = await ensurePeerConnection(remoteSocketId);
       console.log('Peer connection created:', pc);
       
-      const offer = await pc.createOffer();
+      // Request to receive remote audio/video to ensure media flows
+      const offer = await pc.createOffer({
+        offerToReceiveAudio: true,
+        offerToReceiveVideo: true
+      });
       console.log('Offer created:', offer);
       
       await pc.setLocalDescription(offer);
