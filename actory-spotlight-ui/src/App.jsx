@@ -41,12 +41,18 @@ import Messages from "./pages/Messages";
 
 // Pages - Feeds
 import Feeds from "./pages/Feeds";
+import Teams from "./pages/Teams";
+import Projects from "./pages/Projects";
+import ProjectDetails from "./pages/ProjectDetails";
+import ContributedProjects from "./pages/ContributedProjects";
 
 // Pages - Auth
 import Login from "./pages/auth/Login";
 import Register from "./pages/auth/Register";
 import RegisterActor from "./pages/auth/RegisterActor";
 import RegisterProducer from "./pages/auth/RegisterProducer";
+import RegisterProductionTeam from "./pages/auth/RegisterProductionTeam";
+import RegisterProductionTeamMember from "./pages/auth/RegisterProductionTeamMember";
 import ForgotPassword from "./pages/auth/ForgotPassword";
 import ResetPassword from "./pages/auth/ResetPassword";
 import VerifyEmail from "./pages/auth/VerifyEmail";
@@ -172,6 +178,34 @@ const App = () => (
                     , React.createElement(Messages, null )
                   )
                 })
+              , React.createElement(Route, {
+                path: "/teams",
+                element: 
+                  React.createElement(MainLayout, null
+                    , React.createElement(Teams, null )
+                  )
+                })
+              , React.createElement(Route, {
+                path: "/projects",
+                element: 
+                  React.createElement(MainLayout, null
+                    , React.createElement(Projects, null )
+                  )
+                })
+              , React.createElement(Route, {
+                path: "/my-projects",
+                element: 
+                  React.createElement(MainLayout, null
+                    , React.createElement(ContributedProjects, null )
+                  )
+                })
+              , React.createElement(Route, {
+                path: "/projects/:projectId",
+                element: 
+                  React.createElement(MainLayout, null
+                    , React.createElement(ProjectDetails, null )
+                  )
+                })
               
               , React.createElement(Route, {
                 path: "/feeds",
@@ -218,6 +252,22 @@ const App = () => (
                 element: 
                   React.createElement(MainLayout, null
                     , React.createElement(RegisterProducer, null )
+                  )
+                })
+              
+              , React.createElement(Route, {
+                path: "/auth/register/production-team",
+                element: 
+                  React.createElement(MainLayout, null
+                    , React.createElement(RegisterProductionTeam, null )
+                  )
+                })
+              
+              , React.createElement(Route, {
+                path: "/auth/register/production-team-member",
+                element: 
+                  React.createElement(MainLayout, null
+                    , React.createElement(RegisterProductionTeamMember, null )
                   )
                 })
               

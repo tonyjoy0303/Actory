@@ -435,7 +435,7 @@ export default function ActorDashboard() {
       
       <div className="flex items-center justify-between mb-8">
         <div>
-          <h1 className="text-3xl font-bold">Welcome back, {user?.name || 'Actor'}</h1>
+          <h1 className="text-3xl font-bold">Welcome back, {((user?.role === 'Producer' || user?.role === 'ProductionTeam') ? user?.companyName : user?.name) || 'Actor'}</h1>
           <p className="text-muted-foreground">Manage your profile, videos, and submissions</p>
         </div>
       </div>

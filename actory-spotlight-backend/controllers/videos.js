@@ -2,8 +2,10 @@ const Video = require('../models/Video');
 const CastingCall = require('../models/CastingCall');
 const User = require('../models/User');
 const Comment = require('../models/Comment');
+const ProductionHouse = require('../models/ProductionHouse');
 const mongoose = require('mongoose');
 const cloudinary = require('cloudinary').v2;
+const { createNotification } = require('../utils/notificationService');
 
 // Configure Cloudinary
 cloudinary.config({
@@ -886,6 +888,32 @@ exports.toggleVideoLike = async (req, res) => {
       if (!video.likedBy) video.likedBy = [];
       video.likedBy.push(userObjectId);
       video.likes = (video.likes || 0) + 1;
+
+      // Send notification to video owner for profile videos (only when liking, not unliking)
+      try {
+        const videoOwnerId = video.actor ? video.actor.toString() : null;
+        // Don't notify if user is liking their own video
+        if (videoOwnerId && videoOwnerId !== userId && video.type === 'profile') {
+          const liker = await User.findById(userId).select('name');
+          await createNotification({
+            user: videoOwnerId,
+            title: 'New Like on Your Video',
+            message: `${liker?.name || 'Someone'} liked your video "${video.title || 'Untitled'}"`,
+            type: 'system',
+            relatedId: videoId,
+            relatedType: 'video',
+            metadata: {
+              videoId: videoId,
+              videoTitle: video.title,
+              likerId: userId,
+              likerName: liker?.name
+            }
+          });
+        }
+      } catch (notifErr) {
+        console.error('Failed to create like notification:', notifErr.message);
+        // Don't fail the like operation if notification fails
+      }
     }
     
     // Save changes and sync to counterpart storage (embedded <-> collection)
@@ -951,6 +979,34 @@ exports.toggleVideoLike = async (req, res) => {
   }
 };
 
+// Helper: ensure comment has a user-like object even for legacy ProductionHouse IDs
+async function hydrateCommentUser(comment) {
+  // When populate succeeds, keep as-is
+  if (comment.user && (comment.user.name || comment.user.companyName)) return comment;
+
+  const userId = comment.user || comment?._id || comment?.user?._id || comment?.user?.id;
+  if (!userId) return comment;
+
+  try {
+    const ph = await ProductionHouse.findById(userId).select('companyName profileImage');
+    if (ph) {
+      // Attach a pseudo-user object so frontend can render the name
+      const hydrated = comment.toObject ? comment.toObject() : { ...comment };
+      hydrated.user = {
+        _id: ph._id,
+        name: ph.companyName,
+        companyName: ph.companyName,
+        profileImage: ph.profileImage,
+        role: 'ProductionHouse'
+      };
+      return hydrated;
+    }
+  } catch (err) {
+    console.warn('hydrateCommentUser: failed to hydrate production house user', err.message);
+  }
+  return comment;
+}
+
 // @desc    Get comments for a video
 // @route   GET /api/v1/videos/:videoId/comments
 // @access  Public
@@ -962,13 +1018,16 @@ exports.getVideoComments = async (req, res) => {
     
     // Fetch comments for this video, populated with user data
     const comments = await Comment.find({ video: videoId })
-      .populate('user', 'name profileImage')
-      .sort({ createdAt: -1 }); // Most recent first
+      .populate('user', 'name companyName role profileImage')
+      .sort({ createdAt: -1 })
+      .lean(); // lean so we can mutate easily
+
+    const hydrated = await Promise.all(comments.map(hydrateCommentUser));
     
     res.json({
       success: true,
-      data: comments,
-      count: comments.length
+      data: hydrated,
+      count: hydrated.length
     });
     
   } catch (error) {
@@ -1025,11 +1084,45 @@ exports.addVideoComment = async (req, res) => {
       comment: comment.trim()
     });
     
-    // Populate the user data for the response
-    await newComment.populate('user', 'name profileImage');
+    // Populate the user data for the response (include companyName for production users)
+    await newComment.populate('user', 'name companyName role profileImage');
+
+    // If populate failed because this is a legacy ProductionHouse user, hydrate manually
+    const hydratedNewComment = await hydrateCommentUser(newComment);
     
     // Increment comment count on the video
     video.comments = (video.comments || 0) + 1;
+
+    // Send notification to video owner for profile videos
+    try {
+      const videoOwnerId = video.actor ? video.actor.toString() : null;
+      // Don't notify if user is commenting on their own video
+      if (videoOwnerId && videoOwnerId !== userId && video.type === 'profile') {
+        // Fetch commenter from User first; if not found, fallback to ProductionHouse
+        let commenter = await User.findById(userId).select('name companyName');
+        if (!commenter) {
+          commenter = await ProductionHouse.findById(userId).select('companyName');
+        }
+        await createNotification({
+          user: videoOwnerId,
+          title: 'New Comment on Your Video',
+          message: `${commenter?.name || commenter?.companyName || 'Someone'} commented on your video "${video.title || 'Untitled'}": "${comment.trim().substring(0, 50)}${comment.trim().length > 50 ? '...' : ''}"`,
+          type: 'system',
+          relatedId: videoId,
+          relatedType: 'video',
+          metadata: {
+            videoId: videoId,
+            videoTitle: video.title,
+            commenterId: userId,
+            commenterName: commenter?.name || commenter?.companyName,
+            commentText: comment.trim()
+          }
+        });
+      }
+    } catch (notifErr) {
+      console.error('Failed to create comment notification:', notifErr.message);
+      // Don't fail the comment operation if notification fails
+    }
     
     // Save changes and sync to counterpart storage (embedded <-> collection)
     if (isVideoCollection) {
@@ -1077,7 +1170,7 @@ exports.addVideoComment = async (req, res) => {
     res.json({ 
       success: true, 
       comments: video.comments,
-      comment: newComment,
+      comment: hydratedNewComment,
       message: 'Comment added successfully'
     });
     

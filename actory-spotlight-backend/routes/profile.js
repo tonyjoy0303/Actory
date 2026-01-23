@@ -182,7 +182,7 @@ router.get('/search', async (req, res) => {
 // @access  Public
 router.get('/:id', async (req, res) => {
   try {
-    const user = await User.findById(req.params.id)
+    let user = await User.findById(req.params.id)
       .select('-password -resetPasswordToken -resetPasswordExpire -__v')
       .populate({
         path: 'videos',
@@ -191,55 +191,94 @@ router.get('/:id', async (req, res) => {
         options: { sort: { uploadedAt: -1 } }
       });
 
-    if (!user) {
-      return res.status(404).json({ message: 'User not found' });
+    if (user) {
+      // Get submission count from Video model
+      const Video = require('../models/Video');
+      const submissionCount = await Video.countDocuments({
+        actor: req.params.id,
+        type: 'audition'
+      });
+
+      // Only show active videos for public profiles
+      const publicVideos = user.videos.filter(video => video.isActive);
+
+      // Calculate stats
+      const stats = {
+        videoCount: publicVideos.length,
+        totalViews: publicVideos.reduce((sum, video) => sum + (video.views || 0), 0),
+        followerCount: user.followers ? user.followers.length : 0,
+        submissionCount
+      };
+
+      // Create public profile object
+      const publicProfile = {
+        _id: user._id,
+        name: user.name,
+        email: user.email,
+        profileImage: user.profileImage,
+        bio: user.bio,
+        location: user.location,
+        gender: user.gender,
+        dateOfBirth: user.dateOfBirth,
+        age: user.dateOfBirth ?
+          new Date().getFullYear() - new Date(user.dateOfBirth).getFullYear() : null,
+        experienceLevel: user.experienceLevel,
+        skills: user.skills || [],
+        socialLinks: user.socialLinks || {},
+        isVerified: user.isVerified,
+        role: user.role,
+        joinedAt: user.createdAt,
+        videos: publicVideos,
+        videoCount: stats.videoCount,
+        followerCount: stats.followerCount,
+        viewCount: stats.totalViews,
+        submissionCount,
+        stats
+      };
+
+      return res.json(publicProfile);
+    }
+    
+    // If not found in User, check ProductionHouse
+    const ProductionHouse = require('../models/ProductionHouse');
+    const ph = await ProductionHouse.findById(req.params.id)
+      .select('-password -resetPasswordToken -resetPasswordExpire -__v');
+      
+    if (ph) {
+      const phProfile = {
+        _id: ph._id,
+        name: ph.name,
+        companyName: ph.companyName,
+        email: ph.email,
+        profileImage: ph.profileImage || ph.photo,
+        bio: ph.bio,
+        location: ph.location,
+        role: ph.role || 'ProductionTeam',
+        joinedAt: ph.createdAt,
+        socialLinks: ph.website ? { website: ph.website } : {},
+        skills: ph.specializations || [],
+        experienceLevel: ph.teamSize, // Mapping teamSize to experienceLevel for UI consistency
+        isVerified: ph.isVerified,
+        
+        // Default empty stats for ProductionHouse as they don't have standard videos yet
+        videos: [],
+        videoCount: 0,
+        followerCount: 0,
+        viewCount: 0,
+        submissionCount: 0,
+        stats: {
+          videoCount: 0,
+          totalViews: 0,
+          followerCount: 0,
+          followingCount: 0,
+          submissionCount: 0
+        }
+      };
+      
+      return res.json(phProfile);
     }
 
-    // Get submission count from Video model
-    const Video = require('../models/Video');
-    const submissionCount = await Video.countDocuments({
-      actor: req.params.id,
-      type: 'audition'
-    });
-
-    // Only show active videos for public profiles
-    const publicVideos = user.videos.filter(video => video.isActive);
-
-    // Calculate stats
-    const stats = {
-      videoCount: publicVideos.length,
-      totalViews: publicVideos.reduce((sum, video) => sum + (video.views || 0), 0),
-      followerCount: user.followers ? user.followers.length : 0,
-      submissionCount
-    };
-
-    // Create public profile object
-    const publicProfile = {
-      _id: user._id,
-      name: user.name,
-      email: user.email,
-      profileImage: user.profileImage,
-      bio: user.bio,
-      location: user.location,
-      gender: user.gender,
-      dateOfBirth: user.dateOfBirth,
-      age: user.dateOfBirth ?
-        new Date().getFullYear() - new Date(user.dateOfBirth).getFullYear() : null,
-      experienceLevel: user.experienceLevel,
-      skills: user.skills || [],
-      socialLinks: user.socialLinks || {},
-      isVerified: user.isVerified,
-      role: user.role,
-      joinedAt: user.createdAt,
-      videos: publicVideos,
-      videoCount: stats.videoCount,
-      followerCount: stats.followerCount,
-      viewCount: stats.totalViews,
-      submissionCount,
-      stats
-    };
-
-    res.json(publicProfile);
+    return res.status(404).json({ message: 'User not found' });
   } catch (error) {
     console.error('Error fetching public profile:', error);
     res.status(500).json({ message: 'Server error', error: error.message });

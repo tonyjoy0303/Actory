@@ -364,7 +364,11 @@ export default function VideoCall() {
 
   function getDisplayName() {
     try {
-      return JSON.parse(localStorage.getItem('user') || '{}').name || 'Guest';
+      const user = JSON.parse(localStorage.getItem('user') || '{}');
+      if (user.role === 'Producer' || user.role === 'ProductionTeam') {
+        return user.companyName || user.name || 'Guest';
+      }
+      return user.name || 'Guest';
     } catch {
       return 'Guest';
     }

@@ -574,22 +574,27 @@ const Feeds = () => {
                   );
                 }
                 
-                return currentComments.map((comment) => (
+                return currentComments.map((comment) => {
+                  // Display name for actors, companyName for producers/production teams
+                  const displayName = comment?.user?.name || comment?.user?.companyName || 'Unknown User';
+                  const displayInitial = (comment?.user?.name?.charAt(0) || comment?.user?.companyName?.charAt(0) || 'U');
+                  
+                  return (
                   <div key={comment._id} className="flex space-x-3">
                     <Avatar className="h-8 w-8">
-                      <AvatarImage src={comment.user.profileImage} />
+                      <AvatarImage src={comment?.user?.profileImage || undefined} />
                       <AvatarFallback>
-                        {comment.user.name?.charAt(0) || 'U'}
+                        {displayInitial}
                       </AvatarFallback>
                     </Avatar>
                     
                     <div className="flex-1 space-y-1">
                       <div className="flex items-center space-x-2">
                         <span className="font-medium text-sm">
-                          {comment.user.name}
+                          {displayName}
                         </span>
                         <span className="text-xs text-muted-foreground">
-                          {format(comment.createdAt, 'MMM d, h:mm a')}
+                          {comment?.createdAt ? format(new Date(comment.createdAt), 'MMM d, h:mm a') : ''}
                         </span>
                       </div>
                       
@@ -607,7 +612,8 @@ const Feeds = () => {
                       </div>
                     </div>
                   </div>
-                ));
+                  );
+                });
               })()}
             </div>
             
@@ -617,7 +623,9 @@ const Feeds = () => {
                 <Avatar className="h-8 w-8">
                   <AvatarImage src={currentUser?.profileImage} />
                   <AvatarFallback>
-                    {currentUser?.name?.charAt(0) || 'U'}
+                    {((currentUser?.role === 'Producer' || currentUser?.role === 'ProductionTeam') 
+                      ? currentUser?.companyName?.charAt(0) 
+                      : currentUser?.name?.charAt(0)) || 'U'}
                   </AvatarFallback>
                 </Avatar>
                 

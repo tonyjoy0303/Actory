@@ -59,7 +59,7 @@ export default function Register() {
         navigate('/dashboard/admin');
       } else if (data.user.role === 'Actor') {
         navigate('/dashboard/actor');
-      } else if (data.user.role === 'Producer') {
+      } else if (data.user.role === 'Producer' || data.user.role === 'ProductionTeam') {
         navigate('/dashboard/producer');
       } else {
         navigate('/'); // Fallback redirect
@@ -111,7 +111,7 @@ export default function Register() {
               disabled: loading, __self: this, __source: {fileName: _jsxFileName, lineNumber: 92}}
             )
             , error && React.createElement('p', { className: "text-sm text-red-500 text-center"  , __self: this, __source: {fileName: _jsxFileName, lineNumber: 99}}, error)
-            , React.createElement('div', { className: "grid grid-cols-2 gap-2"  , __self: this, __source: {fileName: _jsxFileName, lineNumber: 100}}
+            , React.createElement('div', { className: "grid grid-cols-1 gap-2"  , __self: this, __source: {fileName: _jsxFileName, lineNumber: 100}}
               , React.createElement(Button, { 
                 variant: "brand-outline", 
                 className: "w-full", 
@@ -127,6 +127,14 @@ export default function Register() {
                 disabled: loading, __self: this, __source: {fileName: _jsxFileName, lineNumber: 109}}
 
                 , loading ? 'Signing up...' : 'Sign up as Producer'
+              )
+              , React.createElement(Button, { 
+                variant: "outline", 
+                className: "w-full", 
+                onClick: () => navigate('/auth/register/production-team-member'),
+                disabled: loading, __self: this, __source: {fileName: _jsxFileName, lineNumber: 117}}
+
+                , 'Join as Production Team Member'
               )
             )
           )

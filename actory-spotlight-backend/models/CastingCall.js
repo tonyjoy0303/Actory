@@ -137,6 +137,20 @@ const CastingCallSchema = new mongoose.Schema({
     ref: 'User',
     required: true,
   },
+  project: {
+    type: mongoose.Schema.ObjectId,
+    ref: 'FilmProject',
+    required: false,
+  },
+  projectRole: {
+    type: mongoose.Schema.ObjectId,
+    required: false,
+  },
+  team: {
+    type: mongoose.Schema.ObjectId,
+    ref: 'ProductionTeam',
+    required: false,
+  },
   createdAt: {
     type: Date,
     default: Date.now,

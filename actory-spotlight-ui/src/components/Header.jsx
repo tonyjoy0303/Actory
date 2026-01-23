@@ -1,5 +1,5 @@
 import React from 'react'
-const _jsxFileName = ""; function _nullishCoalesce(lhs, rhsFn) { if (lhs != null) { return lhs; } else { return rhsFn(); } } function _optionalChain(ops) { let lastAccessLHS = undefined; let value = ops[0]; let i = 1; while (i < ops.length) { const op = ops[i]; const fn = ops[i + 1]; i += 2; if ((op === 'optionalAccess' || op === 'optionalCall') && value == null) { return undefined; } if (op === 'access' || op === 'optionalAccess') { lastAccessLHS = value; value = fn(value); } else if (op === 'call' || op === 'optionalCall') { value = fn((...args) => value.call(lastAccessLHS, ...args)); lastAccessLHS = undefined; } } return value; }import { NavLink, useNavigate, useLocation } from "react-router-dom";
+const _jsxFileName = ""; function _nullishCoalesce(lhs, rhsFn) { if (lhs != null) { return lhs; } else { return rhsFn(); } } function _optionalChain(ops) { let lastAccessLHS = undefined; let value = ops[0]; let i = 1; while (i < ops.length) { const op = ops[i]; const fn = ops[i + 1]; i += 2; if ((op === 'optionalAccess' || op === 'optionalCall') && value == null) { return undefined; } if (op === 'access' || op === 'optionalAccess') { lastAccessLHS = value; value = fn(value); } else if (op === 'call' || op === 'optionalCall') { value = fn((...args) => value.call(lastAccessLHS, ...args)); lastAccessLHS = undefined; } } return value; } import { NavLink, useNavigate, useLocation } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { Search, User, Video, Menu, X, LogOut } from "lucide-react";
 import ThemeToggle from "@/components/ThemeToggle";
@@ -9,6 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import Logo from "@/components/Logo";
+import NotificationBell from "@/components/NotificationBell";
 import API from "@/lib/api";
 import recruiterImg from "@/assets/recruiter.jpg";
 import actorImg from "@/assets/actor.jpg";
@@ -41,9 +42,11 @@ export default function Header() {
   const [unreadCount, setUnreadCount] = useState(0);
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
+  const canSeeProjects = !!(user && ['Producer', 'ProductionTeam', 'ProductionHouse'].includes(user.role));
+
   const dashboardPathFor = (role) => {
     if (role === 'Actor') return '/dashboard/actor';
-    if (role === 'Producer') return '/dashboard/producer';
+    if (role === 'Producer' || role === 'ProductionTeam') return '/dashboard/producer';
     if (role === 'Admin') return '/dashboard/admin';
     return '/';
   };
@@ -192,6 +195,8 @@ export default function Header() {
       navigate('/auth/register/actor');
     } else if (role === 'Producer') {
       navigate('/auth/register/producer');
+    } else if (role === 'ProductionTeam') {
+      navigate('/auth/register/production-team-member');
     }
   };
 
@@ -208,11 +213,11 @@ export default function Header() {
             <NavLink to="/" className="flex items-center gap-2" aria-label="Actory home">
               <Logo />
             </NavLink>
-            
+
             {/* Menu Button */}
-            <Button 
-              variant="ghost" 
-              size="icon" 
+            <Button
+              variant="ghost"
+              size="icon"
               className="h-12 w-12"
               onClick={() => setSidebarOpen(true)}
             >
@@ -222,8 +227,10 @@ export default function Header() {
 
           <div className="hidden md:flex items-center gap-6">
             <NavLink to="/casting" className={linkCls} end={true}>Castings</NavLink>
+            {canSeeProjects && <NavLink to="/my-projects" className={linkCls} end={true}>My Projects</NavLink>}
             {_optionalChain([user, 'optionalAccess', _ => _.role]) === 'Actor' && <NavLink to="/dashboard/actor" className={linkCls} end={true}>Dashboard</NavLink>}
-            {_optionalChain([user, 'optionalAccess', _2 => _2.role]) === 'Producer' && <NavLink to="/dashboard/producer" className={linkCls} end={true}>Dashboard</NavLink>}
+            {(_optionalChain([user, 'optionalAccess', _2 => _2.role]) === 'Producer' || _optionalChain([user, 'optionalAccess', _3 => _3.role]) === 'ProductionTeam') && <NavLink to="/dashboard/producer" className={linkCls} end={true}>Dashboard</NavLink>}
+
             {user && (
               <div className="relative">
                 <NavLink to="/messages" className={linkCls} end={true}>Messages</NavLink>
@@ -239,29 +246,30 @@ export default function Header() {
           <div className="flex items-center gap-2">
             {user ? (
               <React.Fragment>
+                <NotificationBell />
                 <Button variant="ghost" size="sm" onClick={() => setSearchOpen(true)}>
                   <Search className="w-4 h-4" />
                 </Button>
                 {/* Profile button at the end for viewing user details */}
-                <NavLink to={`/profile/${_nullishCoalesce(user._id, () => ( ''))}`} className="hidden sm:inline-flex items-center gap-2">
+                <NavLink to={`/profile/${_nullishCoalesce(user._id, () => (''))}`} className="hidden sm:inline-flex items-center gap-2">
                   {_optionalChain([user, 'optionalAccess', _ => _.profileImage]) ? (
-                    <img 
+                    <img
                       src={`${_optionalChain([user, 'optionalAccess', _2 => _2.profileImage])}`}
-                      alt="Avatar" 
-                      className="w-8 h-8 rounded-full object-cover border" 
+                      alt="Avatar"
+                      className="w-8 h-8 rounded-full object-cover border"
                     />
                   ) : _optionalChain([user, 'optionalAccess', _3 => _3.photo]) ? (
-                    <img 
+                    <img
                       src={getImageUrl(_optionalChain([user, 'optionalAccess', _4 => _4.photo]))}
-                      alt="Avatar" 
-                      className="w-8 h-8 rounded-full object-cover border" 
+                      alt="Avatar"
+                      className="w-8 h-8 rounded-full object-cover border"
                     />
                   ) : (
                     <Button variant="ghost">Profile</Button>
                   )}
                 </NavLink>
                 <Button onClick={handleLogout} variant="hero">Logout</Button>
-                {user.role === 'Producer' && (
+                {(user.role === 'Producer' || user.role === 'ProductionTeam') && (
                   <NavLink to="/casting/new">
                     <Button variant="hero" className="hover-scale">Post Casting</Button>
                   </NavLink>
@@ -301,7 +309,7 @@ export default function Header() {
                         </div>
                         <div className="hidden md:block absolute inset-y-0 left-1/2 w-px bg-border" />
                       </div>
-                      <div className="px-6 pb-6 text-center text-xs text-muted-foreground">Are you a talent agency? <span className="underline cursor-pointer" onClick={() => navigate('/auth/register/producer')}>Click here.</span></div>
+                      <div className="px-6 pb-6 text-center text-xs text-muted-foreground">Are you a talent agency? <span className="underline cursor-pointer" onClick={() => { setRegisterOpen(false); navigate('/auth/register/production-team'); }}>Click here.</span></div>
                     </DialogContent>
                   </Dialog>
                 </React.Fragment>
@@ -383,7 +391,7 @@ export default function Header() {
               Please provide a reason for switching to a Producer account. Your request will be reviewed by an administrator.
             </DialogDescription>
           </DialogHeader>
-          
+
           <div className="grid gap-4 py-4">
             <div className="space-y-2">
               <label htmlFor="reason" className="text-sm font-medium">Reason</label>
@@ -396,16 +404,16 @@ export default function Header() {
               />
             </div>
           </div>
-          
+
           <DialogFooter>
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               onClick={() => setSwitchRoleOpen(false)}
               disabled={isRequesting}
             >
               Cancel
             </Button>
-            <Button 
+            <Button
               onClick={handleSubmitSwitchRequest}
               disabled={isRequesting || !reason.trim()}
             >
@@ -417,25 +425,25 @@ export default function Header() {
 
       {/* Sidebar Menu */}
       {sidebarOpen && (
-        <div 
+        <div
           className="fixed inset-0 bg-black/50 z-50 transition-opacity"
           onClick={() => setSidebarOpen(false)}
         >
-          <div 
+          <div
             className="fixed left-0 top-0 bottom-0 w-80 bg-background border-r shadow-lg transform transition-transform duration-300 ease-in-out overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between p-4 border-b">
               <h2 className="font-semibold text-lg">Menu</h2>
-              <Button 
-                variant="ghost" 
-                size="icon" 
+              <Button
+                variant="ghost"
+                size="icon"
                 onClick={() => setSidebarOpen(false)}
               >
                 <X className="h-5 w-5" />
               </Button>
             </div>
-            
+
             <div className="py-2">
               <button
                 onClick={() => {
@@ -446,7 +454,7 @@ export default function Header() {
               >
                 <span>Home</span>
               </button>
-              
+
               <button
                 onClick={() => {
                   navigate('/casting');
@@ -478,6 +486,18 @@ export default function Header() {
                   >
                     <span>Feeds</span>
                   </button>
+
+                  {canSeeProjects && (
+                    <button
+                      onClick={() => {
+                        navigate('/my-projects');
+                        setSidebarOpen(false);
+                      }}
+                      className="w-full px-4 py-3 text-left hover:bg-accent transition-colors flex items-center gap-3"
+                    >
+                      <span>My Projects</span>
+                    </button>
+                  )}
 
                   <button
                     onClick={() => {
@@ -513,6 +533,29 @@ export default function Header() {
                       </Badge>
                     )}
                   </button>
+
+                  {(user.role === 'Producer' || user.role === 'ProductionTeam' || user.role === 'ProductionHouse') && (
+                    <>
+                      <button
+                        onClick={() => {
+                          navigate('/projects');
+                          setSidebarOpen(false);
+                        }}
+                        className="w-full px-4 py-3 text-left hover:bg-accent transition-colors flex items-center gap-3"
+                      >
+                        <span>Create Project</span>
+                      </button>
+                      <button
+                        onClick={() => {
+                          navigate('/teams');
+                          setSidebarOpen(false);
+                        }}
+                        className="w-full px-4 py-3 text-left hover:bg-accent transition-colors flex items-center gap-3"
+                      >
+                        <span>Team Collaboration</span>
+                      </button>
+                    </>
+                  )}
 
                   <div className="border-t my-2"></div>
 

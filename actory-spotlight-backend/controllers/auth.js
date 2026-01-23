@@ -1,5 +1,7 @@
 const User = require('../models/User');
 const PendingUser = require('../models/PendingUser');
+const ProductionHouse = require('../models/ProductionHouse');
+const PendingProductionHouse = require('../models/PendingProductionHouse');
 const jwt = require('jsonwebtoken');
 const { OAuth2Client } = require('google-auth-library');
 const crypto = require('crypto');
@@ -12,7 +14,7 @@ const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 // @access  Public
 exports.register = async (req, res, next) => {
   try {
-    const {
+    let {
       name,
       email,
       password,
@@ -78,9 +80,9 @@ exports.register = async (req, res, next) => {
       }
     }
 
-    if (role === 'Producer') {
+    if (role === 'Producer' || role === 'ProductionTeam') {
       if (!companyName) {
-        return res.status(400).json({ success: false, message: 'Production House / Company Name is required' });
+        return res.status(400).json({ success: false, message: 'Company Name is required' });
       }
       if (!phone) {
         return res.status(400).json({ success: false, message: 'Phone is required' });
@@ -107,6 +109,23 @@ exports.register = async (req, res, next) => {
       bio
     };
 
+    // Auto-verify Admin users without email verification
+    if (role === 'Admin') {
+      const adminData = {
+        ...payload,
+        isEmailVerified: true,
+        isVerified: true
+      };
+
+      const adminUser = await User.create(adminData);
+
+      return res.status(201).json({
+        success: true,
+        message: 'Admin account created successfully. You can now log in.',
+        email: adminUser.email
+      });
+    }
+
     // Generate 6-digit OTP
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
 
@@ -114,18 +133,18 @@ exports.register = async (req, res, next) => {
     payload.emailVerificationOTP = otp;
     payload.emailVerificationOTPExpire = Date.now() + 10 * 60 * 1000; // 10 minutes
 
-    // Delete any existing pending user for this email first
-    await PendingUser.deleteOne({ email });
+    let pendingRecord;
 
     // Create pending user (temporary storage until verification)
-    const pendingUser = await PendingUser.create(payload);
+    // All roles use PendingUser now
+    pendingRecord = await PendingUser.create(payload);
 
     // Try to send verification email, but don't block registration if it fails
     let emailSent = false;
     try {
-      await sendVerificationEmail(pendingUser, otp);
+      await sendVerificationEmail(pendingRecord, otp);
       emailSent = true;
-      console.log('✅ Verification email sent successfully to:', pendingUser.email);
+      console.log('✅ Verification email sent successfully to:', pendingRecord.email);
     } catch (err) {
       console.error('❌ Email verification error:', {
         message: err.message,
@@ -135,14 +154,14 @@ exports.register = async (req, res, next) => {
       });
       // Keep the OTP in database so user can still verify later
     }
-    
+
     // Send response without token (user must verify email first)
     res.status(201).json({
       success: true,
-      message: emailSent 
+      message: emailSent
         ? 'Registration successful! Please check your email for the verification code.'
         : 'Registration successful! Your verification code is: ' + otp + ' (Email service temporarily unavailable)',
-      email: pendingUser.email,
+      email: pendingRecord.email,
       ...(process.env.NODE_ENV === 'development' && !emailSent ? { otp } : {})
     });
   } catch (err) {
@@ -163,8 +182,17 @@ exports.login = async (req, res, next) => {
       return res.status(400).json({ success: false, message: 'Please provide an email and password' });
     }
 
-    // Check for user
-    const user = await User.findOne({ email }).select('+password');
+    // Check for user in User collection first
+    let user = await User.findOne({ email }).select('+password');
+    let isProductionHouse = false;
+
+    // Check ProductionHouse only if not found in User (LEGACY SUPPORT)
+    if (!user) {
+      user = await ProductionHouse.findOne({ email }).select('+password');
+      if (user) {
+        isProductionHouse = true;
+      }
+    }
 
     if (!user) {
       return res.status(401).json({ success: false, message: 'Invalid credentials' });
@@ -178,24 +206,30 @@ exports.login = async (req, res, next) => {
     }
 
     // Check if email is verified (skip for Admin users)
-    if (!user.isEmailVerified && user.role !== 'Admin') {
-      return res.status(403).json({ 
-        success: false, 
-        message: 'Please verify your email address before logging in. Check your inbox for the verification link.' 
+    // ProductionHouse logic kept for legacy support
+    if (!user.isEmailVerified && !isProductionHouse && user.role !== 'Admin') {
+      return res.status(403).json({
+        success: false,
+        message: 'Please verify your email address before logging in. Check your inbox for the verification link.'
       });
     }
 
-    sendTokenResponse(user, 200, res);
+    sendTokenResponse(user, 200, res, isProductionHouse);
   } catch (err) {
-     res.status(400).json({ success: false, message: err.message });
+    console.error('Login error:', err);
+    res.status(400).json({ success: false, message: err.message });
   }
 };
 
 // Get token from model, create cookie and send response
-const sendTokenResponse = (user, statusCode, res) => {
+const sendTokenResponse = (user, statusCode, res, isProductionHouse = false) => {
   // Create token
   const jwtSecret = process.env.JWT_SECRET || 'your_super_secret_jwt_key_here_change_this_in_production';
-  const token = jwt.sign({ id: user._id }, jwtSecret, {
+  const tokenPayload = isProductionHouse
+    ? { id: user._id, type: 'ProductionHouse' }
+    : { id: user._id };
+
+  const token = jwt.sign(tokenPayload, jwtSecret, {
     expiresIn: '30d',
   });
 
@@ -211,7 +245,19 @@ const sendTokenResponse = (user, statusCode, res) => {
   }
 
   // Send user data without the password
-  const userResponse = {
+  const userResponse = isProductionHouse ? {
+    _id: user._id,
+    name: user.companyName || user.name,
+    email: user.email,
+    role: 'ProductionTeam',
+    phone: user.phone,
+    photo: user.photo || '',
+    location: user.location,
+    profileImage: user.profileImage,
+    companyName: user.companyName,
+    website: user.website,
+    type: 'ProductionHouse'
+  } : {
     _id: user._id,
     name: user.name,
     email: user.email,
@@ -249,7 +295,7 @@ exports.updatePassword = async (req, res, next) => {
     const { currentPassword, newPassword } = req.body;
 
     if (!currentPassword || !newPassword) {
-        return res.status(400).json({ success: false, message: 'Please provide current and new passwords' });
+      return res.status(400).json({ success: false, message: 'Please provide current and new passwords' });
     }
 
     const isMatch = await user.matchPassword(currentPassword);
@@ -456,9 +502,14 @@ exports.googleLogin = async (req, res) => {
     const email = payload.email;
     const name = payload.name || payload.given_name || 'User';
 
-    // Validate desired role if provided
-    const allowedRoles = ['Actor', 'Producer', 'Admin'];
-    const desiredRole = allowedRoles.includes(role) ? role : 'Actor';
+    // Validate desired role if provided and convert Producer to ProductionTeam
+    let allowedRoles = ['Actor', 'Producer', 'ProductionTeam', 'Admin'];
+    let desiredRole = allowedRoles.includes(role) ? role : 'Actor';
+
+    // Convert Producer to ProductionTeam for consistency
+    if (desiredRole === 'Producer') {
+      desiredRole = 'ProductionTeam';
+    }
 
     // Find or create user
     let user = await User.findOne({ email });
@@ -475,9 +526,9 @@ exports.googleLogin = async (req, res) => {
 
     // Check if email is verified (skip for Admin users)
     if (!user.isEmailVerified && user.role !== 'Admin') {
-      return res.status(403).json({ 
-        success: false, 
-        message: 'Please verify your email address before logging in. Check your inbox for the verification link.' 
+      return res.status(403).json({
+        success: false,
+        message: 'Please verify your email address before logging in. Check your inbox for the verification link.'
       });
     }
 
@@ -495,7 +546,7 @@ exports.googleLogin = async (req, res) => {
 exports.checkEmail = async (req, res, next) => {
   try {
     const { email } = req.query;
-    
+
     if (!email) {
       return res.status(400).json({
         success: false,
@@ -505,13 +556,13 @@ exports.checkEmail = async (req, res, next) => {
 
     // Check if email exists in the database
     const user = await User.findOne({ email: email.toLowerCase().trim() });
-    
+
     res.status(200).json({
       success: true,
       available: !user, // true if email is available, false if already exists
       message: user ? 'Email is already registered' : 'Email is available'
     });
-    
+
   } catch (err) {
     console.error('Error checking email:', err);
     res.status(500).json({
@@ -530,9 +581,9 @@ exports.forgotPassword = async (req, res, next) => {
     const { email } = req.body;
 
     if (!email) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'Please provide an email address' 
+      return res.status(400).json({
+        success: false,
+        message: 'Please provide an email address'
       });
     }
 
@@ -541,9 +592,9 @@ exports.forgotPassword = async (req, res, next) => {
 
     if (!user) {
       // For security, don't reveal if the email exists or not
-      return res.status(200).json({ 
-        success: true, 
-        message: 'If an account with that email exists, a password reset link has been sent' 
+      return res.status(200).json({
+        success: true,
+        message: 'If an account with that email exists, a password reset link has been sent'
       });
     }
 
@@ -558,29 +609,29 @@ exports.forgotPassword = async (req, res, next) => {
     try {
       // Send email with reset token
       await sendPasswordResetEmail(user, resetToken, resetUrl);
-      
-      res.status(200).json({ 
-        success: true, 
+
+      res.status(200).json({
+        success: true,
         message: 'If an account with that email exists, a password reset link has been sent'
       });
     } catch (err) {
       console.error('Error sending email:', err);
-      
+
       // Reset the token if email fails to send
       user.resetPasswordToken = undefined;
       user.resetPasswordExpire = undefined;
       await user.save({ validateBeforeSave: false });
 
-      return res.status(500).json({ 
-        success: false, 
-        message: 'Email could not be sent' 
+      return res.status(500).json({
+        success: false,
+        message: 'Email could not be sent'
       });
     }
   } catch (err) {
     console.error('Forgot password error:', err);
-    res.status(500).json({ 
-      success: false, 
-      message: 'Server error' 
+    res.status(500).json({
+      success: false,
+      message: 'Server error'
     });
   }
 };
@@ -603,9 +654,9 @@ exports.checkResetToken = async (req, res, next) => {
     });
 
     if (!user) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'Invalid or expired reset token' 
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid or expired reset token'
       });
     }
 
@@ -615,9 +666,9 @@ exports.checkResetToken = async (req, res, next) => {
     });
   } catch (err) {
     console.error('Check reset token error:', err);
-    res.status(500).json({ 
-      success: false, 
-      message: 'Server error' 
+    res.status(500).json({
+      success: false,
+      message: 'Server error'
     });
   }
 };
@@ -640,9 +691,9 @@ exports.resetPassword = async (req, res, next) => {
     });
 
     if (!user) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'Invalid or expired reset token' 
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid or expired reset token'
       });
     }
 
@@ -650,16 +701,16 @@ exports.resetPassword = async (req, res, next) => {
 
     // Validate passwords
     if (!newPassword || newPassword.length < 6) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'Password must be at least 6 characters' 
+      return res.status(400).json({
+        success: false,
+        message: 'Password must be at least 6 characters'
       });
     }
 
     if (newPassword !== confirmPassword) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'Passwords do not match' 
+      return res.status(400).json({
+        success: false,
+        message: 'Passwords do not match'
       });
     }
 
@@ -667,16 +718,16 @@ exports.resetPassword = async (req, res, next) => {
     user.password = newPassword;
     user.resetPasswordToken = undefined;
     user.resetPasswordExpire = undefined;
-    
+
     await user.save();
 
     // Send token response to log the user in
     sendTokenResponse(user, 200, res);
   } catch (err) {
     console.error('Reset password error:', err);
-    res.status(500).json({ 
-      success: false, 
-      message: 'Server error' 
+    res.status(500).json({
+      success: false,
+      message: 'Server error'
     });
   }
 };
@@ -689,13 +740,13 @@ exports.verifyEmail = async (req, res, next) => {
     const { email, otp } = req.body;
 
     if (!email || !otp) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'Email and OTP are required' 
+      return res.status(400).json({
+        success: false,
+        message: 'Email and OTP are required'
       });
     }
 
-    // Find pending user and check if OTP matches and not expired
+    // Check PendingUser
     const pendingUser = await PendingUser.findOne({
       email,
       emailVerificationOTP: otp,
@@ -703,13 +754,13 @@ exports.verifyEmail = async (req, res, next) => {
     });
 
     if (!pendingUser) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'Invalid or expired OTP. Please request a new one.' 
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid or expired OTP. Please request a new one.'
       });
     }
 
-    // Create the actual user from pending user data
+    // Handle regular User verification (for all roles now)
     const userData = {
       name: pendingUser.name,
       email: pendingUser.email,
@@ -724,25 +775,31 @@ exports.verifyEmail = async (req, res, next) => {
       gender: pendingUser.gender,
       experienceLevel: pendingUser.experienceLevel,
       bio: pendingUser.bio,
-      isEmailVerified: true,  // Mark as verified
-      isVerified: true        // Mark as fully verified for login
+
+      // New producer fields
+      establishedYear: pendingUser.establishedYear,
+      teamSize: pendingUser.teamSize,
+      specializations: pendingUser.specializations,
+
+      isEmailVerified: true,
+      isVerified: true
     };
 
     // Create the actual user
-    const user = await User.create(userData);
+    await User.create(userData);
 
     // Delete the pending user record
     await PendingUser.deleteOne({ email });
-    
-    res.status(200).json({
+
+    return res.status(200).json({
       success: true,
       message: 'Email verified successfully! You can now log in to your account.'
     });
   } catch (err) {
     console.error('Email verification error:', err);
-    res.status(500).json({ 
-      success: false, 
-      message: 'Server error' 
+    res.status(500).json({
+      success: false,
+      message: 'Server error'
     });
   }
 };
@@ -755,9 +812,9 @@ exports.resendVerificationEmail = async (req, res, next) => {
     const { email } = req.body;
 
     if (!email) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'Please provide an email address' 
+      return res.status(400).json({
+        success: false,
+        message: 'Please provide an email address'
       });
     }
 
@@ -765,19 +822,19 @@ exports.resendVerificationEmail = async (req, res, next) => {
     const pendingUser = await PendingUser.findOne({ email });
 
     if (!pendingUser) {
-      return res.status(404).json({ 
-        success: false, 
-        message: 'No pending registration found for that email address. Please register first.' 
+      return res.status(404).json({
+        success: false,
+        message: 'No pending registration found for that email address. Please register first.'
       });
     }
 
     // Generate new 6-digit OTP
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
-    
+
     // Set OTP and expiration (10 minutes)
     pendingUser.emailVerificationOTP = otp;
     pendingUser.emailVerificationOTPExpire = Date.now() + 10 * 60 * 1000;
-    
+
     await pendingUser.save();
 
     // Try to send verification email, but don't block if it fails
@@ -790,19 +847,19 @@ exports.resendVerificationEmail = async (req, res, next) => {
       console.error('Error sending verification email (non-blocking):', err.message);
       // Keep the OTP in database so user can still verify later
     }
-    
+
     res.status(200).json({
       success: true,
-      message: emailSent 
+      message: emailSent
         ? 'Verification code sent! Check your email. Code expires in 10 minutes.'
         : 'New verification code generated: ' + otp + ' (Email service temporarily unavailable)',
       ...(process.env.NODE_ENV === 'development' && !emailSent ? { otp } : {})
     });
   } catch (err) {
     console.error('Resend verification error:', err);
-    res.status(500).json({ 
-      success: false, 
-      message: 'Server error' 
+    res.status(500).json({
+      success: false,
+      message: 'Server error'
     });
   }
 };

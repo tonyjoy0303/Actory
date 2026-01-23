@@ -204,7 +204,7 @@ const PublicProfile = () => {
               window.dispatchEvent(new Event('authChange'));
             }
           }
-        } catch {}
+        } catch { }
       }
     } catch (error) {
       console.error('Error updating profile:', error);
@@ -260,7 +260,7 @@ const PublicProfile = () => {
               </CardContent>
             </Card>
           </div>
-          
+
           {/* Main Content */}
           <div className="md:w-2/3 space-y-6">
             <Skeleton className="h-10 w-48" />
@@ -298,11 +298,23 @@ const PublicProfile = () => {
     return age;
   };
 
+  const displayName = (profile?.role === 'Producer' || profile?.role === 'ProductionTeam')
+    ? (profile?.companyName || profile?.name)
+    : profile?.name;
+
+  const roleLabel = profile?.role === 'Producer'
+    ? 'Recruiter'
+    : profile?.role === 'ProductionTeam'
+      ? 'Production House'
+      : profile?.role === 'Actor'
+        ? 'Actor'
+        : 'Performer';
+
   return (
     <div className="min-h-screen bg-background">
-      <SEO 
-        title={`${profile?.name || 'Actor'} | Actory`}
-        description={profile?.bio || `View ${profile?.name}'s profile on Actory`}
+      <SEO
+        title={`${displayName || 'Profile'} | Actory`}
+        description={profile?.bio || `View ${displayName || 'profile'} on Actory`}
         image={profile?.profileImage}
       />
 
@@ -314,12 +326,12 @@ const PublicProfile = () => {
               <Avatar className="h-32 w-32 border-4 border-background">
                 <AvatarImage src={profileImagePreview || (profile?.profileImage ? `${profile?.profileImage}?t=${imageKey}` : undefined)} alt={profile?.name} />
                 <AvatarFallback className="text-4xl">
-                  {profile?.name?.charAt(0) || 'A'}
+                  {displayName?.charAt(0) || 'A'}
                 </AvatarFallback>
               </Avatar>
               <div>
                 <div className="flex items-center space-x-3">
-                  <h1 className="text-3xl font-bold">{profile?.name}</h1>
+                  <h1 className="text-3xl font-bold">{displayName}</h1>
                   {profile?.isVerified && (
                     <Badge variant="secondary" className="text-xs">
                       Verified
@@ -327,7 +339,7 @@ const PublicProfile = () => {
                   )}
                 </div>
                 <p className="text-muted-foreground">
-                  {profile?.role === 'Actor' ? 'Actor' : profile?.role === 'Producer' ? 'Recruiter' : 'Performer'}
+                  {roleLabel}
                   {profile?.location && ` • ${profile.location}`}
                   {profile?.age && ` • ${profile.age} years old`}
                 </p>
@@ -540,7 +552,7 @@ const PublicProfile = () => {
                 )}
               </CardContent>
             </Card>
-            
+
             {/* Skills Card */}
             {profile?.skills?.length > 0 && (
               <Card>
@@ -558,7 +570,7 @@ const PublicProfile = () => {
                 </CardContent>
               </Card>
             )}
-            
+
             {/* Stats Card */}
             <Card>
               <CardHeader>
@@ -584,11 +596,11 @@ const PublicProfile = () => {
               </CardContent>
             </Card>
           </div>
-          
+
           {/* Main Content */}
           <div className="md:w-2/3 space-y-6">
-            <Tabs 
-              value={activeTab} 
+            <Tabs
+              value={activeTab}
               onValueChange={setActiveTab}
               className="space-y-6"
             >
@@ -597,7 +609,7 @@ const PublicProfile = () => {
                 <TabsTrigger value="about">About</TabsTrigger>
                 <TabsTrigger value="experience">Experience</TabsTrigger>
               </TabsList>
-              
+
               <TabsContent value="videos" className="space-y-6">
                 <VideoList
                   videos={profile?.videos || []}
@@ -607,7 +619,7 @@ const PublicProfile = () => {
                   profileOwnerId={profile?._id}
                 />
               </TabsContent>
-              
+
               <TabsContent value="about" className="space-y-6">
                 <Card>
                   <CardHeader>
@@ -625,10 +637,10 @@ const PublicProfile = () => {
                     )}
                   </CardContent>
                 </Card>
-                
+
                 {/* Add more sections like training, education, etc. */}
               </TabsContent>
-              
+
               <TabsContent value="experience" className="space-y-6">
                 {profile?.experience?.length > 0 ? (
                   <div className="space-y-4">
@@ -669,7 +681,7 @@ const PublicProfile = () => {
                         </CardContent>
                       </Card>
                     )}
-                    
+
                     {/* No Experience Entries Message */}
                     <Card>
                       <CardContent className="py-8 text-center">
@@ -714,9 +726,9 @@ const PublicProfile = () => {
                   className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                 />
               </div>
-              <Button 
-                variant="outline" 
-                size="sm" 
+              <Button
+                variant="outline"
+                size="sm"
                 onClick={() => {
                   navigator.clipboard.writeText(shareUrl);
                   toast.success('Link copied to clipboard!');

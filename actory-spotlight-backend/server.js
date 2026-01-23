@@ -3,6 +3,8 @@ const dotenv = require('dotenv');
 const cors = require('cors');
 const connectDB = require('./config/db');
 const path = require('path');
+const jwt = require('jsonwebtoken');
+const { setNotificationEmitter } = require('./utils/notificationService');
 
 // Load env vars
 dotenv.config({ path: './.env' });
@@ -20,14 +22,14 @@ const allowedOrigins = [
 ];
 
 const corsOptions = {
-  origin: function(origin, callback) {
+  origin: function (origin, callback) {
     // Allow non-browser requests (like curl/postman) which have no origin
     if (!origin) return callback(null, true);
     if (allowedOrigins.includes(origin)) return callback(null, true);
     return callback(new Error('Not allowed by CORS')); // blocks unexpected origins
   },
   credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
   optionsSuccessStatus: 200
 };
@@ -47,7 +49,7 @@ app.use((req, res, next) => {
     res.setHeader('Access-Control-Allow-Origin', requestOrigin);
   }
   res.setHeader('Access-Control-Allow-Credentials', 'true');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
 
   // Cross-Origin headers
@@ -72,6 +74,10 @@ app.use('/api/v1/actor', require('./routes/actor'));
 app.use('/api/v1/admin', require('./routes/admin'));
 app.use('/api/v1/profile', require('./routes/profile'));
 app.use('/api/v1/messages', require('./routes/messages'));
+app.use('/api/v1/notifications', require('./routes/notifications'));
+app.use('/api/v1/teams', require('./routes/teams'));
+app.use('/api/v1/team-invitations', require('./routes/teamInvitations'));
+app.use('/api/v1/projects', require('./routes/projects'));
 app.use('/api', require('./routes/prediction'));
 
 // Handle OPTIONS preflight requests
@@ -95,7 +101,7 @@ app.post('/api/v1/fit/knn', (req, res) => {
       return res.status(400).json({ success: false, message: 'candidate and non-empty trainingSet are required' });
     }
 
-    const featureKeys = ['age','height','skillsEncoded','expYears','callbackRate','portfolioVideos','genreMatch'];
+    const featureKeys = ['age', 'height', 'skillsEncoded', 'expYears', 'callbackRate', 'portfolioVideos', 'genreMatch'];
 
     // Build vectors and compute min/max for normalization
     const train = trainingSet.map((row) => ({
@@ -168,7 +174,7 @@ app.post('/api/v1/fit/knn', (req, res) => {
 });
 
 app.get('/', (req, res) => {
-    res.send('Actory API is running...');
+  res.send('Actory API is running...');
 });
 
 const PORT = process.env.PORT || 5000;
@@ -201,13 +207,55 @@ async function start() {
     const rooms = new Map();
 
     if (io) {
+      // Notification namespace with JWT auth
+      const notificationNamespace = io.of('/notifications');
+      const onlineUsers = new Map(); // userId -> Set<socketId>
+
+      notificationNamespace.use((socket, next) => {
+        const token = socket.handshake.auth?.token || socket.handshake.query?.token;
+        if (!token) return next(new Error('Unauthorized'));
+        try {
+          const jwtSecret = process.env.JWT_SECRET || 'your_super_secret_jwt_key_here_change_this_in_production';
+          const decoded = jwt.verify(token, jwtSecret);
+          socket.userId = decoded.id;
+          return next();
+        } catch (err) {
+          return next(new Error('Unauthorized'));
+        }
+      });
+
+      const emitToUser = (userId, payload) => {
+        const sockets = onlineUsers.get(String(userId));
+        if (!sockets || !notificationNamespace) return;
+        sockets.forEach((sid) => {
+          notificationNamespace.to(sid).emit('notification:new', payload);
+        });
+      };
+
+      setNotificationEmitter(emitToUser);
+
+      notificationNamespace.on('connection', (socket) => {
+        const userId = String(socket.userId);
+        if (!onlineUsers.has(userId)) onlineUsers.set(userId, new Set());
+        onlineUsers.get(userId).add(socket.id);
+
+        socket.on('disconnect', () => {
+          const sockets = onlineUsers.get(userId);
+          if (!sockets) return;
+          sockets.delete(socket.id);
+          if (sockets.size === 0) {
+            onlineUsers.delete(userId);
+          }
+        });
+      });
+
       io.on('connection', (socket) => {
         // Create a room, mark this socket as admin
         socket.on('vc:create', ({ roomId, user, settings }) => {
           const id = roomId || Math.random().toString(36).slice(2, 10);
-          rooms.set(id, { 
-            adminSocketId: socket.id, 
-            members: new Set([socket.id]), 
+          rooms.set(id, {
+            adminSocketId: socket.id,
+            members: new Set([socket.id]),
             pending: new Map(),
             adminUser: user || { name: 'Admin' },
             maxParticipants: settings?.maxParticipants || 10
@@ -225,15 +273,15 @@ async function start() {
             socket.emit('vc:join-rejected', { roomId, reason: 'Room not found' });
             return;
           }
-          
+
           // Check if room is full
           const maxParticipants = room.maxParticipants || 10;
-          
+
           if (room.members.size >= maxParticipants) {
             socket.emit('vc:join-rejected', { roomId, reason: 'Room is full' });
             return;
           }
-          
+
           // Always require admin approval - no automatic joins
           room.pending.set(socket.id, user || { name: 'Guest' });
           console.log('Notifying admin of join request:', room.adminSocketId);
@@ -281,16 +329,18 @@ async function start() {
         socket.on('vc:update-settings', ({ roomId, settings }) => {
           const room = rooms.get(roomId);
           if (!room || room.adminSocketId !== socket.id) return;
-          
+
           // Update room settings (only maxParticipants now)
           if (settings.maxParticipants !== undefined) {
             room.maxParticipants = settings.maxParticipants;
           }
-          
+
           // Notify all participants about settings change
-          io.to(roomId).emit('vc:settings-updated', { settings: {
-            maxParticipants: room.maxParticipants
-          }});
+          io.to(roomId).emit('vc:settings-updated', {
+            settings: {
+              maxParticipants: room.maxParticipants
+            }
+          });
         });
 
         // Finalize join after approval
@@ -311,14 +361,14 @@ async function start() {
           socket.join(roomId);
           room.members.add(socket.id);
           console.log('User joined room, notifying others');
-          
+
           // Send user info along with the join notification to existing members
-          socket.to(roomId).emit('vc:user-joined', { 
-            socketId: socket.id, 
-            userId, 
+          socket.to(roomId).emit('vc:user-joined', {
+            socketId: socket.id,
+            userId,
             user: user || { name: 'Guest' }
           });
-          
+
           // Send existing participants list to the newly joined user
           const existingParticipants = Array.from(room.members).map(memberSocketId => {
             if (memberSocketId === room.adminSocketId) {
@@ -336,7 +386,7 @@ async function start() {
               };
             }
           });
-          
+
           socket.emit('vc:participants-list', { participants: existingParticipants });
         });
 

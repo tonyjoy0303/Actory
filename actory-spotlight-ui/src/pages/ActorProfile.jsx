@@ -62,7 +62,11 @@ export default function ActorProfile() {
         setLoading(true);
         const { data } = await API.get('/auth/me');
         setUser(data.user);
-        setName(data.user?.name || "");
+        // Use companyName for Producer/ProductionTeam, name for others
+        const displayName = (data.user?.role === 'Producer' || data.user?.role === 'ProductionTeam') 
+          ? (data.user?.companyName || data.user?.name) 
+          : data.user?.name;
+        setName(displayName || "");
       } catch (err) {
         const status = _optionalChain([err, 'access', _2 => _2.response, 'optionalAccess', _3 => _3.status]);
         const message = _optionalChain([err, 'access', _4 => _4.response, 'optionalAccess', _5 => _5.data, 'optionalAccess', _6 => _6.message]) || 'Failed to load profile.';

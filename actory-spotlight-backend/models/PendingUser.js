@@ -24,7 +24,7 @@ const PendingUserSchema = new mongoose.Schema({
   },
   role: {
     type: String,
-    enum: ['Actor', 'Producer', 'Admin'],
+    enum: ['Actor', 'Producer', 'ProductionTeam', 'Admin'],
     default: 'Actor'
   },
   phone: {
@@ -44,6 +44,12 @@ const PendingUserSchema = new mongoose.Schema({
   // Producer-specific
   companyName: { type: String },
   website: { type: String },
+  establishedYear: { type: Number },
+  teamSize: {
+    type: String,
+    enum: ['1-10', '11-50', '51-200', '201-500', '500+']
+  },
+  specializations: [{ type: String }],
   // OTP verification
   emailVerificationOTP: {
     type: String,

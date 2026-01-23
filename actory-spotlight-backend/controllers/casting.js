@@ -1,5 +1,6 @@
 const CastingCall = require('../models/CastingCall');
 const User = require('../models/User');
+const ProductionTeam = require('../models/ProductionTeam');
 
 // @desc    Get all casting calls
 // @route   GET /api/v1/casting
@@ -36,11 +37,51 @@ exports.getCastingCalls = async (req, res, next) => {
 
     const castingCalls = await CastingCall.find(query)
       .populate('producer', 'name email')
+      .populate('project', 'name description')
       .sort({ submissionDeadline: 1 }); // Sort by submission deadline
       
     res.status(200).json({ success: true, count: castingCalls.length, data: castingCalls });
   } catch (err) {
     res.status(400).json({ success: false, message: err.message });
+  }
+};
+
+// @desc    Get team casting calls (for team members to see all castings in their team's projects)
+// @route   GET /api/v1/casting/team/:teamId
+// @access  Private (Team members only)
+exports.getTeamCastingCalls = async (req, res, next) => {
+  try {
+    const { teamId } = req.params;
+    
+    // Verify user is team member
+    const team = await ProductionTeam.findById(teamId);
+    if (!team) {
+      return res.status(404).json({ success: false, message: 'Team not found' });
+    }
+    
+    const isTeamMember = String(team.owner) === String(req.user.id) || 
+      team.members.some(m => String(m.user) === String(req.user.id));
+    
+    if (!isTeamMember) {
+      return res.status(403).json({ success: false, message: 'Not authorized to view this team\'s castings' });
+    }
+
+    // Find all castings for projects in this team
+    const castingCalls = await CastingCall.find({ team: teamId })
+      .populate('producer', 'name email')
+      .populate('project', 'name description')
+      .sort({ createdAt: -1 });
+      
+    res.status(200).json({ 
+      success: true, 
+      count: castingCalls.length, 
+      data: castingCalls 
+    });
+  } catch (err) {
+    res.status(500).json({ 
+      success: false, 
+      message: 'Server error: ' + err.message 
+    });
   }
 };
 
@@ -52,6 +93,7 @@ exports.getProducerCastingCalls = async (req, res, next) => {
     // Find all casting calls for the logged-in producer
     const castingCalls = await CastingCall.find({ producer: req.user.id })
       .populate('producer', 'name email')
+      .populate('project', 'name description')
       .sort({ createdAt: -1 }); // Sort by creation date, newest first
       
     res.status(200).json({ 

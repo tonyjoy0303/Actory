@@ -1,5 +1,6 @@
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
+const ProductionHouse = require('../models/ProductionHouse');
 
 // Protect routes
 exports.protect = async (req, res, next) => {
@@ -32,7 +33,16 @@ exports.protect = async (req, res, next) => {
     const jwtSecret = process.env.JWT_SECRET || 'your_super_secret_jwt_key_here_change_this_in_production';
     const decoded = jwt.verify(token, jwtSecret);
 
-    req.user = await User.findById(decoded.id);
+    // Check if it's a ProductionHouse token
+    if (decoded.type === 'ProductionHouse') {
+      req.user = await ProductionHouse.findById(decoded.id);
+      if (req.user) {
+        req.user.role = 'ProductionTeam'; // Set role for authorization middleware
+        req.user.isProductionHouse = true;
+      }
+    } else {
+      req.user = await User.findById(decoded.id);
+    }
 
     if (!req.user) {
       return res.status(403).json({ success: false, message: 'Access denied' });
@@ -75,7 +85,16 @@ exports.optionalAuth = async (req, res, next) => {
     const jwtSecret = process.env.JWT_SECRET || 'your_super_secret_jwt_key_here_change_this_in_production';
     const decoded = jwt.verify(token, jwtSecret);
 
-    req.user = await User.findById(decoded.id);
+    // Check if it's a ProductionHouse token
+    if (decoded.type === 'ProductionHouse') {
+      req.user = await ProductionHouse.findById(decoded.id);
+      if (req.user) {
+        req.user.role = 'ProductionTeam';
+        req.user.isProductionHouse = true;
+      }
+    } else {
+      req.user = await User.findById(decoded.id);
+    }
 
     // Continue even if user not found (token might be invalid)
     next();

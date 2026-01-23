@@ -49,6 +49,18 @@ export default function CastingList() {
     age: ''
   });
 
+  const user = (() => {
+    try {
+      return JSON.parse(localStorage.getItem('user'));
+    } catch (e) {
+      return null;
+    }
+  })();
+
+  // Check if user is team member to show team castings
+  const [showTeamCastings, setShowTeamCastings] = useState(false);
+  const [userTeams, setUserTeams] = useState([]);
+
   useEffect(() => {
     const fetchCastings = async () => {
       try {
@@ -64,8 +76,21 @@ export default function CastingList() {
         setLoading(false);
       }
     };
+
+    const fetchUserTeams = async () => {
+      if (user && ['Producer', 'ProductionTeam'].includes(user.role)) {
+        try {
+          const { data } = await API.get('/teams');
+          setUserTeams(data.data || []);
+        } catch (err) {
+          console.error('Failed to fetch teams', err);
+        }
+      }
+    };
+
     fetchCastings();
-  }, []);
+    fetchUserTeams();
+  }, [user]);
 
   const filtered = useMemo(() => {
     return castings.filter((c) => {
@@ -201,6 +226,16 @@ export default function CastingList() {
             min={1}
             max={120}
           />
+
+          {user && ['Producer', 'ProductionTeam'].includes(user.role) && userTeams.length > 0 && (
+            <Button
+              variant={showTeamCastings ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setShowTeamCastings(!showTeamCastings)}
+            >
+              {showTeamCastings ? '✓ My Team Castings' : 'My Team Castings'}
+            </Button>
+          )}
         </div>
       </div>
 
@@ -219,10 +254,17 @@ export default function CastingList() {
             <Card key={casting._id} className="flex flex-col h-full">
               <CardHeader className="pb-3">
                 <div className="flex justify-between items-start">
-                  <CardTitle className="text-xl">{casting.roleTitle}</CardTitle>
+                  <div className="flex-1">
+                    <CardTitle className="text-xl">{casting.roleTitle}</CardTitle>
+                    {casting.project && (
+                      <p className="text-sm text-muted-foreground mt-1">
+                        Project: <span className="font-medium">{casting.project.name}</span>
+                      </p>
+                    )}
+                  </div>
                   <ExperienceLevelBadge level={casting.experienceLevel} />
                 </div>
-                <div className="flex items-center text-sm text-muted-foreground">
+                <div className="flex items-center text-sm text-muted-foreground mt-2">
                   <MapPin className="h-4 w-4 mr-1" />
                   {casting.location}
                 </div>
@@ -237,6 +279,22 @@ export default function CastingList() {
                 <p className="text-sm text-muted-foreground line-clamp-3 mb-4">
                   {casting.description}
                 </p>
+
+                {casting.project && (
+                  <div className="mb-3 flex items-center justify-between gap-2">
+                    <div className="text-sm text-muted-foreground">
+                      <span className="font-medium text-foreground">Project:</span>{' '}
+                      {casting.project.name}
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => navigate(`/projects/${casting.project._id}`)}
+                    >
+                      View Project
+                    </Button>
+                  </div>
+                )}
 
                 <div className="space-y-2 text-sm">
                   <div className="flex items-center">

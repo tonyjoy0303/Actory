@@ -88,12 +88,12 @@ router.get('/mine', protect, authorize('Actor'), getMyVideos);
 // @route   PATCH /api/v1/videos/:id/status
 // @desc    Update submission status (Accept/Reject)
 // @access  Private (Producer)
-router.patch('/:id/status', protect, authorize('Producer'), updateStatus);
+router.patch('/:id/status', protect, authorize('Producer', 'ProductionTeam'), updateStatus);
 
 // @route   PUT /api/v1/videos/:id/metrics
 // @desc    Update video metrics and recalculate quality
 // @access  Private (Producer)
-router.put('/:id/metrics', protect, authorize('Producer'), updateVideoMetrics);
+router.put('/:id/metrics', protect, authorize('Producer', 'ProductionTeam'), updateVideoMetrics);
 
 // @route   DELETE /api/v1/videos/:id
 // @desc    Delete a video
@@ -103,12 +103,12 @@ router.delete('/:id', protect, authorize('Actor', 'Admin'), deleteVideo);
 // @route   GET /api/v1/videos/:id/portfolio
 // @desc    Get a viewable portfolio URL (handles authenticated/raw)
 // @access  Private (Producer or Admin)
-router.get('/:id/portfolio', protect, authorize('Producer', 'Admin'), getPortfolio);
+router.get('/:id/portfolio', protect, authorize('Producer', 'ProductionTeam', 'Admin'), getPortfolio);
 
 // Stream proxy for portfolio PDF (best for embedded viewers)
 // Use standard auth middleware so Authorization header works consistently
 // @access  Private (Producer or Admin)
-router.get('/:id/portfolio/file', protect, authorize('Producer', 'Admin'), getPortfolioFile);
+router.get('/:id/portfolio/file', protect, authorize('Producer', 'ProductionTeam', 'Admin'), getPortfolioFile);
 
 // ==============================
 // Casting Call Videos
@@ -119,7 +119,7 @@ router.get('/:id/portfolio/file', protect, authorize('Producer', 'Admin'), getPo
 // @access  Private (Producer of the call only)
 router.get('/', 
   protect, 
-  authorize('Producer'), 
+  authorize('Producer', 'ProductionTeam'), 
   getVideos
 );
 

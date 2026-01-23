@@ -57,7 +57,7 @@ const VideoSchema = new mongoose.Schema({
 }, { _id: true });
 
 // Ensure sensible defaults for missing title/category when uploading profile videos
-VideoSchema.pre('validate', function(next) {
+VideoSchema.pre('validate', function (next) {
   if (!this.title || !this.title.trim()) {
     if (this.description && this.description.trim()) {
       this.title = this.description.trim().slice(0, 80);
@@ -78,7 +78,7 @@ const UserSchema = new mongoose.Schema({
     minlength: [2, 'Name must be at least 2 characters'],
     maxlength: [50, 'Name must be at most 50 characters'],
     validate: {
-      validator: function(v) {
+      validator: function (v) {
         return /\S/.test(v);
       },
       message: 'Name cannot be blank'
@@ -103,7 +103,7 @@ const UserSchema = new mongoose.Schema({
     type: String,
     required: false, // Will be conditionally required below using custom validator
     validate: {
-      validator: function(v) {
+      validator: function (v) {
         if (!v) return true; // optional unless role mandates
         // Accepts international formats with + and spaces/dashes
         return /^\+?[0-9\-\s]{7,15}$/.test(v);
@@ -113,7 +113,7 @@ const UserSchema = new mongoose.Schema({
   },
   role: {
     type: String,
-    enum: ['Actor', 'Producer', 'Admin'],
+    enum: ['Actor', 'Producer', 'ProductionTeam', 'Admin'],
     default: 'Actor',
   },
   password: {
@@ -139,6 +139,12 @@ const UserSchema = new mongoose.Schema({
   // Producer-specific
   companyName: { type: String },
   website: { type: String },
+  establishedYear: { type: Number },
+  teamSize: {
+    type: String,
+    enum: ['1-10', '11-50', '51-200', '201-500', '500+']
+  },
+  specializations: [{ type: String }],
 
   // Verification status
   isVerified: { type: Boolean, default: false },
@@ -153,42 +159,42 @@ const UserSchema = new mongoose.Schema({
 });
 
 // Conditional required validations by role
-UserSchema.path('phone').validate(function(value) {
-  if (this.role === 'Actor' || this.role === 'Producer') {
-    return !!value; // required for both actor and producer
+UserSchema.path('phone').validate(function (value) {
+  if (this.role === 'Actor' || this.role === 'Producer' || this.role === 'ProductionTeam') {
+    return !!value; // required for actor, producer, and production team
   }
   return true;
 }, 'Phone number is required');
 
-UserSchema.path('location').validate(function(value) {
-  if (this.role === 'Actor' || this.role === 'Producer') {
-    return !!value; // required for both actor and producer
+UserSchema.path('location').validate(function (value) {
+  if (this.role === 'Actor' || this.role === 'Producer' || this.role === 'ProductionTeam') {
+    return !!value; // required for actor, producer, and production team
   }
   return true;
 }, 'Location is required');
 
-UserSchema.path('companyName').validate(function(value) {
-  if (this.role === 'Producer') {
+UserSchema.path('companyName').validate(function (value) {
+  if (this.role === 'Producer' || this.role === 'ProductionTeam') {
     return !!value;
   }
   return true;
 }, 'Company name is required');
 
-UserSchema.path('age').validate(function(value) {
+UserSchema.path('age').validate(function (value) {
   if (this.role === 'Actor') {
     return typeof value === 'number' && value >= 1 && value <= 120;
   }
   return true;
 }, 'Age is required and must be between 1 and 120');
 
-UserSchema.path('gender').validate(function(value) {
+UserSchema.path('gender').validate(function (value) {
   if (this.role === 'Actor') {
     return !!value;
   }
   return true;
 }, 'Gender is required');
 
-UserSchema.path('experienceLevel').validate(function(value) {
+UserSchema.path('experienceLevel').validate(function (value) {
   if (this.role === 'Actor') {
     return !!value;
   }
@@ -196,7 +202,7 @@ UserSchema.path('experienceLevel').validate(function(value) {
 }, 'Experience level is required');
 
 // Add instance method to add a video to user's profile
-UserSchema.methods.addVideo = async function(videoData) {
+UserSchema.methods.addVideo = async function (videoData) {
   try {
     this.videos.push(videoData);
     await this.save();
@@ -207,7 +213,7 @@ UserSchema.methods.addVideo = async function(videoData) {
 };
 
 // Add instance method to remove a video
-UserSchema.methods.removeVideo = async function(videoId) {
+UserSchema.methods.removeVideo = async function (videoId) {
   try {
     const videoIndex = this.videos.findIndex(v => v._id.toString() === videoId);
     if (videoIndex === -1) {
@@ -222,7 +228,7 @@ UserSchema.methods.removeVideo = async function(videoId) {
 };
 
 // Add instance method to increment video views
-UserSchema.methods.incrementVideoViews = async function(videoId) {
+UserSchema.methods.incrementVideoViews = async function (videoId) {
   try {
     const video = this.videos.id(videoId);
     if (!video) {
@@ -253,7 +259,7 @@ UserSchema.methods.matchPassword = async function (enteredPassword) {
 };
 
 // Generate and hash password token
-UserSchema.methods.getResetPasswordToken = function() {
+UserSchema.methods.getResetPasswordToken = function () {
   // Generate token
   const resetToken = crypto.randomBytes(20).toString('hex');
 
