@@ -3,9 +3,50 @@ const CastingCall = require('../models/CastingCall');
 const User = require('../models/User');
 const Comment = require('../models/Comment');
 const ProductionHouse = require('../models/ProductionHouse');
+const ProductionTeam = require('../models/ProductionTeam');
+const FilmProject = require('../models/FilmProject');
 const mongoose = require('mongoose');
 const cloudinary = require('cloudinary').v2;
 const { createNotification } = require('../utils/notificationService');
+
+// Helper: authorize casting call access.
+// allowWrite=false → any team member (or producer) can read.
+// allowWrite=true  → only producer, owner, or members whose role is not 'Viewer'.
+async function isAuthorizedForCasting(castingCall, userId, { allowWrite = false } = {}) {
+  const requesterId = String(userId);
+
+  // Producer always allowed
+  if (castingCall.producer && castingCall.producer.toString() === requesterId) {
+    return true;
+  }
+
+  // If no team, only producer could authorize
+  if (!castingCall.team) {
+    return false;
+  }
+
+  const team = await ProductionTeam.findById(castingCall.team);
+  if (!team) {
+    return false;
+  }
+
+  const isOwner = team.owner && team.owner.toString() === requesterId;
+  const member = team.members.find(m => m.user && m.user.toString() === requesterId);
+  const hasTeamAccess = isOwner || Boolean(member);
+
+  if (!hasTeamAccess) {
+    return false;
+  }
+
+  // Read access: any team member (including owner)
+  if (!allowWrite) {
+    return true;
+  }
+
+  // Write access: owner, or member whose role is not 'Viewer'
+  const role = isOwner ? 'Owner' : member?.role;
+  return role && role !== 'Viewer';
+}
 
 // Configure Cloudinary
 cloudinary.config({
@@ -16,7 +57,7 @@ cloudinary.config({
 
 // @desc    Get all videos for a casting call
 // @route   GET /api/v1/casting/:castingCallId/videos
-// @access  Private (Producer of the call only)
+// @access  Private (Producer or Team Members)
 exports.getVideos = async (req, res, next) => {
   try {
     const castingCall = await CastingCall.findById(req.params.castingCallId);
@@ -25,8 +66,9 @@ exports.getVideos = async (req, res, next) => {
       return res.status(404).json({ success: false, message: 'Casting call not found' });
     }
 
-    // Make sure user is the owner of the casting call
-    if (castingCall.producer.toString() !== req.user.id) {
+    // Check if user is authorized (producer or team member)
+    const authorized = await isAuthorizedForCasting(castingCall, req.user._id);
+    if (!authorized) {
       return res.status(401).json({ success: false, message: 'Not authorized to view these submissions' });
     }
 
@@ -43,7 +85,7 @@ exports.getVideos = async (req, res, next) => {
 exports.addVideo = async (req, res, next) => {
   try {
     req.body.castingCall = req.params.castingCallId;
-    req.body.actor = req.user.id;
+    req.body.actor = req.user._id;
 
     const castingCall = await CastingCall.findById(req.params.castingCallId);
 
@@ -70,7 +112,7 @@ exports.addVideo = async (req, res, next) => {
 
     // Get previous shortlist history for the actor
     const previousShortlists = await Video.countDocuments({
-      actor: req.user.id,
+      actor: req.user._id,
       status: 'Accepted'
     });
 
@@ -91,6 +133,85 @@ exports.addVideo = async (req, res, next) => {
     };
 
     const video = await Video.create(req.body);
+
+    // Notify all users associated with the casting (producer and team members)
+    try {
+      const notifyUsers = [];
+      
+      // Always notify the producer
+      if (castingCall.producer && String(castingCall.producer) !== String(req.user._id)) {
+        notifyUsers.push(castingCall.producer);
+      }
+      
+      // If casting has a team, notify all team members
+      if (castingCall.team) {
+        const team = await ProductionTeam.findById(castingCall.team)
+          .populate('owner')
+          .populate('members.user');
+        
+        if (team) {
+          // Add team owner
+          if (team.owner && String(team.owner._id || team.owner) !== String(req.user._id)) {
+            const ownerId = team.owner._id || team.owner;
+            if (!notifyUsers.some(id => String(id) === String(ownerId))) {
+              notifyUsers.push(ownerId);
+            }
+          }
+          
+          // Add all team members
+          if (team.members && Array.isArray(team.members)) {
+            team.members.forEach(member => {
+              if (member.user) {
+                const userId = member.user._id || member.user;
+                if (String(userId) !== String(req.user._id) && 
+                    !notifyUsers.some(id => String(id) === String(userId))) {
+                  notifyUsers.push(userId);
+                }
+              }
+            });
+          }
+        }
+      }
+
+      // If casting is linked to a project, notify project collaborators and creator
+      if (castingCall.project) {
+        const project = await FilmProject.findById(castingCall.project)
+          .select('createdBy collaborators');
+        if (project) {
+          const creatorId = project.createdBy;
+          if (creatorId && String(creatorId) !== String(req.user._id) &&
+              !notifyUsers.some(id => String(id) === String(creatorId))) {
+            notifyUsers.push(creatorId);
+          }
+          if (Array.isArray(project.collaborators)) {
+            project.collaborators.forEach(collabId => {
+              if (collabId && String(collabId) !== String(req.user._id) &&
+                  !notifyUsers.some(id => String(id) === String(collabId))) {
+                notifyUsers.push(collabId);
+              }
+            });
+          }
+        }
+      }
+      
+      // Send notifications to all users
+      await Promise.all(
+        notifyUsers.map(userId =>
+          createNotification({
+            user: userId,
+            title: 'New Casting Submission',
+            message: `${req.user?.name || 'An actor'} submitted an audition for "${castingCall.roleTitle}"`,
+            type: 'casting-submission',
+            relatedId: castingCall._id,
+            relatedType: 'casting-call'
+          }).catch(err => console.error(`Failed to notify user ${userId}:`, err.message))
+        )
+      );
+    } catch (notifyErr) {
+      console.error('Failed to send submission notifications:', notifyErr.message);
+      // Non-blocking - don't fail the submission if notifications fail
+    }
+
     res.status(201).json({ 
       success: true, 
       data: {
@@ -111,7 +232,7 @@ exports.addVideo = async (req, res, next) => {
 // @access  Private (Actor)
 exports.getMyVideos = async (req, res, next) => {
   try {
-    const videos = await Video.find({ actor: req.user.id })
+    const videos = await Video.find({ actor: req.user._id })
       .sort({ createdAt: -1 })
       .populate('castingCall', 'roleTitle roleName');
     res.status(200).json({ success: true, count: videos.length, data: videos });
@@ -185,7 +306,7 @@ exports.getPublicVideos = async (req, res, next) => {
     });
     
     // Get current user ID if authenticated (for checking if user liked each video)
-    const currentUserId = req.user ? req.user.id : null;
+    const currentUserId = req.user ? req.user._id : null;
     
     // Transform videos to include all required fields for the frontend
     const transformedVideos = videos.map(video => {
@@ -237,10 +358,10 @@ exports.getPublicVideos = async (req, res, next) => {
 // @access  Private (Actor)
 exports.getMyProfileVideos = async (req, res, next) => {
   try {
-    console.log('Getting profile videos for user:', req.user.id);
+    console.log('Getting profile videos for user:', req.user._id);
     
     // First, check if there are any videos for this user at all
-    const allUserVideos = await Video.find({ actor: req.user.id }).lean();
+    const allUserVideos = await Video.find({ actor: req.user._id }).lean();
     console.log('All videos for user:', {
       count: allUserVideos.length,
       videos: allUserVideos.map(v => ({
@@ -253,14 +374,14 @@ exports.getMyProfileVideos = async (req, res, next) => {
     
     // Now get just the profile videos from the Video collection
     const videoDocs = await Video.find({ 
-      actor: req.user.id,
+      actor: req.user._id,
       type: 'profile' // Only get profile videos
     })
     .sort({ createdAt: -1 })
     .lean();
 
     // Also load embedded profile videos from the User document
-    const user = await User.findById(req.user.id).lean();
+    const user = await User.findById(req.user._id).lean();
     const embedded = (user && Array.isArray(user.videos)) ? user.videos.map(v => ({
       _id: v._id,
       title: v.title,
@@ -276,7 +397,7 @@ exports.getMyProfileVideos = async (req, res, next) => {
       uploadedAt: v.uploadedAt,
       category: v.category,
       type: 'profile',
-      actor: req.user.id
+      actor: req.user._id
     })) : [];
 
     // Merge both sources and de-duplicate by videoUrl + title
@@ -288,7 +409,7 @@ exports.getMyProfileVideos = async (req, res, next) => {
     const videos = Array.from(mergedMap.values());
     
     console.log('Profile videos query:', {
-      query: { actor: req.user.id, type: 'profile' },
+      query: { actor: req.user._id, type: 'profile' },
       counts: { videoDocs: videoDocs.length, embedded: embedded.length, merged: videos.length },
       sample: videos.slice(0, 2).map(v => ({
         _id: v._id,
@@ -329,7 +450,7 @@ exports.getMyProfileVideos = async (req, res, next) => {
     console.error('Error in getMyProfileVideos:', {
       error: err.message,
       stack: err.stack,
-      user: req.user ? req.user.id : 'No user in request'
+      user: req.user ? req.user._id : 'No user in request'
     });
     res.status(400).json({ 
       success: false, 
@@ -340,7 +461,7 @@ exports.getMyProfileVideos = async (req, res, next) => {
 
 // @desc    Update submission status (Accept/Reject)
 // @route   PATCH /api/v1/videos/:id/status
-// @access  Private (Producer owner of the casting call)
+// @access  Private (Producer, Owner, Recruiter)
 exports.updateStatus = async (req, res, next) => {
   try {
     const { status } = req.body; // 'Accepted' | 'Rejected' | 'Pending'
@@ -348,13 +469,14 @@ exports.updateStatus = async (req, res, next) => {
       return res.status(400).json({ success: false, message: 'Invalid status value' });
     }
 
-    const video = await Video.findById(req.params.id).populate('castingCall', 'producer');
+    const video = await Video.findById(req.params.id).populate('castingCall');
     if (!video) {
       return res.status(404).json({ success: false, message: 'Submission not found' });
     }
 
-    // Ensure current user is the producer who owns the casting call
-    if (video.castingCall.producer.toString() !== req.user.id) {
+    // Check if user is authorized to write (producer or non-viewer team member)
+    const authorized = await isAuthorizedForCasting(video.castingCall, req.user._id, { allowWrite: true });
+    if (!authorized) {
       return res.status(401).json({ success: false, message: 'Not authorized to update this submission' });
     }
 
@@ -379,7 +501,7 @@ exports.deleteVideo = async (req, res, next) => {
     }
 
     // Make sure user is the video owner or an admin
-    if (video.actor.toString() !== req.user.id && req.user.role !== 'Admin') {
+    if (video.actor.toString() !== String(req.user._id) && req.user.role !== 'Admin') {
       return res.status(401).json({ success: false, message: 'Not authorized to delete this video' });
     }
 
@@ -422,7 +544,7 @@ exports.uploadProfileVideo = async (req, res, next) => {
       description: req.body.description || '',
       videoUrl: result.secure_url,
       cloudinaryId: result.public_id,
-      actor: req.user.id,
+      actor: req.user._id,
       type: 'profile', // Mark as profile video
       // No castingCall or category for profile videos
     });
@@ -454,7 +576,7 @@ exports.deleteProfileVideo = async (req, res, next) => {
       video = await Video.findOne({ _id: videoId, type: 'profile' });
     } else {
       // Actor can only delete their own videos
-      video = await Video.findOne({ _id: videoId, actor: req.user.id, type: 'profile' });
+      video = await Video.findOne({ _id: videoId, actor: req.user._id, type: 'profile' });
     }
 
     if (video) {
@@ -473,7 +595,7 @@ exports.deleteProfileVideo = async (req, res, next) => {
       user = await User.findOne({ 'videos._id': videoId });
     } else {
       // Actor can only access their own profile
-      user = await User.findById(req.user.id);
+      user = await User.findById(req.user._id);
     }
 
     if (user) {
@@ -500,33 +622,31 @@ exports.deleteProfileVideo = async (req, res, next) => {
 
 // @desc    Get a viewable portfolio URL for a submission (handles authenticated/raw PDFs)
 // @route   GET /api/v1/videos/:id/portfolio
-// @access  Private (Producer owner of the casting call or Admin)
+// @access  Private (Producer or Team Members or Admin)
 exports.getPortfolio = async (req, res, next) => {
   try {
-    const video = await Video.findById(req.params.id).populate('castingCall', 'producer');
+    const video = await Video.findById(req.params.id).populate('castingCall');
     if (!video) {
       return res.status(404).json({ success: false, message: 'Submission not found' });
     }
     if (!video.portfolioUrl) {
       return res.status(404).json({ success: false, message: 'Portfolio not uploaded for this submission' });
     }
-    // Ensure current user is the producer who owns the casting call
-    const isOwner = String(video.castingCall?.producer || '') === String(req.user.id || '');
+    
+    // Check authorization
     const isAdmin = req.user && req.user.role === 'Admin';
+    const authorized = isAdmin || await isAuthorizedForCasting(video.castingCall, req.user._id);
     
     console.log('[getPortfolio] Authorization check:', {
       videoId: req.params.id,
-      userId: req.user.id,
+      userId: req.user._id,
       userRole: req.user.role,
       castingCallProducer: video.castingCall?.producer,
-      isOwner,
       isAdmin,
-      authorized: isOwner || isAdmin
+      authorized
     });
     
-    // If we can definitively determine ownership and it's false, block.
-    // If producer is missing (e.g., castingCall not populated), allow and rely on route-level role auth.
-    if ((video.castingCall && video.castingCall.producer) && !isOwner && !isAdmin) {
+    if (!authorized) {
       return res.status(401).json({ success: false, message: 'Not authorized to view this portfolio' });
     }
 
@@ -661,27 +781,24 @@ exports.getPortfolio = async (req, res, next) => {
 
 // @desc    Stream the portfolio PDF through the server (avoids 401s/private access)
 // @route   GET /api/v1/videos/:id/portfolio/file
-// @access  Private (Producer owner of the casting call)
+// @access  Private (Producer or Team Members or Admin)
 exports.getPortfolioFile = async (req, res, next) => {
   try {
     console.log('[getPortfolioFile] params.id=', req.params.id);
-    let video = await Video.findById(req.params.id).populate('castingCall', 'producer');
+    let video = await Video.findById(req.params.id).populate('castingCall');
     if (!video) {
       return res.status(404).json({ success: false, message: 'Submission not found' });
     }
     if (!video.portfolioUrl) {
       return res.status(404).json({ success: false, message: 'Portfolio not uploaded for this submission' });
     }
-    // Authorization: ensure castingCall producer present even if initial populate failed
-    const requesterId = req.user && req.user.id ? String(req.user.id) : undefined;
-    let producerId = video?.castingCall && video.castingCall.producer ? String(video.castingCall.producer) : undefined;
-    if (!producerId && video?.castingCall) {
-      const cc = await CastingCall.findById(video.castingCall).select('producer').lean();
-      producerId = cc ? String(cc.producer) : undefined;
-    }
-    // Only block when both IDs are present and mismatched.
-    if (requesterId && producerId && producerId !== requesterId && (req.user.role !== 'Admin')) {
-      console.warn('[getPortfolioFile] Not authorized', { requesterId, producerId, videoId: String(video._id) });
+    
+    // Check authorization
+    const isAdmin = req.user && req.user.role === 'Admin';
+    const authorized = isAdmin || await isAuthorizedForCasting(video.castingCall, req.user._id);
+    
+    if (!authorized) {
+      console.warn('[getPortfolioFile] Not authorized', { userId: req.user._id, videoId: String(video._id) });
       return res.status(401).json({ success: false, message: 'Not authorized to view this portfolio' });
     }
 
@@ -1186,7 +1303,7 @@ exports.addVideoComment = async (req, res) => {
 
 // @desc    Update video metrics and recalculate quality
 // @route   PUT /api/v1/videos/:id/metrics
-// @access  Private (Producer only)
+// @access  Private (Producer, Owner, Recruiter)
 exports.updateVideoMetrics = async (req, res, next) => {
   try {
     const { watchTime, brightness, audioQuality } = req.body;
@@ -1197,8 +1314,9 @@ exports.updateVideoMetrics = async (req, res, next) => {
       return res.status(404).json({ success: false, message: 'Video not found' });
     }
 
-    // Ensure current user is the producer who owns the casting call
-    if (video.castingCall.producer.toString() !== req.user.id) {
+    // Check if user is authorized to write (producer or non-viewer team member)
+    const authorized = await isAuthorizedForCasting(video.castingCall, req.user._id, { allowWrite: true });
+    if (!authorized) {
       return res.status(401).json({ success: false, message: 'Not authorized to update metrics for this video' });
     }
 

@@ -21,6 +21,7 @@ const Index = () => {
           className: "absolute inset-0 h-full w-full object-cover"    ,
           loading: "eager", __self: this, __source: {fileName: _jsxFileName, lineNumber: 17}}
         )
+        , React.createElement('div', { className: "absolute inset-0 moving-lights"  , 'aria-hidden': true, __self: this, __source: {fileName: _jsxFileName, lineNumber: 21}} )
         , React.createElement('div', { className: "absolute inset-0 bg-gradient-to-t from-background/80 via-background/50 to-background/20"     , __self: this, __source: {fileName: _jsxFileName, lineNumber: 23}} )
         , React.createElement('div', { className: "relative container text-center py-24"   , __self: this, __source: {fileName: _jsxFileName, lineNumber: 24}}
           , React.createElement('h1', { className: "font-display text-4xl md:text-6xl font-semibold tracking-tight animate-enter"     , __self: this, __source: {fileName: _jsxFileName, lineNumber: 25}}, "Spotlight Your Talent. Empower Your Casting."

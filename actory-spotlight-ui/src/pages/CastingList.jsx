@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import API from '@/lib/api';
 import SEO from '@/components/SEO';
+import '@/styles/casting-card.css';
 
 const ExperienceLevelBadge = ({ level }) => {
   const getVariant = () => {
@@ -91,6 +92,47 @@ export default function CastingList() {
     fetchCastings();
     fetchUserTeams();
   }, [user]);
+
+  // Fetch team castings when toggle is enabled
+  useEffect(() => {
+    const fetchTeamCastings = async () => {
+      if (!showTeamCastings || !userTeams.length) {
+        return;
+      }
+
+      try {
+        setLoading(true);
+        // Fetch castings for all user's teams
+        const teamCastingsPromises = userTeams.map(team =>
+          API.get(`/casting/team/${team._id}`)
+            .catch(err => {
+              console.error(`Failed to fetch castings for team ${team._id}`, err);
+              return { data: { data: [] } };
+            })
+        );
+
+        const responses = await Promise.all(teamCastingsPromises);
+        const allTeamCastings = responses.flatMap(res => res.data?.data || []);
+
+        // Combine with public castings and remove duplicates
+        const publicCastings = castings;
+        const castingIds = new Set(publicCastings.map(c => c._id));
+        const uniqueTeamCastings = allTeamCastings.filter(c => !castingIds.has(c._id));
+
+        const combined = [...publicCastings, ...uniqueTeamCastings].sort((a, b) =>
+          new Date(a.submissionDeadline) - new Date(b.submissionDeadline)
+        );
+
+        setCastings(combined);
+      } catch (err) {
+        console.error('Failed to fetch team castings', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchTeamCastings();
+  }, [showTeamCastings, userTeams]);
 
   const filtered = useMemo(() => {
     return castings.filter((c) => {
@@ -251,7 +293,11 @@ export default function CastingList() {
       ) : (
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filtered.map((casting) => (
-            <Card key={casting._id} className="flex flex-col h-full">
+            <Card 
+              key={casting._id} 
+              className="flex flex-col h-full casting-card cursor-pointer"
+              onClick={() => navigate(`/casting/${casting._id}`)}
+            >
               <CardHeader className="pb-3">
                 <div className="flex justify-between items-start">
                   <div className="flex-1">
@@ -289,7 +335,10 @@ export default function CastingList() {
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => navigate(`/projects/${casting.project._id}`)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        navigate(`/projects/${casting.project._id}`);
+                      }}
                     >
                       View Project
                     </Button>
@@ -357,10 +406,8 @@ export default function CastingList() {
                 <Button 
                   variant="outline" 
                   className="w-full"
-                  onClick={() => {
-                    console.log('View Details clicked for casting ID:', casting._id);
-                    console.log('Type of ID:', typeof casting._id);
-                    console.log('Full casting object:', casting);
+                  onClick={(e) => {
+                    e.stopPropagation();
                     navigate(`/casting/${casting._id}`);
                   }}
                 >

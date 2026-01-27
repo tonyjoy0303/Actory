@@ -289,7 +289,7 @@ const sendTokenResponse = (user, statusCode, res, isProductionHouse = false) => 
 // @access  Private
 exports.updatePassword = async (req, res, next) => {
   try {
-    const user = await User.findById(req.user.id).select('+password');
+    const user = await User.findById(req.user._id).select('+password');
 
     // Check current password
     const { currentPassword, newPassword } = req.body;
@@ -319,7 +319,7 @@ exports.updatePassword = async (req, res, next) => {
 // @access  Private
 exports.getMe = async (req, res, next) => {
   try {
-    const user = await User.findById(req.user.id).populate('following', '_id');
+    const user = await User.findById(req.user._id).populate('following', '_id');
     if (!user) {
       return res.status(404).json({ success: false, message: 'User not found' });
     }
@@ -371,7 +371,7 @@ exports.updateMe = async (req, res) => {
       return res.status(400).json({ success: false, message: 'No valid fields provided' });
     }
 
-    const user = await User.findByIdAndUpdate(req.user.id, updates, {
+    const user = await User.findByIdAndUpdate(req.user._id, updates, {
       new: true,
       runValidators: true
     });
@@ -409,6 +409,15 @@ exports.updateMe = async (req, res) => {
 // @access  Private
 exports.uploadPhoto = async (req, res) => {
   try {
+    console.log('[uploadPhoto] req.user:', {
+      _id: req.user._id,
+      id: req.user.id,
+      email: req.user.email,
+      name: req.user.name,
+      isProductionHouse: req.user.isProductionHouse,
+      keys: Object.keys(req.user)
+    });
+
     if (!req.file) {
       return res.status(400).json({ success: false, message: 'No file uploaded' });
     }
@@ -429,7 +438,7 @@ exports.uploadPhoto = async (req, res) => {
       const stream = cloudinary.uploader.upload_stream(
         {
           resource_type: 'image',
-          folder: `actory/profile-photos/${req.user.id}`,
+          folder: `actory/profile-photos/${req.user._id}`,
           public_id: `profile_${randomUUID()}_${Date.now()}`,
           transformation: [
             { width: 400, height: 400, crop: 'fill', gravity: 'face' },
@@ -449,17 +458,48 @@ exports.uploadPhoto = async (req, res) => {
       stream.end(req.file.buffer);
     });
 
-    const user = await User.findByIdAndUpdate(
-      req.user.id,
-      { profileImage: result.secure_url },
-      { new: true }
-    );
+    // Update the correct collection based on user type
+    let user;
+    if (req.user.isProductionHouse) {
+      // Update ProductionHouse collection
+      user = await ProductionHouse.findByIdAndUpdate(
+        req.user._id,
+        { photo: result.secure_url },
+        { new: true }
+      );
+    } else {
+      // Update User collection
+      user = await User.findByIdAndUpdate(
+        req.user._id,
+        { profileImage: result.secure_url },
+        { new: true }
+      );
+    }
+
+    console.log('[uploadPhoto] findByIdAndUpdate result:', {
+      found: !!user,
+      userId: req.user._id,
+      userEmail: user?.email,
+      isProductionHouse: req.user.isProductionHouse
+    });
 
     if (!user) {
       return res.status(404).json({ success: false, message: 'User not found' });
     }
 
-    const userResponse = {
+    // Build response based on user type
+    const userResponse = req.user.isProductionHouse ? {
+      id: user._id,
+      name: user.companyName || user.name,
+      email: user.email,
+      role: 'ProductionTeam',
+      phone: user.phone,
+      photo: user.photo || '',
+      profileImage: user.photo || '',
+      location: user.location,
+      companyName: user.companyName,
+      website: user.website
+    } : {
       id: user._id,
       name: user.name,
       email: user.email,
@@ -467,6 +507,7 @@ exports.uploadPhoto = async (req, res) => {
       phone: user.phone,
       createdAt: user.createdAt,
       profileImage: user.profileImage || '',
+      photo: user.profileImage || '',
       location: user.location,
       age: user.age,
       gender: user.gender,

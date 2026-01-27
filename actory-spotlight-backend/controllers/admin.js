@@ -43,7 +43,7 @@ exports.approveSwitchRequest = async (req, res, next) => {
 
     // Update request status
     request.status = 'Approved';
-    request.reviewedBy = req.user.id;
+    request.reviewedBy = req.user._id;
     request.reviewedAt = Date.now();
     await request.save();
 
@@ -70,7 +70,7 @@ exports.rejectSwitchRequest = async (req, res, next) => {
 
     // Update request status
     request.status = 'Rejected';
-    request.reviewedBy = req.user.id;
+    request.reviewedBy = req.user._id;
     request.reviewedAt = Date.now();
     await request.save();
 

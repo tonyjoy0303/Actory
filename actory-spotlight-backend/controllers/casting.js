@@ -1,4 +1,5 @@
 const CastingCall = require('../models/CastingCall');
+const FilmProject = require('../models/FilmProject');
 const User = require('../models/User');
 const ProductionTeam = require('../models/ProductionTeam');
 
@@ -14,6 +15,15 @@ exports.getCastingCalls = async (req, res, next) => {
         { submissionDeadline: { $gte: now } }
       ]
     };
+
+    // Exclude castings whose project is archived
+    const archivedProjectIds = await FilmProject.find({ status: 'archived' }).distinct('_id');
+    if (archivedProjectIds.length > 0) {
+      query.$and.push({ $or: [
+        { project: { $exists: false } },
+        { project: { $nin: archivedProjectIds } }
+      ]});
+    }
     
     // Filter by producer if provided (for producer dashboard)
     if (req.query.producer) {
@@ -59,8 +69,8 @@ exports.getTeamCastingCalls = async (req, res, next) => {
       return res.status(404).json({ success: false, message: 'Team not found' });
     }
     
-    const isTeamMember = String(team.owner) === String(req.user.id) || 
-      team.members.some(m => String(m.user) === String(req.user.id));
+    const isTeamMember = String(team.owner) === String(req.user._id) || 
+      team.members.some(m => String(m.user) === String(req.user._id));
     
     if (!isTeamMember) {
       return res.status(403).json({ success: false, message: 'Not authorized to view this team\'s castings' });
@@ -85,15 +95,35 @@ exports.getTeamCastingCalls = async (req, res, next) => {
   }
 };
 
-// @desc    Get all producer casting calls (including past ones)
+// @desc    Get all producer casting calls (including past ones) + team castings
 // @route   GET /api/v1/casting/producer
-// @access  Private (Producer only)
+// @access  Private (Producer, ProductionTeam)
 exports.getProducerCastingCalls = async (req, res, next) => {
   try {
-    // Find all casting calls for the logged-in producer
-    const castingCalls = await CastingCall.find({ producer: req.user.id })
+    // Find all teams where the user is owner or member
+    const teams = await ProductionTeam.find({
+      $or: [
+        { owner: req.user._id },
+        { 'members.user': req.user._id }
+      ]
+    }).select('_id');
+    
+    const teamIds = teams.map(team => team._id);
+    
+    // Find casting calls where:
+    // 1. User is the producer (their own castings)
+    // 2. Casting belongs to any team the user is part of
+    const query = {
+      $or: [
+        { producer: req.user._id },
+        { team: { $in: teamIds } }
+      ]
+    };
+    
+    const castingCalls = await CastingCall.find(query)
       .populate('producer', 'name email')
       .populate('project', 'name description')
+      .populate('team', 'name')
       .sort({ createdAt: -1 }); // Sort by creation date, newest first
       
     res.status(200).json({ 
@@ -193,7 +223,11 @@ exports.createCastingCall = async (req, res, next) => {
       submissionDeadline: new Date(submissionDeadline),
       shootStartDate: new Date(shootStartDate),
       shootEndDate: new Date(shootEndDate),
-      producer: req.user.id
+      producer: req.user._id,
+      // Include project and team if provided (for role-based castings)
+      project: req.body.project || req.body.projectId,
+      team: req.body.team || req.body.teamId,
+      projectRole: req.body.projectRole || req.body.roleId
     });
 
     res.status(201).json({ success: true, data: castingCall });
@@ -223,7 +257,7 @@ exports.updateCastingCall = async (req, res, next) => {
     }
 
     // Make sure user is casting call owner
-    if (castingCall.producer.toString() !== req.user.id) {
+    if (castingCall.producer.toString() !== String(req.user._id)) {
       return res.status(401).json({ 
         success: false, 
         message: 'Not authorized to update this casting call' 
@@ -301,7 +335,7 @@ exports.deleteCastingCall = async (req, res, next) => {
     }
 
     // Make sure user is casting call owner
-    if (castingCall.producer.toString() !== req.user.id) {
+    if (castingCall.producer.toString() !== String(req.user._id)) {
       return res.status(401).json({ 
         success: false, 
         message: 'Not authorized to delete this casting call' 

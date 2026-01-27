@@ -173,6 +173,21 @@ export default function Teams() {
   const [isEditing, setIsEditing] = useState(false);
   const [editForm, setEditForm] = useState({ name: '', productionHouse: '', description: '' });
 
+  const deleteTeam = useMutation({
+    mutationFn: async (teamId) => {
+      const { data } = await API.delete(`/teams/${teamId}`);
+      return data;
+    },
+    onSuccess: () => {
+      toast.success('Team deleted');
+      setIsEditing(false);
+      setSelectedTeamId(null);
+      queryClient.invalidateQueries({ queryKey: ['teams'] });
+      queryClient.invalidateQueries({ queryKey: ['team', selectedTeamId] });
+    },
+    onError: (err) => toast.error(err?.response?.data?.message || 'Failed to delete team')
+  });
+
   // Pre-fill edit form when team loads or modal opens
   useEffect(() => {
     if (selectedTeamQuery.data && !isEditing) {
@@ -205,6 +220,14 @@ export default function Teams() {
     }, 300);
     return () => clearTimeout(handle);
   }, [searchQuery]);
+
+  const handleDeleteTeam = () => {
+    const teamId = selectedTeamQuery.data?._id;
+    if (!teamId) return;
+    const confirmed = window.confirm('Delete this team? This action cannot be undone.');
+    if (!confirmed) return;
+    deleteTeam.mutate(teamId);
+  };
 
   return (
     <div className="container py-8 space-y-6">
@@ -416,7 +439,17 @@ export default function Teams() {
                     )}
 
                     {selectedTeamQuery.data.owner && user._id === selectedTeamQuery.data.owner._id && !isEditing && (
-                      <Button variant="ghost" size="sm" onClick={() => setIsEditing(true)}>Edit</Button>
+                      <div className="flex items-center gap-2">
+                        <Button variant="ghost" size="sm" onClick={() => setIsEditing(true)}>Edit</Button>
+                        <Button
+                          variant="destructive"
+                          size="sm"
+                          onClick={handleDeleteTeam}
+                          disabled={deleteTeam.isPending}
+                        >
+                          {deleteTeam.isPending ? 'Deleting...' : 'Delete'}
+                        </Button>
+                      </div>
                     )}
                   </div>
 

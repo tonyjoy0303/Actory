@@ -6,7 +6,8 @@ const {
   getTeamById,
   removeMember,
   leaveTeam,
-  updateTeam
+  updateTeam,
+  deleteTeam
 } = require('../controllers/teams');
 
 const router = express.Router();
@@ -19,5 +20,6 @@ router.get('/:id', getTeamById);
 router.delete('/:id/members/:memberId', removeMember);
 router.post('/:id/leave', leaveTeam);
 router.put('/:id', updateTeam);
+router.delete('/:id', deleteTeam);
 
 module.exports = router;

@@ -1,5 +1,5 @@
 const express = require('express');
-const { protect, authorize } = require('../middleware/auth');
+const { protect, optionalAuth, authorize } = require('../middleware/auth');
 const {
   createProject,
   getProjects,
@@ -12,14 +12,15 @@ const {
 
 const router = express.Router();
 
-router.use(protect, authorize('Producer', 'ProductionTeam', 'Admin'));
+// Project creation and management (restricted)
+router.post('/', protect, authorize('Producer', 'ProductionTeam', 'Admin'), createProject);
+router.get('/', protect, authorize('Producer', 'ProductionTeam', 'Admin'), getProjects);
+router.put('/:id', protect, authorize('Producer', 'ProductionTeam', 'Admin'), updateProject);
+router.post('/:id/roles', protect, authorize('Producer', 'ProductionTeam', 'Admin'), addRole);
+router.post('/:id/roles/:roleId/casting', protect, authorize('Producer', 'ProductionTeam', 'Admin'), createCastingFromRole);
+router.delete('/:id', protect, authorize('Producer', 'ProductionTeam', 'Admin'), deleteProject);
 
-router.post('/', createProject);
-router.get('/', getProjects);
-router.get('/:id', getProjectById);
-router.put('/:id', updateProject);
-router.post('/:id/roles', addRole);
-router.post('/:id/roles/:roleId/casting', createCastingFromRole);
-router.delete('/:id', deleteProject);
+// Public/actor-friendly project view (read-only)
+router.get('/:id', optionalAuth, getProjectById);
 
 module.exports = router;

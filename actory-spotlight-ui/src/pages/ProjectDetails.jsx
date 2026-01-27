@@ -8,6 +8,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
+import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { ChevronLeft, Plus, X, Loader2 } from 'lucide-react';
 import API from '@/lib/api';
@@ -63,7 +64,7 @@ export default function ProjectDetails() {
       });
       return data.data;
     },
-    onSuccess: () => {
+    onSuccess: (updatedProject) => {
       toast.success('Role added successfully');
       setRoleForm({
         roleName: '',
@@ -78,10 +79,26 @@ export default function ProjectDetails() {
         numberOfOpenings: 1
       });
       setShowAddRole(false);
-      queryClient.invalidateQueries({ queryKey: ['project', projectId] });
+      // Optimistically update the cache with the new project data
+      queryClient.setQueryData(['project', projectId], updatedProject);
     },
     onError: (err) => {
       toast.error(err.message || 'Failed to add role');
+    }
+  });
+
+  // Update project mutation
+  const updateProjectMutation = useMutation({
+    mutationFn: async (updates) => {
+      const { data } = await API.put(`/projects/${projectId}`, updates);
+      return data.data;
+    },
+    onSuccess: () => {
+      toast.success('Project updated successfully');
+      queryClient.invalidateQueries({ queryKey: ['project', projectId] });
+    },
+    onError: (err) => {
+      toast.error(err.message || 'Failed to update project');
     }
   });
 
@@ -128,23 +145,50 @@ export default function ProjectDetails() {
   }
 
   const project = projectQuery.data;
+  const canManageRoles = project?.viewerPermissions?.canManageRoles;
 
   return (
     <div className="container py-8 space-y-6">
-      <div className="flex items-center gap-4">
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => navigate('/projects')}
-          className="mb-0"
-        >
-          <ChevronLeft className="h-4 w-4 mr-2" />
-          Back to Projects
-        </Button>
-        <div>
-          <h1 className="text-3xl font-bold">{project.name}</h1>
-          <p className="text-muted-foreground">{project.genre} • {project.language}</p>
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => navigate('/projects')}
+            className="mb-0"
+          >
+            <ChevronLeft className="h-4 w-4 mr-2" />
+            Back to Projects
+          </Button>
+          <div>
+            <div className="flex items-center gap-2">
+              <h1 className="text-3xl font-bold">{project.name}</h1>
+              <Badge variant={project.status === 'active' ? 'default' : project.status === 'archived' ? 'secondary' : 'outline'}>
+                {project.status}
+              </Badge>
+            </div>
+            <p className="text-muted-foreground">{project.genre} • {project.language}</p>
+          </div>
         </div>
+        {canManageRoles && (
+          <div className="flex items-center gap-2">
+            <Label className="text-sm font-medium">Status:</Label>
+            <Select
+              value={project.status}
+              onValueChange={(status) => updateProjectMutation.mutate({ status })}
+              disabled={updateProjectMutation.isPending}
+            >
+              <SelectTrigger className="w-[140px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="draft">Draft</SelectItem>
+                <SelectItem value="active">Active</SelectItem>
+                <SelectItem value="archived">Archived</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        )}
       </div>
 
       {/* Project Info Card */}
@@ -182,14 +226,16 @@ export default function ProjectDetails() {
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle>Roles ({project.roles?.length || 0})</CardTitle>
-          <Button
-            onClick={() => setShowAddRole(true)}
-            size="sm"
-            className="gap-2"
-          >
-            <Plus className="h-4 w-4" />
-            Add Role
-          </Button>
+          {canManageRoles && (
+            <Button
+              onClick={() => setShowAddRole(true)}
+              size="sm"
+              className="gap-2"
+            >
+              <Plus className="h-4 w-4" />
+              Add Role
+            </Button>
+          )}
         </CardHeader>
         <CardContent>
           {!project.roles || project.roles.length === 0 ? (
@@ -209,7 +255,7 @@ export default function ProjectDetails() {
                         )}
                       </div>
                     </div>
-                    {!role.castingCallId && (
+                    {!role.castingCallId && canManageRoles && (
                       <Button
                         size="sm"
                         onClick={() => {
@@ -429,20 +475,38 @@ export default function ProjectDetails() {
               </div>
             </div>
 
-            <Button
-              onClick={() => createCastingMutation.mutate()}
-              disabled={createCastingMutation.isPending}
-              className="w-full"
-            >
-              {createCastingMutation.isPending ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Creating...
-                </>
-              ) : (
-                'Create Casting'
-              )}
-            </Button>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setShowCreateCasting(false);
+                  setSelectedRole(null);
+                  setCastingForm({
+                    description: '',
+                    auditionDate: '',
+                    submissionDeadline: '',
+                    location: '',
+                    skills: []
+                  });
+                }}
+              >
+                Skip for Now
+              </Button>
+              <Button
+                onClick={() => createCastingMutation.mutate()}
+                disabled={createCastingMutation.isPending}
+                className="flex-1"
+              >
+                {createCastingMutation.isPending ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Creating...
+                  </>
+                ) : (
+                  'Create Casting'
+                )}
+              </Button>
+            </div>
           </div>
         </DialogContent>
       </Dialog>

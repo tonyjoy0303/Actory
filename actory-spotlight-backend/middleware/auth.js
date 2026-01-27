@@ -33,6 +33,8 @@ exports.protect = async (req, res, next) => {
     const jwtSecret = process.env.JWT_SECRET || 'your_super_secret_jwt_key_here_change_this_in_production';
     const decoded = jwt.verify(token, jwtSecret);
 
+    console.log('[protect middleware] decoded token:', { id: decoded.id, type: decoded.type });
+
     // Check if it's a ProductionHouse token
     if (decoded.type === 'ProductionHouse') {
       req.user = await ProductionHouse.findById(decoded.id);
@@ -42,6 +44,7 @@ exports.protect = async (req, res, next) => {
       }
     } else {
       req.user = await User.findById(decoded.id);
+      console.log('[protect middleware] User.findById result:', { found: !!req.user, userId: decoded.id, userEmail: req.user?.email });
     }
 
     if (!req.user) {
@@ -50,6 +53,7 @@ exports.protect = async (req, res, next) => {
 
     next();
   } catch (err) {
+    console.error('[protect middleware] Error:', err.message);
     return res.status(401).json({ success: false, message: 'Not authorized to access this route' });
   }
 };

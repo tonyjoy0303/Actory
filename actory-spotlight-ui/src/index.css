@@ -121,4 +121,27 @@ All colors MUST be HSL.
   .story-link { @apply relative inline-block; }
   .story-link::after { content: ""; position: absolute; left: 0; bottom: 0; height: 2px; width: 100%; transform: scaleX(0); transform-origin: right; background: hsl(var(--brand)); transition: transform .3s ease; }
   .story-link:hover::after { transform: scaleX(1); transform-origin: left; }
+
+  /* Soft spotlight sweep across the hero image */
+  .moving-lights {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background:
+      radial-gradient(40% 70% at 18% -12%, rgba(255, 226, 140, 0.32), transparent 58%),
+      radial-gradient(40% 70% at 82% -12%, rgba(255, 214, 102, 0.28), transparent 58%),
+      radial-gradient(28% 40% at 50% -6%, rgba(255, 255, 255, 0.18), transparent 65%);
+    mix-blend-mode: screen;
+    opacity: 0.95;
+    animation: moving-lights-pan 8s ease-in-out infinite alternate;
+    filter: blur(0.4px) saturate(1.05);
+    transform-origin: 50% 10%;
+  }
+
+  @keyframes moving-lights-pan {
+    0% { transform: translateX(-14%) translateY(0%) rotate(-2deg) scale(1.05); }
+    40% { transform: translateX(8%) translateY(2%) rotate(1deg) scale(1.08); }
+    70% { transform: translateX(14%) translateY(-2%) rotate(2deg) scale(1.1); }
+    100% { transform: translateX(-10%) translateY(1%) rotate(-1deg) scale(1.06); }
+  }
 }

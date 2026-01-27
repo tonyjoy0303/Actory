@@ -162,19 +162,18 @@ export default function Header() {
   }, [user]);
 
   // On initial load or path change, if authenticated and on a public page, redirect to dashboard
+  // EXCEPT for informational pages like /features and /know-more
   useEffect(() => {
     const token = localStorage.getItem('token');
     if (!user || !token) return;
-    const publicPaths = new Set([
+    const redirectPaths = new Set([
       '/',
-      '/features',
-      '/know-more',
       '/auth/login',
       '/auth/register',
       '/auth/register/actor',
       '/auth/register/producer',
     ]);
-    if (publicPaths.has(location.pathname)) {
+    if (redirectPaths.has(location.pathname)) {
       navigate(dashboardPathFor(user.role), { replace: true });
     }
   }, [user, location.pathname, navigate]);
@@ -463,6 +462,26 @@ export default function Header() {
                 className="w-full px-4 py-3 text-left hover:bg-accent transition-colors flex items-center gap-3"
               >
                 <span>Castings</span>
+              </button>
+
+              <button
+                onClick={() => {
+                  navigate('/features');
+                  setSidebarOpen(false);
+                }}
+                className="w-full px-4 py-3 text-left hover:bg-accent transition-colors flex items-center gap-3"
+              >
+                <span>Features</span>
+              </button>
+
+              <button
+                onClick={() => {
+                  navigate('/know-more');
+                  setSidebarOpen(false);
+                }}
+                className="w-full px-4 py-3 text-left hover:bg-accent transition-colors flex items-center gap-3"
+              >
+                <span>Know More</span>
               </button>
 
               {user && (

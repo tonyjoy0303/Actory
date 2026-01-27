@@ -375,8 +375,17 @@ router.put('/me', protect, upload.none(), async (req, res) => {
     }
   });
 
-    const user = await User.findByIdAndUpdate(req.user._id, updates, { new: true, runValidators: true })
-      .select('-password -resetPasswordToken -resetPasswordExpire -__v');
+    // Check if user is ProductionHouse or regular User
+    let user;
+    const ProductionHouse = require('../models/ProductionHouse');
+    
+    if (req.user.isProductionHouse) {
+      user = await ProductionHouse.findByIdAndUpdate(req.user._id, updates, { new: true, runValidators: true })
+        .select('-password -resetPasswordToken -resetPasswordExpire -__v');
+    } else {
+      user = await User.findByIdAndUpdate(req.user._id, updates, { new: true, runValidators: true })
+        .select('-password -resetPasswordToken -resetPasswordExpire -__v');
+    }
 
     if (!user) {
       return res.status(404).json({ message: 'User not found' });

@@ -61,6 +61,32 @@ exports.createProject = async (req, res) => {
       return res.status(400).json({ success: false, message: 'teamId and name are required' });
     }
 
+    // Validate dates (optional fields)
+    const parsedStart = startDate ? new Date(startDate) : undefined;
+    const parsedEnd = endDate ? new Date(endDate) : undefined;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    if (startDate && (isNaN(parsedStart?.getTime()))) {
+      return res.status(400).json({ success: false, message: 'Invalid startDate' });
+    }
+
+    if (endDate && (isNaN(parsedEnd?.getTime()))) {
+      return res.status(400).json({ success: false, message: 'Invalid endDate' });
+    }
+
+    if (parsedStart && parsedEnd && parsedEnd < parsedStart) {
+      return res.status(400).json({ success: false, message: 'endDate must be on or after startDate' });
+    }
+
+    if (parsedStart && parsedStart < today) {
+      return res.status(400).json({ success: false, message: 'startDate cannot be in the past' });
+    }
+
+    if (parsedEnd && parsedEnd < today) {
+      return res.status(400).json({ success: false, message: 'endDate cannot be in the past' });
+    }
+
     // Fetch team WITHOUT populate first for membership check
     const team = await ProductionTeam.findById(teamId);
     if (!team) return res.status(404).json({ success: false, message: 'Team not found' });
@@ -79,8 +105,8 @@ exports.createProject = async (req, res) => {
       genre: genre?.trim(),
       language: language?.trim(),
       location: location?.trim(),
-      startDate: startDate ? new Date(startDate) : undefined,
-      endDate: endDate ? new Date(endDate) : undefined,
+      startDate: parsedStart,
+      endDate: parsedEnd,
       description: description?.trim(),
       createdBy: req.user._id,
       collaborators: [req.user._id],
@@ -118,23 +144,13 @@ exports.createProject = async (req, res) => {
                 const auditionDate = new Date();
                 auditionDate.setDate(auditionDate.getDate() + 14);
                 
-                // shootStartDate: use project startDate if valid, otherwise use auditionDate
-                let shootStartDate = auditionDate;
-                if (startDate) {
-                  const parsedStart = new Date(startDate);
-                  if (!isNaN(parsedStart.getTime()) && parsedStart >= auditionDate) {
-                    shootStartDate = parsedStart;
-                  }
-                }
+                // shootStartDate: use validated project startDate if present, otherwise auditionDate
+                let shootStartDate = parsedStart && parsedStart >= auditionDate ? parsedStart : auditionDate;
                 
-                // shootEndDate: use project endDate if valid, otherwise 7 days after shootStartDate
-                let shootEndDate = new Date(shootStartDate.getTime() + 7 * 24 * 60 * 60 * 1000);
-                if (endDate) {
-                  const parsedEnd = new Date(endDate);
-                  if (!isNaN(parsedEnd.getTime()) && parsedEnd >= shootStartDate) {
-                    shootEndDate = parsedEnd;
-                  }
-                }
+                // shootEndDate: use validated project endDate if present, otherwise 7 days after shootStartDate
+                let shootEndDate = parsedEnd && parsedEnd >= shootStartDate
+                  ? parsedEnd
+                  : new Date(shootStartDate.getTime() + 7 * 24 * 60 * 60 * 1000);
 
                 // Age range defaults with guard
                 const minAge = Number(role.ageMin) || 18;
@@ -227,25 +243,29 @@ exports.updateProject = async (req, res) => {
 
     await project.save();
 
-    // Notify team members about project update (populate for notifications)
-    await team.populate('owner');
-    await team.populate('members.user');
-    const notifyUsers = [team.owner?._id || team.owner, ...team.members.map((m) => m.user?._id || m.user)].filter(
-      (id) => String(id) !== String(req.user._id)
-    );
-    
-    await Promise.all(
-      notifyUsers.map((u) =>
-        createNotification({
-          user: u,
-          title: 'Project updated',
-          message: `${project.name} was updated with new roles and details`,
-          type: 'project',
-          relatedId: project._id,
-          relatedType: 'film-project'
-        })
-      )
-    );
+    // Notify team members about project update (populate for notifications, non-blocking)
+    try {
+      await team.populate('owner');
+      await team.populate('members.user');
+      const notifyUsers = [team.owner?._id || team.owner, ...team.members.map((m) => m.user?._id || m.user)].filter(
+        (id) => id && String(id) !== String(req.user._id)
+      );
+      
+      await Promise.all(
+        notifyUsers.map((u) =>
+          createNotification({
+            user: u,
+            title: 'Project updated',
+            message: `${project.name} was updated`,
+            type: 'project',
+            relatedId: project._id,
+            relatedType: 'film-project'
+          }).catch(err => console.error(`Failed to notify user ${u}:`, err.message))
+        )
+      );
+    } catch (err) {
+      console.error('Notification error (non-blocking):', err.message);
+    }
 
     res.json({ success: true, data: project });
   } catch (err) {
@@ -272,33 +292,143 @@ exports.addRole = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Role name is required' });
     }
 
-    project.roles.push(role);
+    // Basic validation for age range when provided
+    const ageMinNum = role.ageMin ? Number(role.ageMin) : undefined;
+    const ageMaxNum = role.ageMax ? Number(role.ageMax) : undefined;
+
+    if (ageMinNum !== undefined && (!Number.isFinite(ageMinNum) || ageMinNum < 1 || ageMinNum > 120)) {
+      return res.status(400).json({ success: false, message: 'ageMin must be a number between 1 and 120' });
+    }
+
+    if (ageMaxNum !== undefined && (!Number.isFinite(ageMaxNum) || ageMaxNum < 1 || ageMaxNum > 120)) {
+      return res.status(400).json({ success: false, message: 'ageMax must be a number between 1 and 120' });
+    }
+
+    if (ageMinNum !== undefined && ageMaxNum !== undefined && ageMaxNum < ageMinNum) {
+      return res.status(400).json({ success: false, message: 'ageMax must be greater than or equal to ageMin' });
+    }
+
+    // Create a new role object, only including fields that have values
+    const newRole = {
+      roleName: role.roleName,
+      roleType: role.roleType || 'Supporting',
+      gender: role.gender || 'Any',
+      skillsRequired: Array.isArray(role.skillsRequired) ? role.skillsRequired : (role.skillsRequired ? [role.skillsRequired] : []),
+      experienceLevel: role.experienceLevel || 'Beginner',
+      numberOfOpenings: role.numberOfOpenings || 1
+    };
+
+    // Only add optional numeric fields if they're valid
+    if (role.ageMin && Number.isFinite(Number(role.ageMin)) && Number(role.ageMin) >= 1 && Number(role.ageMin) <= 120) {
+      newRole.ageMin = Number(role.ageMin);
+    }
+    if (role.ageMax && Number.isFinite(Number(role.ageMax)) && Number(role.ageMax) >= 1 && Number(role.ageMax) <= 120) {
+      newRole.ageMax = Number(role.ageMax);
+    }
+    
+    // Only add string fields if they have content
+    if (role.physicalTraits && role.physicalTraits.trim()) {
+      newRole.physicalTraits = role.physicalTraits.trim();
+    }
+    if (role.roleDescription && role.roleDescription.trim()) {
+      newRole.roleDescription = role.roleDescription.trim();
+    }
+
+    project.roles.push(newRole);
     await project.save();
 
-    // Notify team members about new role (populate for notifications)
-    await team.populate('owner');
-    await team.populate('members.user');
-    const notifyUsers = [team.owner?._id || team.owner, ...team.members.map((m) => m.user?._id || m.user)].filter(
-      (id) => String(id) !== String(req.user._id)
-    );
-    
-    await Promise.all(
-      notifyUsers.map((u) =>
-        createNotification({
-          user: u,
-          title: 'New role added to project',
-          message: `New role "${role.roleName}" added to ${project.name}`,
-          type: 'role',
-          relatedId: project._id,
-          relatedType: 'film-project'
-        })
-      )
-    );
+    // Get the newly added role (last one in the array)
+    let addedRole = project.roles[project.roles.length - 1];
 
-    res.json({ success: true, data: project });
+    // Auto-create a casting call for this role so it appears on the castings page
+    try {
+      const now = new Date();
+      const defaultSubmission = project?.startDate ? new Date(project.startDate) : new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+      const defaultAudition = project?.startDate ? new Date(project.startDate) : new Date(now.getTime() + 14 * 24 * 60 * 60 * 1000);
+
+      const ageMin = Number(addedRole.ageMin) || 18;
+      const ageMax = Number(addedRole.ageMax) || Math.max(ageMin + 20, 25);
+
+      const castingCall = await CastingCall.create({
+        roleTitle: addedRole.roleName,
+        description: addedRole.roleDescription || `Casting for ${addedRole.roleName}`,
+        ageRange: { min: ageMin, max: ageMax },
+        genderRequirement: (addedRole.gender === 'Any' ? 'any' : addedRole.gender?.toLowerCase()) || 'any',
+        experienceLevel: addedRole.experienceLevel?.toLowerCase() || 'beginner',
+        location: project.location || 'TBD',
+        numberOfOpenings: addedRole.numberOfOpenings || 1,
+        skills: Array.isArray(addedRole.skillsRequired) ? addedRole.skillsRequired : [],
+        auditionDate: defaultAudition,
+        submissionDeadline: defaultSubmission,
+        shootStartDate: project.startDate || defaultAudition,
+        shootEndDate: project.endDate || defaultAudition,
+        producer: req.user._id,
+        project: project._id,
+        projectRole: addedRole._id,
+        team: team._id
+      });
+
+      // Link the role to the casting call and persist
+      addedRole.castingCallId = castingCall._id;
+      await project.save();
+      // Refresh reference
+      addedRole = project.roles.id(addedRole._id);
+    } catch (autoCastingErr) {
+      console.error('Auto-create casting failed (role added ok):', autoCastingErr.message);
+    }
+
+    // Notify team members about new role (populate for notifications)
+    try {
+      await team.populate('owner');
+      await team.populate('members.user');
+      
+      // Extract user IDs safely
+      const notifyUsers = [];
+      
+      // Add owner if exists and not the current user
+      if (team.owner) {
+        const ownerId = typeof team.owner === 'string' ? team.owner : team.owner._id;
+        if (ownerId && String(ownerId) !== String(req.user._id)) {
+          notifyUsers.push(ownerId);
+        }
+      }
+      
+      // Add team members if exist and not the current user
+      if (team.members && Array.isArray(team.members)) {
+        team.members.forEach((m) => {
+          if (m.user) {
+            const userId = typeof m.user === 'string' ? m.user : m.user._id;
+            if (userId && String(userId) !== String(req.user._id)) {
+              notifyUsers.push(userId);
+            }
+          }
+        });
+      }
+      
+      // Send notifications only if we have users to notify
+      if (notifyUsers.length > 0) {
+        await Promise.all(
+          notifyUsers.map((userId) =>
+            createNotification({
+              user: userId,
+              title: 'New role added to project',
+              message: `New role "${role.roleName}" added to ${project.name}`,
+              type: 'project',
+              relatedId: project._id,
+              relatedType: 'film-project'
+            }).catch(err => console.error('Notification error:', err))
+          )
+        );
+      }
+    } catch (notifyErr) {
+      console.error('Error sending notifications:', notifyErr);
+      // Don't fail the entire request if notifications fail
+    }
+
+    res.json({ success: true, data: { ...project.toObject(), lastAddedRole: addedRole } });
   } catch (err) {
     console.error('addRole error', err);
-    res.status(500).json({ success: false, message: 'Failed to add role' });
+    res.status(500).json({ success: false, message: 'Failed to add role', error: err.message });
   }
 };
 
@@ -348,24 +478,52 @@ exports.createCastingFromRole = async (req, res) => {
     await project.save();
 
     // Notify team members about new casting (populate for notifications)
-    await team.populate('owner');
-    await team.populate('members.user');
-    const notifyUsers = [team.owner?._id || team.owner, ...team.members.map((m) => m.user?._id || m.user)].filter(
-      (id) => String(id) !== String(req.user._id)
-    );
-    
-    await Promise.all(
-      notifyUsers.map((u) =>
-        createNotification({
-          user: u,
-          title: 'New casting call posted',
-          message: `Casting for "${role.roleName}" in ${project.name} is now open`,
-          type: 'casting',
-          relatedId: castingCall._id,
-          relatedType: 'casting-call'
-        })
-      )
-    );
+    try {
+      await team.populate('owner');
+      await team.populate('members.user');
+      
+      // Extract user IDs safely
+      const notifyUsers = [];
+      
+      // Add owner if exists and not the current user
+      if (team.owner) {
+        const ownerId = typeof team.owner === 'string' ? team.owner : team.owner._id;
+        if (ownerId && String(ownerId) !== String(req.user._id)) {
+          notifyUsers.push(ownerId);
+        }
+      }
+      
+      // Add team members if exist and not the current user
+      if (team.members && Array.isArray(team.members)) {
+        team.members.forEach((m) => {
+          if (m.user) {
+            const userId = typeof m.user === 'string' ? m.user : m.user._id;
+            if (userId && String(userId) !== String(req.user._id)) {
+              notifyUsers.push(userId);
+            }
+          }
+        });
+      }
+      
+      // Send notifications only if we have users to notify
+      if (notifyUsers.length > 0) {
+        await Promise.all(
+          notifyUsers.map((userId) =>
+            createNotification({
+              user: userId,
+              title: 'New casting call posted',
+              message: `Casting for "${role.roleName}" in ${project.name} is now open`,
+              type: 'audition',
+              relatedId: castingCall._id,
+              relatedType: 'casting-call'
+            }).catch(err => console.error('Notification error:', err))
+          )
+        );
+      }
+    } catch (notifyErr) {
+      console.error('Error sending notifications:', notifyErr);
+      // Don't fail the entire request if notifications fail
+    }
 
     res.status(201).json({ success: true, data: castingCall });
   } catch (err) {
@@ -415,11 +573,32 @@ exports.getProjectById = async (req, res) => {
 
     if (!project) return res.status(404).json({ success: false, message: 'Project not found' });
     const team = project.team;
-    if (team && !isTeamMember(team, req.user._id)) {
-      return res.status(403).json({ success: false, message: 'Not authorized for this project' });
+
+    const isActorViewer = !req.user || req.user.role === 'Actor';
+    const isTeamMemberUser = Boolean(req.user && team && isTeamMember(team, req.user._id));
+
+    if (isActorViewer) {
+      // Allow actors to view active projects or any project that currently has a casting call
+      const hasActiveCasting = await CastingCall.exists({ project: project._id });
+
+      if (project.status === 'archived' || (!hasActiveCasting && project.status !== 'active')) {
+        return res.status(403).json({ success: false, message: 'Project not available' });
+      }
+    } else {
+      // Internal roles must belong to the team
+      if (team && !isTeamMemberUser) {
+        return res.status(403).json({ success: false, message: 'Not authorized for this project' });
+      }
     }
 
-    res.json({ success: true, data: project });
+    const projectData = project.toObject();
+    projectData.viewerPermissions = {
+      isTeamMember: isTeamMemberUser,
+      canManageRoles:
+        isTeamMemberUser && ['Producer', 'ProductionTeam', 'Admin'].includes(req.user?.role)
+    };
+
+    res.json({ success: true, data: projectData });
   } catch (err) {
     console.error('getProjectById error', err);
     res.status(500).json({ success: false, message: 'Failed to fetch project' });

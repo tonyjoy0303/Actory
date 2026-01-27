@@ -8,14 +8,14 @@ exports.requestSwitch = async (req, res, next) => {
         const { reason } = req.body;
 
         // Check if a pending request already exists for this user
-        const existingRequest = await RoleSwitchRequest.findOne({ actorId: req.user.id, status: 'Pending' });
+        const existingRequest = await RoleSwitchRequest.findOne({ actorId: req.user._id, status: 'Pending' });
 
         if (existingRequest) {
             return res.status(400).json({ success: false, message: 'You already have a pending request.' });
         }
 
         const request = await RoleSwitchRequest.create({
-            actorId: req.user.id,
+            actorId: req.user._id,
             reason
         });
 

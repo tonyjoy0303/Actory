@@ -2,6 +2,7 @@ const ProductionTeam = require('../models/ProductionTeam');
 const TeamInvitation = require('../models/TeamInvitation');
 const User = require('../models/User');
 const ProductionHouse = require('../models/ProductionHouse');
+const FilmProject = require('../models/FilmProject');
 const { createNotification } = require('../utils/notificationService');
 
 const isMember = (team, userId) => {
@@ -229,5 +230,31 @@ exports.leaveTeam = async (req, res) => {
   } catch (err) {
     console.error('leaveTeam error', err);
     res.status(500).json({ success: false, message: 'Failed to leave team' });
+  }
+};
+
+exports.deleteTeam = async (req, res) => {
+  try {
+    const team = await ProductionTeam.findById(req.params.id);
+    if (!team) return res.status(404).json({ success: false, message: 'Team not found' });
+
+    const isOwner = String(team.owner) === String(req.user._id);
+    const isAdmin = req.user.role === 'Admin';
+    if (!isOwner && !isAdmin) {
+      return res.status(403).json({ success: false, message: 'Only the team owner can delete this team' });
+    }
+
+    const hasProjects = await FilmProject.exists({ team: team._id });
+    if (hasProjects) {
+      return res.status(400).json({ success: false, message: 'Remove or reassign projects before deleting the team' });
+    }
+
+    await TeamInvitation.deleteMany({ team: team._id });
+    await team.deleteOne();
+
+    res.json({ success: true, message: 'Team deleted' });
+  } catch (err) {
+    console.error('deleteTeam error', err);
+    res.status(500).json({ success: false, message: 'Failed to delete team' });
   }
 };
