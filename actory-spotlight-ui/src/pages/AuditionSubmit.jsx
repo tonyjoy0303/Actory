@@ -34,7 +34,14 @@ export default function AuditionSubmit() {
   const [uploadProgress, setUploadProgress] = useState(0);
   const [portfolioFile, setPortfolioFile] = useState(null);
   const [portfolioUploadProgress, setPortfolioUploadProgress] = useState(0);
+  const [idProofFile, setIdProofFile] = useState(null);
+  const [idProofUploadProgress, setIdProofUploadProgress] = useState(0);
+  const [webcamPhoto, setWebcamPhoto] = useState(null);
+  const [webcamPhotoPreview, setWebcamPhotoPreview] = useState('');
+  const [cameraActive, setCameraActive] = useState(false);
   const videoRef = useRef(null);
+  const webcamVideoRef = useRef(null);
+  const webcamStreamRef = useRef(null);
 
   // Skills handling functions
   const handleAddSkill = (e) => {
@@ -99,6 +106,89 @@ export default function AuditionSubmit() {
     }
   };
 
+  const onSelectIdProof = (e) => {
+    const f = _optionalChain([e, 'access', _ => _.target, 'access', _2 => _2.files, 'optionalAccess', _3 => _3[0]]);
+    const maxBytes = 2 * 1024 * 1024; // 2 MB
+    if (!f) {
+      setIdProofFile(null);
+      return;
+    }
+    const allowed = f.type.startsWith('image/') || f.type === 'application/pdf';
+    if (!allowed) {
+      setIdProofFile(null);
+      toast.error('ID proof must be an image or PDF.');
+      return;
+    }
+    if (f.size > maxBytes) {
+      setIdProofFile(null);
+      toast.error('ID proof must be 2 MB or smaller.');
+      return;
+    }
+    setIdProofFile(f);
+  };
+
+  const stopCamera = () => {
+    if (webcamStreamRef.current) {
+      webcamStreamRef.current.getTracks().forEach(track => track.stop());
+      webcamStreamRef.current = null;
+    }
+    setCameraActive(false);
+  };
+
+  const startCamera = async () => {
+    try {
+      setCameraActive(true);
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } });
+      webcamStreamRef.current = stream;
+      
+      // Wait for next frame to ensure video element is rendered
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
+      if (webcamVideoRef.current) {
+        webcamVideoRef.current.srcObject = stream;
+        try {
+          await webcamVideoRef.current.play();
+        } catch (playErr) {
+          console.warn('Video autoplay blocked, waiting for user interaction:', playErr);
+        }
+      }
+    } catch (err) {
+      console.error('Camera error:', err);
+      setCameraActive(false);
+      if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+        toast.error('Camera access denied. Please allow camera permissions in your browser.');
+      } else if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
+        toast.error('No camera found on your device.');
+      } else {
+        toast.error('Unable to access camera. Please check your camera settings.');
+      }
+    }
+  };
+
+  const capturePhoto = () => {
+    const videoEl = webcamVideoRef.current;
+    if (!videoEl) return;
+    const canvas = document.createElement('canvas');
+    canvas.width = videoEl.videoWidth || 640;
+    canvas.height = videoEl.videoHeight || 480;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    // Mirror the image horizontally
+    ctx.translate(canvas.width, 0);
+    ctx.scale(-1, 1);
+    ctx.drawImage(videoEl, 0, 0, canvas.width, canvas.height);
+    canvas.toBlob((blob) => {
+      if (!blob) return;
+      setWebcamPhoto(blob);
+      setWebcamPhotoPreview(URL.createObjectURL(blob));
+      stopCamera();
+    }, 'image/jpeg', 0.9);
+  };
+
+  useEffect(() => {
+    return () => stopCamera();
+  }, []);
+
   function computeAge(d) {
     try {
       if (!d) return NaN;
@@ -117,9 +207,9 @@ export default function AuditionSubmit() {
     const w = Number(weight);
     const a = Number(age);
 
-    if (!file || !portfolioFile || !title || !height || !weight || !age || skills.length === 0 || 
+    if (!file || !portfolioFile || !idProofFile || !webcamPhoto || !title || !height || !weight || !age || skills.length === 0 || 
         !permanentAddress || !livingCity || !dateOfBirth || !phoneNumber) {
-      toast.error('Please fill all fields, select a video, upload your portfolio PDF, and add at least one skill.');
+      toast.error('Please fill all fields, select a video, upload your portfolio PDF, provide ID proof, capture a webcam photo, and add at least one skill.');
       return;
     }
     if (portfolioFile && portfolioFile.size > 500 * 1024) {
@@ -163,6 +253,29 @@ export default function AuditionSubmit() {
     portfolioForm.append('upload_preset', portfolioPreset);
     portfolioForm.append('folder', 'portfolio');
 
+    const idProofForm = new FormData();
+    idProofForm.append('file', idProofFile);
+    const idProofPreset = import.meta.env.VITE_CLOUDINARY_IDPROOF_PRESET || portfolioPreset;
+    if (!idProofPreset) {
+      toast.error('Missing Cloudinary unsigned upload preset for ID proof (VITE_CLOUDINARY_IDPROOF_PRESET).');
+      setLoading(false);
+      return;
+    }
+    idProofForm.append('upload_preset', idProofPreset);
+    idProofForm.append('folder', 'id-proof');
+
+    const webcamForm = new FormData();
+    const webcamFile = new File([webcamPhoto], 'webcam.jpg', { type: 'image/jpeg' });
+    webcamForm.append('file', webcamFile);
+    const webcamPreset = import.meta.env.VITE_CLOUDINARY_WEBCAM_PRESET || import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET;
+    if (!webcamPreset) {
+      toast.error('Missing Cloudinary unsigned upload preset for webcam photo (VITE_CLOUDINARY_WEBCAM_PRESET).');
+      setLoading(false);
+      return;
+    }
+    webcamForm.append('upload_preset', webcamPreset);
+    webcamForm.append('folder', 'webcam');
+
     try {
       // 1. Upload to Cloudinary
       const cloudinaryRes = await axios.post(
@@ -193,6 +306,30 @@ export default function AuditionSubmit() {
       );
       const portfolioUrl = _optionalChain([portfolioRes, 'access', _ => _.data, 'optionalAccess', _2 => _2.secure_url]);
 
+      // Upload ID proof (raw endpoint supports PDF and images)
+      const idProofRes = await axios.post(
+        `https://api.cloudinary.com/v1_1/${import.meta.env.VITE_CLOUDINARY_CLOUD_NAME}/raw/upload`,
+        idProofForm,
+        {
+          headers: { 'Content-Type': 'multipart/form-data' },
+          onUploadProgress: (progressEvent) => {
+            const percent = Math.round((progressEvent.loaded * 100) / (progressEvent.total || 1));
+            setIdProofUploadProgress(percent);
+          },
+        }
+      );
+      const idProofUrl = _optionalChain([idProofRes, 'access', _ => _.data, 'optionalAccess', _2 => _2.secure_url]);
+
+      // Upload webcam photo
+      const webcamRes = await axios.post(
+        `https://api.cloudinary.com/v1_1/${import.meta.env.VITE_CLOUDINARY_CLOUD_NAME}/image/upload`,
+        webcamForm,
+        {
+          headers: { 'Content-Type': 'multipart/form-data' },
+        }
+      );
+      const webcamPhotoUrl = _optionalChain([webcamRes, 'access', _ => _.data, 'optionalAccess', _2 => _2.secure_url]);
+
       // 2. Submit to our backend
       const response = await API.post(`/casting/${castingCallId}/videos`,
         { 
@@ -210,6 +347,8 @@ export default function AuditionSubmit() {
           phoneNumber,
           email,
           portfolioUrl,
+          idProofUrl,
+          webcamPhotoUrl,
           // Add video metadata for quality assessment
           videoHeight: videoRef.current?.videoHeight || 720,
           duration: videoRef.current?.duration || 0,
@@ -390,6 +529,23 @@ export default function AuditionSubmit() {
                     , React.createElement(Input, { type: "file", accept: "application/pdf", onChange: onSelectPortfolio, disabled: loading, __self: this, __source: {fileName: _jsxFileName, lineNumber: 237}} )
                     , portfolioFile ? React.createElement('p', { className: "text-xs text-muted-foreground mt-1" , __self: this, __source: {fileName: _jsxFileName, lineNumber: 238}}, _optionalChain([portfolioFile, 'access', _ => _.name])) : null
                   )
+                  , React.createElement('div', {__self: this, __source: {fileName: _jsxFileName, lineNumber: 239}}
+                    , React.createElement('label', { className: "block text-sm mb-1"  , __self: this, __source: {fileName: _jsxFileName, lineNumber: 240}}, "Government ID Proof *")
+                    , React.createElement(Input, { type: "file", accept: "application/pdf,image/*", onChange: onSelectIdProof, disabled: loading, __self: this, __source: {fileName: _jsxFileName, lineNumber: 241}} )
+                    , idProofFile ? React.createElement('p', { className: "text-xs text-muted-foreground mt-1" , __self: this, __source: {fileName: _jsxFileName, lineNumber: 242}}, _optionalChain([idProofFile, 'access', _ => _.name])) : null
+                  )
+                  , React.createElement('div', { className: "space-y-2"  , __self: this, __source: {fileName: _jsxFileName, lineNumber: 243}}
+                    , React.createElement('label', { className: "block text-sm mb-1"  , __self: this, __source: {fileName: _jsxFileName, lineNumber: 244}}, "Webcam Photo *")
+                    , webcamPhotoPreview && React.createElement('img', { src: webcamPhotoPreview, alt: "Webcam capture", className: "w-full max-w-sm rounded-md border", style: { transform: 'scaleX(-1)' }, __self: this, __source: {fileName: _jsxFileName, lineNumber: 245}} )
+                    , (!webcamPhotoPreview && cameraActive) && React.createElement('video', { ref: webcamVideoRef, className: "w-full max-w-sm rounded-md border bg-black", style: { transform: 'scaleX(-1)' }, autoPlay: true, playsInline: true, muted: true, __self: this, __source: {fileName: _jsxFileName, lineNumber: 246}} )
+                    , React.createElement('div', { className: "flex gap-2"  , __self: this, __source: {fileName: _jsxFileName, lineNumber: 247}}
+                      , (!cameraActive && !webcamPhotoPreview) && React.createElement(Button, { type: "button", variant: "secondary", onClick: startCamera, disabled: loading, __self: this, __source: {fileName: _jsxFileName, lineNumber: 248}}, "Start Camera")
+                      , cameraActive && React.createElement(Button, { type: "button", variant: "secondary", onClick: capturePhoto, disabled: loading, __self: this, __source: {fileName: _jsxFileName, lineNumber: 249}}, "Capture Photo")
+                      , cameraActive && React.createElement(Button, { type: "button", variant: "outline", onClick: stopCamera, disabled: loading, __self: this, __source: {fileName: _jsxFileName, lineNumber: 250}}, "Cancel")
+                      , webcamPhotoPreview && React.createElement(Button, { type: "button", variant: "outline", onClick: () => { setWebcamPhoto(null); setWebcamPhotoPreview(''); startCamera(); }, disabled: loading, __self: this, __source: {fileName: _jsxFileName, lineNumber: 251}}, "Retake")
+                    )
+                    , React.createElement('p', { className: "text-xs text-muted-foreground"  , __self: this, __source: {fileName: _jsxFileName, lineNumber: 252}}, "Use your device camera to capture a clear photo.")
+                  )
               )
 
               , src && (
@@ -400,9 +556,10 @@ export default function AuditionSubmit() {
               , loading && React.createElement('div', { className: "space-y-2", __self: this, __source: {fileName: _jsxFileName, lineNumber: 230}}
                 , React.createElement(Progress, { value: uploadProgress, className: "w-full", __self: this, __source: {fileName: _jsxFileName, lineNumber: 231}} )
                 , portfolioFile && React.createElement(Progress, { value: portfolioUploadProgress, className: "w-full", __self: this, __source: {fileName: _jsxFileName, lineNumber: 232}} )
+                , idProofFile && React.createElement(Progress, { value: idProofUploadProgress, className: "w-full", __self: this, __source: {fileName: _jsxFileName, lineNumber: 233}} )
               )
               , React.createElement('div', { className: "mt-2 flex justify-end"  , __self: this, __source: {fileName: _jsxFileName, lineNumber: 231}}
-                , React.createElement(Button, { variant: "hero", className: "hover-scale", onClick: handleSubmit, disabled: loading || !file || !portfolioFile, __self: this, __source: {fileName: _jsxFileName, lineNumber: 232}}
+                , React.createElement(Button, { variant: "hero", className: "hover-scale", onClick: handleSubmit, disabled: loading || !file || !portfolioFile || !idProofFile || !webcamPhoto, __self: this, __source: {fileName: _jsxFileName, lineNumber: 232}}
                   , loading ? `Uploading... ${uploadProgress}%` : 'Submit Audition'
                 )
               )

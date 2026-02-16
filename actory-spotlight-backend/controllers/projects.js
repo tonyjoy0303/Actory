@@ -343,11 +343,21 @@ exports.addRole = async (req, res) => {
     // Auto-create a casting call for this role so it appears on the castings page
     try {
       const now = new Date();
-      const defaultSubmission = project?.startDate ? new Date(project.startDate) : new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
-      const defaultAudition = project?.startDate ? new Date(project.startDate) : new Date(now.getTime() + 14 * 24 * 60 * 60 * 1000);
+      
+      // Always use future dates for casting deadlines, even if project dates are in the past
+      const defaultSubmission = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000); // 7 days from now
+      const defaultAudition = new Date(now.getTime() + 14 * 24 * 60 * 60 * 1000); // 14 days from now
 
       const ageMin = Number(addedRole.ageMin) || 18;
       const ageMax = Number(addedRole.ageMax) || Math.max(ageMin + 20, 25);
+
+      // Ensure shoot dates are valid (must be on or after audition date)
+      const shootStartDate = project.startDate && new Date(project.startDate) >= defaultAudition
+        ? new Date(project.startDate)
+        : defaultAudition;
+      const shootEndDate = project.endDate && new Date(project.endDate) >= defaultAudition
+        ? new Date(project.endDate)
+        : new Date(defaultAudition.getTime() + 30 * 24 * 60 * 60 * 1000); // 30 days after audition
 
       const castingCall = await CastingCall.create({
         roleTitle: addedRole.roleName,
@@ -360,8 +370,8 @@ exports.addRole = async (req, res) => {
         skills: Array.isArray(addedRole.skillsRequired) ? addedRole.skillsRequired : [],
         auditionDate: defaultAudition,
         submissionDeadline: defaultSubmission,
-        shootStartDate: project.startDate || defaultAudition,
-        shootEndDate: project.endDate || defaultAudition,
+        shootStartDate: shootStartDate,
+        shootEndDate: shootEndDate,
         producer: req.user._id,
         project: project._id,
         projectRole: addedRole._id,
@@ -371,8 +381,12 @@ exports.addRole = async (req, res) => {
       // Link the role to the casting call and persist
       addedRole.castingCallId = castingCall._id;
       await project.save();
-      // Refresh reference
+      
+      // Reload the project to get the updated role with castingCallId
+      await project.populate('roles');
       addedRole = project.roles.id(addedRole._id);
+      
+      console.log(`Casting call ${castingCall._id} created and linked to role ${addedRole._id}`);
     } catch (autoCastingErr) {
       console.error('Auto-create casting failed (role added ok):', autoCastingErr.message);
     }
@@ -425,7 +439,10 @@ exports.addRole = async (req, res) => {
       // Don't fail the entire request if notifications fail
     }
 
-    res.json({ success: true, data: { ...project.toObject(), lastAddedRole: addedRole } });
+    // Reload project from database to ensure we have the latest state with castingCallId
+    const updatedProject = await FilmProject.findById(project._id);
+    
+    res.json({ success: true, data: updatedProject });
   } catch (err) {
     console.error('addRole error', err);
     res.status(500).json({ success: false, message: 'Failed to add role', error: err.message });

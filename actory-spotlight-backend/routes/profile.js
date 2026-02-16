@@ -167,7 +167,7 @@ router.get('/search', async (req, res) => {
 
     const users = await User.find({
       name: { $regex: username, $options: 'i' },
-      role: { $in: ['Actor', 'Producer'] }
+      role: { $in: ['Actor', 'Producer', 'ProductionTeam'] }
     }).select('_id name role profileImage isVerified');
 
     res.json({ success: true, data: users });

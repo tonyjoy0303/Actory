@@ -399,7 +399,9 @@ export default function Submissions() {
                         )
                       )
                       , React.createElement('p', { className: "text-xs text-muted-foreground" }, `Submitted: ${new Date(s.createdAt).toLocaleString()}`)
-                      , s.portfolioUrl ? React.createElement('a', { href: s.portfolioUrl, target: "_blank", rel: "noreferrer", className: "text-xs underline mt-1 inline-block" }, 'View Portfolio (PDF)') : null
+                      , s.portfolioUrl ? React.createElement('a', { href: s.portfolioUrl, target: "_blank", rel: "noreferrer", className: "text-xs underline mt-1 inline-block text-blue-500 hover:text-blue-600" }, 'View Portfolio (PDF)') : null
+                      , s.idProofUrl ? React.createElement('a', { href: s.idProofUrl, target: "_blank", rel: "noreferrer", className: "text-xs underline mt-1 inline-block ml-3 text-blue-500 hover:text-blue-600" }, 'View ID Proof') : null
+                      , s.webcamPhotoUrl ? React.createElement('div', { className: "mt-2" }, React.createElement('p', { className: "text-xs font-medium mb-1" }, 'Webcam Photo:'), React.createElement('img', { src: s.webcamPhotoUrl, alt: "Webcam capture", className: "w-32 h-32 object-cover rounded border" })) : null
                       , React.createElement('div', { className: "mt-1" }
                         , React.createElement('span', { className: `inline-block px-2 py-0.5 rounded text-xs ${s.status === 'Accepted' ? 'bg-green-600/20 text-green-500' : s.status === 'Rejected' ? 'bg-red-600/20 text-red-500' : 'bg-yellow-600/20 text-yellow-500'}` }, s.status || 'Pending')
                       )

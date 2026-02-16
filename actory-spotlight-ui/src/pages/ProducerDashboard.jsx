@@ -203,6 +203,22 @@ export default function ProducerDashboard() {
                 <p className="text-xs text-muted-foreground">
                   Submitted: {new Date(s.createdAt).toLocaleString()}
                 </p>
+                {s.portfolioUrl && (
+                  <a href={s.portfolioUrl} target="_blank" rel="noreferrer" className="text-xs underline text-blue-500 hover:text-blue-600">
+                    View Portfolio (PDF)
+                  </a>
+                )}
+                {s.idProofUrl && (
+                  <a href={s.idProofUrl} target="_blank" rel="noreferrer" className="text-xs underline text-blue-500 hover:text-blue-600 ml-3">
+                    View ID Proof
+                  </a>
+                )}
+                {s.webcamPhotoUrl && (
+                  <div className="mt-2">
+                    <p className="text-xs font-medium mb-1">Webcam Photo:</p>
+                    <img src={s.webcamPhotoUrl} alt="Webcam capture" className="w-32 h-32 object-cover rounded border" />
+                  </div>
+                )}
                 <div className="mt-1">
                   <div className="flex gap-2">
                     <span 

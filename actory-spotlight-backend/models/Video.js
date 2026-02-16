@@ -18,6 +18,16 @@ const VideoSchema = new mongoose.Schema({
     type: String,
     required: function() { return this.type === 'audition'; },
   },
+  // Government ID proof (required for audition submissions)
+  idProofUrl: {
+    type: String,
+    required: function() { return this.type === 'audition'; },
+  },
+  // Webcam photo (required for audition submissions)
+  webcamPhotoUrl: {
+    type: String,
+    required: function() { return this.type === 'audition'; },
+  },
   actor: {
     type: mongoose.Schema.ObjectId,
     ref: 'User',
