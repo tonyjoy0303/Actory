@@ -1,4 +1,5 @@
 # Python Dependencies for AI Emotion Analysis
+# Python Version: 3.13.x (3.13.2 or compatible)
 # Install with: pip install -r requirements.txt
 
 # NumPy for numerical operations (install first to avoid conflicts)
