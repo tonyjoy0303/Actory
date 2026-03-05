@@ -8,6 +8,7 @@ const FilmProject = require('../models/FilmProject');
 const mongoose = require('mongoose');
 const cloudinary = require('cloudinary').v2;
 const { createNotification } = require('../utils/notificationService');
+const { safeAnalyzeVideo, validateVideoFile } = require('../utils/aiIntegration');
 
 // Helper: authorize casting call access.
 // allowWrite=false → any team member (or producer) can read.
@@ -212,6 +213,99 @@ exports.addVideo = async (req, res, next) => {
       // Non-blocking - don't fail the submission if notifications fail
     }
 
+    // 🤖 AI: Trigger emotion analysis (BLOCKING for audition videos)
+    console.log(`[AI TRIGGER] Initiating AI analysis for video: ${video._id}`);
+    if (video.type === 'audition') {
+      try {
+        console.log(`[AI] Starting emotion analysis for video ${video._id}`);
+        
+        // Validate video file
+        if (!validateVideoFile(video.videoUrl)) {
+          console.warn(`[AI] Invalid video file: ${video.videoUrl}`);
+          video.aiAnalysis.error = 'Invalid video file format';
+          await video.save();
+        } else {
+          // Run AI analysis SYNCHRONOUSLY - wait for it to complete
+          const analysisResult = await safeAnalyzeVideo(
+            video.videoUrl,
+            castingCall.requiredEmotion || 'neutral'
+          );
+
+          if (analysisResult.success) {
+            // Update video with AI results
+            video.aiAnalysis = {
+              analyzed: true,
+              requiredEmotion: analysisResult.requiredEmotion,
+              detectedEmotion: analysisResult.detectedEmotion,
+              emotionScores: analysisResult.emotionScores,
+              emotionMatchScore: analysisResult.emotionMatchScore,
+              confidence: analysisResult.confidence,
+              overallScore: analysisResult.overallScore,
+              feedback: analysisResult.feedback,
+              framesAnalyzed: analysisResult.framesAnalyzed || 0,
+              analyzedAt: new Date(),
+              error: null,
+            };
+            console.log(`[AI] Analysis complete for video ${video._id}: score=${analysisResult.overallScore}`);
+          } else {
+            // Save error
+            video.aiAnalysis = {
+              analyzed: false,
+              error: analysisResult.error,
+              analyzedAt: new Date(),
+            };
+            console.error(`[AI] Analysis failed for video ${video._id}: ${analysisResult.error}`);
+          }
+
+          // Save with AI results
+          await video.save();
+        }
+      } catch (aiError) {
+        console.error(`[AI] Unexpected error in analysis: ${aiError.message}`);
+        console.error(aiError.stack);
+        // Still save even if analysis fails - don't block submission
+        video.aiAnalysis = {
+          analyzed: false,
+          error: aiError.message,
+          analyzedAt: new Date(),
+        };
+        await video.save();
+      }
+    } else {
+      // For profile videos, run analysis async (non-blocking)
+      try {
+        setImmediate(async () => {
+          try {
+            console.log(`[AI] Starting async analysis for profile video ${video._id}`);
+            const analysisResult = await safeAnalyzeVideo(
+              video.videoUrl,
+              'neutral'
+            );
+            if (analysisResult.success) {
+              video.aiAnalysis = {
+                analyzed: true,
+                requiredEmotion: analysisResult.requiredEmotion,
+                detectedEmotion: analysisResult.detectedEmotion,
+                emotionScores: analysisResult.emotionScores,
+                emotionMatchScore: analysisResult.emotionMatchScore,
+                confidence: analysisResult.confidence,
+                overallScore: analysisResult.overallScore,
+                feedback: analysisResult.feedback,
+                framesAnalyzed: analysisResult.framesAnalyzed || 0,
+                analyzedAt: new Date(),
+                error: null,
+              };
+            }
+            await video.save();
+          } catch (err) {
+            console.error(`[AI] Async analysis failed: ${err.message}`);
+          }
+        });
+      } catch (aiErr) {
+        console.error(`[AI] Failed to trigger async analysis: ${aiErr.message}`);
+      }
+    }
+
     res.status(201).json({ 
       success: true, 
       data: {
@@ -219,6 +313,11 @@ exports.addVideo = async (req, res, next) => {
         qualityAssessment: {
           level: qualityAssessment.quality,
           score: qualityAssessment.score
+        },
+        // aiAnalysis already populated if audition video, or indicates pending if profile
+        aiAnalysis: video.aiAnalysis || {
+          analyzed: video.type === 'audition' ? true : false,
+          requiredEmotion: castingCall?.requiredEmotion || 'neutral'
         }
       } 
     });

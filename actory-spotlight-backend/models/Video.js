@@ -179,10 +179,73 @@ const VideoSchema = new mongoose.Schema({
       default: 0
     }
   },
+  // 🤖 AI Emotion Analysis Fields
+  aiAnalysis: {
+    // Has AI analysis been performed
+    analyzed: {
+      type: Boolean,
+      default: false,
+    },
+    // Required emotion from casting (stored when analysis is run)
+    requiredEmotion: {
+      type: String,
+      enum: ['happy', 'sad', 'angry', 'fear', 'surprise', 'disgust', 'neutral'],
+      default: 'neutral',
+    },
+    // Detected emotion from video analysis
+    detectedEmotion: {
+      type: String,
+      enum: ['happy', 'sad', 'angry', 'fear', 'surprise', 'disgust', 'neutral'],
+    },
+    // Detailed emotion probability scores for all emotions (0-1)
+    emotionScores: {
+      angry: { type: Number, min: 0, max: 1 },
+      disgust: { type: Number, min: 0, max: 1 },
+      fear: { type: Number, min: 0, max: 1 },
+      happy: { type: Number, min: 0, max: 1 },
+      sad: { type: Number, min: 0, max: 1 },
+      surprise: { type: Number, min: 0, max: 1 },
+      neutral: { type: Number, min: 0, max: 1 },
+    },
+    // How well the detected emotion matches the required emotion (0-100)
+    emotionMatchScore: {
+      type: Number,
+      min: 0,
+      max: 100,
+    },
+    // Number of frames analyzed in the video
+    framesAnalyzed: {
+      type: Number,
+      min: 0,
+    },
+    // Confidence level of emotion detection (0-1)
+    confidence: {
+      type: Number,
+      min: 0,
+      max: 1,
+    },
+    // Overall score combining emotion match and confidence (0-100)
+    overallScore: {
+      type: Number,
+      min: 0,
+      max: 100,
+    },
+    // AI feedback message
+    feedback: String,
+    // Timestamp of last AI analysis
+    analyzedAt: Date,
+    // Error message if analysis failed
+    error: String,
+  },
   createdAt: {
     type: Date,
     default: Date.now,
   },
 });
+
+// Index for faster queries on casting and ai analysis
+VideoSchema.index({ castingCall: 1 });
+VideoSchema.index({ 'aiAnalysis.analyzed': 1 });
+VideoSchema.index({ 'aiAnalysis.overallScore': -1 });
 
 module.exports = mongoose.model('Video', VideoSchema);

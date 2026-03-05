@@ -18,6 +18,7 @@ app.use(express.json());
 const allowedOrigins = [
   process.env.FRONTEND_URL || 'http://localhost:8080',
   'http://localhost:8080',
+  'http://localhost:8081', // Vite dev server fallback port
   'https://actory-1ci4.onrender.com'
 ];
 
@@ -78,6 +79,7 @@ app.use('/api/v1/notifications', require('./routes/notifications'));
 app.use('/api/v1/teams', require('./routes/teams'));
 app.use('/api/v1/team-invitations', require('./routes/teamInvitations'));
 app.use('/api/v1/projects', require('./routes/projects'));
+app.use('/api/v1/submissions', require('./routes/submissions'));
 app.use('/api', require('./routes/prediction'));
 
 // Handle OPTIONS preflight requests

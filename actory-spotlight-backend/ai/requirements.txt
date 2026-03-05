@@ -1,0 +1,14 @@
+# Python Dependencies for AI Emotion Analysis
+# Install with: pip install -r requirements.txt
+
+# NumPy for numerical operations (install first to avoid conflicts)
+numpy>=1.26.0
+
+# TensorFlow/Keras for deep learning model
+tensorflow>=2.13.0,<3.0.0
+
+# OpenCV for video processing and face detection
+opencv-python>=4.8.0
+
+# Optional: GPU support (uncomment if using NVIDIA GPU)
+# tensorflow-gpu>=2.13.0,<3.0.0

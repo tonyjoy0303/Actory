@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { doLogin } from './login.spec';
+import { doLogin } from './helpers';
 
 const ACTOR = { email: 'jesly@gmail.com', password: 'jesly123' };
 const PRODUCER = { email: 'tonyjoyjp@gmail.com', password: 'tony123' };

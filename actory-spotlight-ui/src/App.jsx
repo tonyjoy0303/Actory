@@ -28,7 +28,7 @@ import CastingList from "./pages/CastingList";
 import CastingDetails from "./pages/casting/CastingDetails";
 import CreateCastingCall from "./pages/casting/CreateCastingCall";
 import EditCastingCall from "./pages/casting/EditCastingCall";
-import Submissions from "./pages/casting/Submissions";
+import SubmissionsPage from "./pages/SubmissionsPage"; // Updated to use new submissions page with AI
 
 // Pages - Profiles & Submissions
 import ActorProfile from "./pages/ActorProfile";
@@ -124,10 +124,10 @@ const App = () => (
                 })
 
               , React.createElement(Route, {
-                path: "/casting/:id/submissions",
+                path: "/casting/:castingId/submissions",
                 element: 
                   React.createElement(MainLayout, null
-                    , React.createElement(Submissions, null )
+                    , React.createElement(SubmissionsPage, null )
                   )
                 })
 

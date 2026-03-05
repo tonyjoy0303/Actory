@@ -18,7 +18,7 @@ const NotificationSchema = new mongoose.Schema(
     },
     type: {
       type: String,
-      enum: ['invite', 'project', 'audition', 'team', 'system'],
+      enum: ['invite', 'project', 'audition', 'team', 'system', 'casting-submission'],
       default: 'system'
     },
     relatedId: {

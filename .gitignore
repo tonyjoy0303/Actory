@@ -100,3 +100,4 @@ actory-spotlight-backend/uploads/*
 # Test results
 test-results/
 playwright-report/
+node_modules

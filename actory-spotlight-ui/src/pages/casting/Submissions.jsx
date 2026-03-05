@@ -36,6 +36,8 @@ export default function Submissions() {
   });
   const [cityInput, setCityInput] = useState('');
   const [skillInput, setSkillInput] = useState('');
+  const [imageViewerOpen, setImageViewerOpen] = useState(false);
+  const [imageViewerSrc, setImageViewerSrc] = useState('');
 
   const sortSubmissions = (items, sort) => {
     const sorted = [...items];
@@ -260,6 +262,15 @@ export default function Submissions() {
     }
   };
 
+  const handleViewImage = (imageUrl) => {
+    if (!imageUrl) {
+      toast.error('No image available.');
+      return;
+    }
+    setImageViewerSrc(imageUrl);
+    setImageViewerOpen(true);
+  };
+
   const handleViewPortfolio = async (url, id) => {
     try {
       if (!url) {
@@ -401,7 +412,7 @@ export default function Submissions() {
                       , React.createElement('p', { className: "text-xs text-muted-foreground" }, `Submitted: ${new Date(s.createdAt).toLocaleString()}`)
                       , s.portfolioUrl ? React.createElement('a', { href: s.portfolioUrl, target: "_blank", rel: "noreferrer", className: "text-xs underline mt-1 inline-block text-blue-500 hover:text-blue-600" }, 'View Portfolio (PDF)') : null
                       , s.idProofUrl ? React.createElement('a', { href: s.idProofUrl, target: "_blank", rel: "noreferrer", className: "text-xs underline mt-1 inline-block ml-3 text-blue-500 hover:text-blue-600" }, 'View ID Proof') : null
-                      , s.webcamPhotoUrl ? React.createElement('div', { className: "mt-2" }, React.createElement('p', { className: "text-xs font-medium mb-1" }, 'Webcam Photo:'), React.createElement('img', { src: s.webcamPhotoUrl, alt: "Webcam capture", className: "w-32 h-32 object-cover rounded border" })) : null
+                      , s.webcamPhotoUrl ? React.createElement('div', { className: "mt-2" }, React.createElement('p', { className: "text-xs font-medium mb-1" }, 'Webcam Photo:'), React.createElement('img', { src: s.webcamPhotoUrl, alt: "Webcam capture", className: "w-32 h-32 object-cover rounded border cursor-pointer hover:opacity-80 transition-opacity", onClick: () => handleViewImage(s.webcamPhotoUrl), title: "Click to view full size" })) : null
                       , React.createElement('div', { className: "mt-1" }
                         , React.createElement('span', { className: `inline-block px-2 py-0.5 rounded text-xs ${s.status === 'Accepted' ? 'bg-green-600/20 text-green-500' : s.status === 'Rejected' ? 'bg-red-600/20 text-red-500' : 'bg-yellow-600/20 text-yellow-500'}` }, s.status || 'Pending')
                       )
@@ -502,6 +513,16 @@ export default function Submissions() {
           )
           , React.createElement('div', { className: "h-full" }
             , portfolioSrc ? React.createElement('iframe', { src: portfolioSrc, title: "Portfolio PDF", className: "w-full h-[75vh]", frameBorder: "0" }) : React.createElement('p', { className: "p-4 text-sm" }, 'No portfolio available')
+          )
+        )
+      )
+      , React.createElement(Dialog, { open: imageViewerOpen, onOpenChange: setImageViewerOpen }
+        , React.createElement(DialogContent, { className: "max-w-6xl w-[95vw] h-[95vh] p-2 flex flex-col" }
+          , React.createElement(DialogHeader, null
+            , React.createElement(DialogTitle, null, 'Webcam Photo')
+          )
+          , React.createElement('div', { className: "flex-1 flex items-center justify-center overflow-hidden" }
+            , imageViewerSrc ? React.createElement('img', { src: imageViewerSrc, alt: "Full size webcam capture", className: "max-w-full max-h-full object-contain" }) : React.createElement('p', { className: "text-sm text-muted-foreground" }, 'No image available')
           )
         )
       )

@@ -151,6 +151,12 @@ const CastingCallSchema = new mongoose.Schema({
     ref: 'ProductionTeam',
     required: false,
   },
+  // 🤖 AI: Required emotion for this casting
+  requiredEmotion: {
+    type: String,
+    enum: ['happy', 'sad', 'angry', 'fear', 'surprise', 'neutral', 'disgust'],
+    default: 'neutral',
+  },
   createdAt: {
     type: Date,
     default: Date.now,

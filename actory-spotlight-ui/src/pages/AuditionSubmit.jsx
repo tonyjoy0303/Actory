@@ -355,6 +355,9 @@ export default function AuditionSubmit() {
           brightness: 0.75, // Default initial values
           audioQuality: 0.8, // Default initial values
           retakes: 1
+        },
+        {
+          timeout: 180000 // 3 minutes to allow for AI emotion analysis
         }
       );
 

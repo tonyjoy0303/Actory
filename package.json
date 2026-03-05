@@ -1,4 +1,7 @@
 {
+  "scripts": {
+    "test:ai": "node actory-spotlight-backend/test-ai-integration.js"
+  },
   "devDependencies": {
     "glob": "^11.0.3",
     "sucrase": "^3.35.0"

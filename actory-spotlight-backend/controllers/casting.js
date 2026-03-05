@@ -2,6 +2,7 @@ const CastingCall = require('../models/CastingCall');
 const FilmProject = require('../models/FilmProject');
 const User = require('../models/User');
 const ProductionTeam = require('../models/ProductionTeam');
+const { extractEmotionFromDescription } = require('../utils/emotionExtractor');
 
 // @desc    Get all casting calls
 // @route   GET /api/v1/casting
@@ -207,6 +208,9 @@ exports.createCastingCall = async (req, res, next) => {
     }
 
     // Create the casting call
+    // 🤖 Extract required emotion from description
+    const requiredEmotion = extractEmotionFromDescription(description);
+
     const castingCall = await CastingCall.create({
       roleTitle,
       description,
@@ -227,7 +231,9 @@ exports.createCastingCall = async (req, res, next) => {
       // Include project and team if provided (for role-based castings)
       project: req.body.project || req.body.projectId,
       team: req.body.team || req.body.teamId,
-      projectRole: req.body.projectRole || req.body.roleId
+      projectRole: req.body.projectRole || req.body.roleId,
+      // 🤖 AI: Extracted emotion
+      requiredEmotion,
     });
 
     res.status(201).json({ success: true, data: castingCall });
