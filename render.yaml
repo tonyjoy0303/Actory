@@ -2,7 +2,6 @@ services:
   # Backend Service (Node.js + Python AI)
   - type: web
     name: actory-backend
-    env: node
     plan: free
     rootDir: actory-spotlight-backend
     buildCommand: pip install -r ai/requirements.txt && npm install
@@ -42,7 +41,6 @@ services:
   # Frontend Service (React/Vite Static Site)
   - type: web
     name: actory-frontend
-    env: static
     plan: free
     rootDir: actory-spotlight-ui
     buildCommand: npm install && npm run build
