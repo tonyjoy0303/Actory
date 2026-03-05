@@ -3,8 +3,8 @@ services:
     name: actory-backend
     env: node
     plan: free
-    buildCommand: cd actory-spotlight-backend && npm install && pip install -r ai/requirements.txt
-    startCommand: cd actory-spotlight-backend && npm start
+    buildCommand: npm install --prefix actory-spotlight-backend && pip install -r actory-spotlight-backend/ai/requirements.txt
+    startCommand: node actory-spotlight-backend/server.js
     envVars:
       - key: NODE_ENV
         value: production
