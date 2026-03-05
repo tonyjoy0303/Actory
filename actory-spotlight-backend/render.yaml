@@ -3,11 +3,11 @@ services:
     name: actory-backend
     env: node
     plan: free
-    buildCommand: npm install && pip install -r ai/requirements.txt
+    buildCommand: pip install -r ai/requirements.txt && npm install
     startCommand: npm start
     envVars:
       - key: PYTHON_VERSION
-        value: 3.13.2
+        value: 3.10.13
       - key: NODE_ENV
         value: production
       - key: MONGODB_URI
