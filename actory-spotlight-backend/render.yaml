@@ -6,6 +6,8 @@ services:
     buildCommand: npm install && pip install -r ai/requirements.txt
     startCommand: npm start
     envVars:
+      - key: PYTHON_VERSION
+        value: 3.13.2
       - key: NODE_ENV
         value: production
       - key: MONGODB_URI
