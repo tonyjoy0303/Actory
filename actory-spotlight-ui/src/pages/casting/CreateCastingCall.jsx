@@ -25,6 +25,15 @@ export default function CreateCastingCall() {
         shootEndDate: data.shootEndDate.toISOString(),
       };
       
+      // Remove heightRange if both min and max are undefined
+      if (formattedData.heightRange) {
+        const hasMin = typeof formattedData.heightRange.min === 'number';
+        const hasMax = typeof formattedData.heightRange.max === 'number';
+        if (!hasMin && !hasMax) {
+          delete formattedData.heightRange;
+        }
+      }
+      
       const response = await API.post('/casting', formattedData);
       
       if (response.data.success) {
@@ -42,9 +51,18 @@ export default function CreateCastingCall() {
       }
     } catch (error) {
       console.error('Error creating casting call:', error);
+      
+      // Display detailed validation errors if available
+      let errorMessage = 'Failed to create casting call. Please try again.';
+      if (error.response?.data?.errors && Array.isArray(error.response.data.errors)) {
+        errorMessage = error.response.data.errors.join(', ');
+      } else if (error.response?.data?.message) {
+        errorMessage = error.response.data.message;
+      }
+      
       toast({
         title: 'Error',
-        description: error.response?.data?.message || 'Failed to create casting call. Please try again.',
+        description: errorMessage,
         variant: 'destructive',
       });
     } finally {

@@ -1,12 +1,26 @@
-/**
- * 🤖 Recruiter Submissions Dashboard
- * Display and manage casting submissions with AI emotion analysis
- */
-
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { AlertCircle, RefreshCw, ChevronDown, Award, TrendingUp, Brain, Sparkles, Loader2, CheckCircle2, XCircle } from 'lucide-react';
+import {
+  AlertCircle,
+  RefreshCw,
+  ChevronDown,
+  TrendingUp,
+  Brain,
+  Sparkles,
+  Loader2,
+  CheckCircle2,
+  XCircle,
+  Users,
+  Gauge,
+  Trophy,
+  ClipboardCheck,
+  SlidersHorizontal,
+  Mail,
+  MapPin,
+  Calendar,
+  Phone,
+} from 'lucide-react';
 import API from '../lib/api';
 import { Alert, AlertTitle, AlertDescription } from '../components/ui/alert';
 import { Button } from '../components/ui/button';
@@ -25,6 +39,10 @@ const SubmissionsPage = () => {
   const [expandedSubmission, setExpandedSubmission] = useState(null);
   const [reanalyzingId, setReanalyzingId] = useState(null);
   const [updatingStatusId, setUpdatingStatusId] = useState(null);
+  const [lastCollapsedId, setLastCollapsedId] = useState(null);
+  
+  // Refs for each submission card to enable scroll-into-view
+  const cardRefs = useRef({});
 
   // Fetch submissions with AI analysis
   const { data: submissionsData, isLoading, error, refetch } = useQuery({
@@ -84,13 +102,29 @@ const SubmissionsPage = () => {
   });
 
   const submissions = useMemo(() => {
-    const data = submissionsData?.data || [];
-    console.log('Submissions data received:', data);
-    if (data.length > 0) {
-      console.log('First submission:', data[0]);
-    }
-    return data;
+    return submissionsData?.data || [];
   }, [submissionsData]);
+
+  // Scroll to expanded/collapsed card for better UX
+  useEffect(() => {
+    if (expandedSubmission && cardRefs.current[expandedSubmission]) {
+      // Small delay to allow DOM to update, then scroll into view
+      setTimeout(() => {
+        cardRefs.current[expandedSubmission]?.scrollIntoView({
+          behavior: 'smooth',
+          block: 'start',
+        });
+      }, 50);
+    } else if (expandedSubmission === null && lastCollapsedId && cardRefs.current[lastCollapsedId]) {
+      // When collapsing, scroll to the same card that was just collapsed
+      setTimeout(() => {
+        cardRefs.current[lastCollapsedId]?.scrollIntoView({
+          behavior: 'smooth',
+          block: 'nearest',
+        });
+      }, 50);
+    }
+  }, [expandedSubmission, lastCollapsedId]);
 
   // Calculate statistics
   const stats = useMemo(() => {
@@ -111,39 +145,24 @@ const SubmissionsPage = () => {
     };
   }, [submissions]);
 
-  // Get score badge color
-  const getScoreBadgeColor = (score) => {
-    if (score > 80) return 'bg-green-100 text-green-800 border-green-300';
-    if (score >= 50) return 'bg-yellow-100 text-yellow-800 border-yellow-300';
-    return 'bg-red-100 text-red-800 border-red-300';
+  const getScoreTone = (score) => {
+    if (score >= 80) return 'text-emerald-300';
+    if (score >= 60) return 'text-amber-300';
+    return 'text-rose-300';
   };
 
-  // Get emotion badge color
-  const getEmotionBadgeColor = (emotion) => {
-    const colors = {
-      happy: 'bg-yellow-100 text-yellow-800',
-      sad: 'bg-blue-100 text-blue-800',
-      angry: 'bg-red-100 text-red-800',
-      fear: 'bg-purple-100 text-purple-800',
-      surprise: 'bg-pink-100 text-pink-800',
-      disgust: 'bg-orange-100 text-orange-800',
-      neutral: 'bg-gray-100 text-gray-800',
-    };
-    return colors[emotion] || colors.neutral;
+  const getMatchTone = (score) => {
+    if (score >= 75) return 'bg-emerald-500/15 text-emerald-200 border-emerald-400/30';
+    if (score >= 50) return 'bg-amber-500/15 text-amber-200 border-amber-400/30';
+    return 'bg-rose-500/15 text-rose-200 border-rose-400/30';
   };
 
-  // Emotion colors for emotion bars
-  const emotionColors = {
-    happy: '#FFD700',
-    sad: '#4682B4',
-    angry: '#DC143C',
-    fear: '#9370DB',
-    surprise: '#FF6347',
-    disgust: '#8B4513',
-    neutral: '#808080'
+  const getStatusTone = (status) => {
+    if (status === 'Accepted') return 'bg-emerald-500/15 border-emerald-500/40 text-emerald-200';
+    if (status === 'Rejected') return 'bg-rose-500/15 border-rose-500/40 text-rose-200';
+    return 'bg-slate-500/15 border-slate-500/40 text-slate-200';
   };
 
-  // Emotion icons
   const emotionIcons = {
     happy: '😊',
     sad: '😢',
@@ -151,53 +170,30 @@ const SubmissionsPage = () => {
     fear: '😨',
     surprise: '😲',
     disgust: '🤢',
-    neutral: '😐'
+    neutral: '😐',
   };
 
-  // Compact Emotion Indicator Component
-  const CompactEmotionIndicator = ({ emotionScores, detectedEmotion }) => {
-    if (!emotionScores) return null;
+  const formatDate = (date) => {
+    return new Date(date).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+    });
+  };
 
-    // Get top 3 emotions
-    const topEmotions = Object.entries(emotionScores)
-      .sort(([, a], [, b]) => b - a)
-      .slice(0, 3);
-
-    return (
-      <div className="w-full">
-        <div className="flex items-center gap-2 mb-2">
-          <Brain className="w-4 h-4 text-blue-400" />
-          <span className="text-xs text-slate-400 font-medium">AI Emotion Analysis</span>
-        </div>
-        <div className="space-y-1.5">
-          {topEmotions.map(([emotion, score]) => (
-            <div key={emotion} className="flex items-center gap-2 group">
-              <span className="text-lg transition-transform group-hover:scale-125">{emotionIcons[emotion]}</span>
-              <div className="flex-1">
-                <div className="flex items-center justify-between mb-0.5">
-                  <span className="text-xs capitalize text-slate-300 font-medium">{emotion}</span>
-                  <span className="text-xs text-slate-400 font-bold">{(score * 100).toFixed(1)}%</span>
-                </div>
-                <div className="h-2 bg-slate-700 rounded-full overflow-hidden">
-                  <div 
-                    className="h-full rounded-full transition-all duration-300 group-hover:brightness-110"
-                    style={{ 
-                      width: `${score * 100}%`,
-                      backgroundColor: emotionColors[emotion]
-                    }}
-                  ></div>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-    );
+  const formatDateTime = (date) => {
+    return new Date(date).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
   };
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white flex items-center justify-center">
+      <div className="min-h-screen bg-slate-950 text-white flex items-center justify-center">
         <div className="text-center">
           <Loader2 className="w-12 h-12 animate-spin mx-auto mb-4 text-blue-500" />
           <p className="text-slate-400">Loading submissions...</p>
@@ -208,7 +204,7 @@ const SubmissionsPage = () => {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white p-6">
+      <div className="min-h-screen bg-slate-950 text-white p-4 sm:p-6">
         <div className="max-w-3xl mx-auto mt-8">
           <Alert variant="destructive">
             <AlertCircle className="h-4 w-4" />
@@ -227,478 +223,514 @@ const SubmissionsPage = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white p-6">
-      <div className="max-w-7xl mx-auto">
-        {/* Header */}
-        <div className="mb-8">
-          <div className="flex items-center justify-between mb-4">
-            <h1 className="text-4xl font-bold">Casting Submissions</h1>
-            <Button
-              onClick={() => navigate(-1)}
-              variant="outline"
-              className="text-slate-300 border-slate-600 hover:bg-slate-700"
-            >
-              Back
-            </Button>
-          </div>
-          {castingData?.data && (
-            <p className="text-slate-400 text-lg">
-              {castingData.data.roleTitle} • {castingData.data.location}
-            </p>
-          )}
+      <div className="min-h-screen bg-slate-950 text-white p-4 sm:p-6">
+      <div className="mx-auto max-w-7xl space-y-6">
+        <Card className="overflow-hidden border-slate-800 bg-gradient-to-r from-slate-900 via-slate-900 to-slate-800">
+          <CardContent className="p-0">
+            <div className="h-1 w-full bg-gradient-to-r from-cyan-400 via-blue-500 to-emerald-400" />
+            <div className="flex flex-col gap-6 p-5 sm:p-7 lg:flex-row lg:items-center lg:justify-between">
+              <div className="space-y-3">
+                <Badge className="w-fit border-cyan-400/30 bg-cyan-500/10 text-cyan-200">AI Performance Analysis</Badge>
+                <div>
+                  <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">Submissions Evaluation Board</h1>
+                  <p className="mt-1 text-sm text-slate-300 sm:text-base">
+                    {castingData?.data?.roleTitle || 'Casting Role'}
+                    {castingData?.data?.location ? ` • ${castingData.data.location}` : ''}
+                  </p>
+                </div>
+                <div className="flex flex-wrap items-center gap-4 text-sm text-slate-300">
+                  <span className="inline-flex items-center gap-2"><Users className="h-4 w-4" /> {stats.total} candidates</span>
+                  <span className="inline-flex items-center gap-2"><ClipboardCheck className="h-4 w-4" /> {stats.analyzed} analyzed</span>
+                  <span className="inline-flex items-center gap-2"><Gauge className="h-4 w-4" /> Avg {stats.avgScore}</span>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 sm:gap-3">
+                <Button
+                  onClick={() => refetch()}
+                  variant="outline"
+                  className="border-slate-600 bg-slate-900/40 text-slate-200 hover:bg-slate-800"
+                >
+                  <RefreshCw className="mr-2 h-4 w-4" />
+                  Refresh
+                </Button>
+                <Button
+                  onClick={() => navigate(-1)}
+                  variant="outline"
+                  className="border-slate-600 bg-slate-900/40 text-slate-200 hover:bg-slate-800"
+                >
+                  Back
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <Card className="border-slate-800 bg-slate-900/80">
+            <CardContent className="p-5">
+              <div className="flex items-center justify-between">
+                <p className="text-sm text-slate-400">Total Submissions</p>
+                <Users className="h-4 w-4 text-slate-400" />
+              </div>
+              <p className="mt-3 text-3xl font-semibold text-slate-100">{stats.total}</p>
+            </CardContent>
+          </Card>
+          <Card className="border-slate-800 bg-slate-900/80">
+            <CardContent className="p-5">
+              <div className="flex items-center justify-between">
+                <p className="text-sm text-slate-400">AI Coverage</p>
+                <Brain className="h-4 w-4 text-cyan-300" />
+              </div>
+              <p className="mt-3 text-3xl font-semibold text-cyan-300">{stats.analyzed}</p>
+            </CardContent>
+          </Card>
+          <Card className="border-slate-800 bg-slate-900/80">
+            <CardContent className="p-5">
+              <div className="flex items-center justify-between">
+                <p className="text-sm text-slate-400">Average Score</p>
+                <TrendingUp className="h-4 w-4 text-amber-300" />
+              </div>
+              <p className="mt-3 text-3xl font-semibold text-amber-300">{stats.avgScore}</p>
+            </CardContent>
+          </Card>
+          <Card className="border-slate-800 bg-slate-900/80">
+            <CardContent className="p-5">
+              <div className="flex items-center justify-between">
+                <p className="text-sm text-slate-400">Best Score</p>
+                <Trophy className="h-4 w-4 text-emerald-300" />
+              </div>
+              <p className="mt-3 text-3xl font-semibold text-emerald-300">{stats.topScore}</p>
+            </CardContent>
+          </Card>
         </div>
 
-        {/* Statistics Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-          <Card className="bg-slate-800 border-slate-700">
-            <CardContent className="pt-6">
-              <div className="text-3xl font-bold text-blue-400">{stats.total}</div>
-              <p className="text-slate-400 text-sm mt-1">Total Submissions</p>
-            </CardContent>
-          </Card>
-          <Card className="bg-slate-800 border-slate-700">
-            <CardContent className="pt-6">
-              <div className="text-3xl font-bold text-green-400">{stats.analyzed}</div>
-              <p className="text-slate-400 text-sm mt-1">AI Analyzed</p>
-            </CardContent>
-          </Card>
-          <Card className="bg-slate-800 border-slate-700">
-            <CardContent className="pt-6">
-              <div className="text-3xl font-bold text-yellow-400">{stats.avgScore}</div>
-              <p className="text-slate-400 text-sm mt-1">Average Score</p>
-            </CardContent>
-          </Card>
-          <Card className="bg-slate-800 border-slate-700">
-            <CardContent className="pt-6">
-              <div className="text-3xl font-bold text-purple-400">{stats.topScore}</div>
-              <p className="text-slate-400 text-sm mt-1">Top Score</p>
-            </CardContent>
-          </Card>
-        </div>
+        <Card className="sticky top-2 z-20 border-slate-800 bg-slate-900/95 backdrop-blur">
+          <CardContent className="p-4 sm:p-5">
+            <div className="mb-3 flex items-center gap-2 text-sm text-slate-300">
+              <SlidersHorizontal className="h-4 w-4" />
+              Review Controls
+            </div>
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              <div>
+                <label className="mb-2 block text-xs uppercase tracking-wider text-slate-400">Sort submissions</label>
+                <Select value={sortBy} onValueChange={setSortBy}>
+                  <SelectTrigger className="border-slate-700 bg-slate-800 text-white">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="border-slate-700 bg-slate-800 text-white">
+                    <SelectItem value="overallScore">Highest score first</SelectItem>
+                    <SelectItem value="newest">Newest first</SelectItem>
+                    <SelectItem value="oldest">Oldest first</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <div className="mb-2 flex items-center justify-between">
+                  <label className="text-xs uppercase tracking-wider text-slate-400">Minimum AI score</label>
+                  <span className="rounded-md border border-slate-700 bg-slate-800 px-2 py-0.5 text-xs text-slate-200">{filterScore}+</span>
+                </div>
+                <input
+                  type="range"
+                  min="0"
+                  max="100"
+                  step="10"
+                  value={filterScore}
+                  onChange={(e) => setFilterScore(parseInt(e.target.value, 10))}
+                  className="w-full cursor-pointer accent-cyan-400"
+                />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
-        {/* Filters and Sort */}
-        <div className="flex flex-col md:flex-row gap-4 mb-6 bg-slate-800 p-4 rounded-lg border border-slate-700">
-          <div className="flex-1">
-            <label className="text-sm text-slate-400 mb-2 block">Sort By</label>
-            <Select value={sortBy} onValueChange={setSortBy}>
-              <SelectTrigger className="bg-slate-700 border-slate-600 text-white">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent className="bg-slate-700 border-slate-600">
-                <SelectItem value="overallScore">Highest Score First</SelectItem>
-                <SelectItem value="newest">Newest First</SelectItem>
-                <SelectItem value="oldest">Oldest First</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="flex-1">
-            <label className="text-sm text-slate-400 mb-2 block">Minimum Score</label>
-            <input
-              type="range"
-              min="0"
-              max="100"
-              step="10"
-              value={filterScore}
-              onChange={(e) => setFilterScore(parseInt(e.target.value))}
-              className="w-full cursor-pointer"
-            />
-            <div className="text-xs text-slate-400 mt-1">{filterScore}+</div>
-          </div>
-        </div>
-
-        {/* Empty State */}
         {submissions.length === 0 && (
-          <Card className="bg-slate-800 border-slate-700">
-            <CardContent className="pt-6 text-center py-12">
-              <AlertCircle className="w-12 h-12 mx-auto text-slate-500 mb-4" />
-              <p className="text-slate-400 text-lg">No submissions matching your filters</p>
+          <Card className="border-slate-800 bg-slate-900/80">
+            <CardContent className="py-16 text-center">
+              <AlertCircle className="mx-auto mb-4 h-12 w-12 text-slate-500" />
+              <p className="text-lg text-slate-300">No submissions match this filter.</p>
+              <p className="mt-2 text-sm text-slate-500">Try lowering the minimum score or changing sort criteria.</p>
             </CardContent>
           </Card>
         )}
 
-        {/* Submissions List */}
         <div className="space-y-4">
-          {submissions.map((submission, idx) => (
-            <Card 
-              key={submission._id} 
-              className="bg-slate-800 border-slate-700 hover:border-blue-500 hover:shadow-lg hover:shadow-blue-500/20 transition-all duration-300 cursor-pointer overflow-hidden group"
-              onClick={() => setExpandedSubmission(expandedSubmission === submission._id ? null : submission._id)}
-            >
-              <CardContent className="pt-6">
-                <div className="flex items-start gap-6">
-                  {/* Left Section - Actor Info and Photo */}
-                  <div className="flex-shrink-0">
-                    {submission.actor?.profilePicture ? (
-                      <img 
-                        src={submission.actor.profilePicture} 
-                        alt={submission.actor.name}
-                        className="w-24 h-24 rounded-lg object-cover border-2 border-slate-600 group-hover:border-blue-500 transition"
-                      />
-                    ) : (
-                      <div className="w-24 h-24 rounded-lg bg-slate-700 flex items-center justify-center border-2 border-slate-600 group-hover:border-blue-500 transition">
-                        <span className="text-3xl">{emotionIcons.neutral}</span>
-                      </div>
-                    )}
-                  </div>
+          {submissions.map((submission) => {
+            const isExpanded = expandedSubmission === submission._id;
+            const score = Number(submission.overallScore || 0);
+            const match = Number(submission.emotionMatchScore || 0);
+            const confidence = Number(submission.confidence || 0) * 100;
 
-                  {/* Middle Section - Actor Details and AI Preview */}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-start justify-between gap-3 mb-3">
-                      <div>
-                        <h3 className="font-semibold text-xl text-white group-hover:text-blue-400 transition">{submission.actor?.name || 'Unknown'}</h3>
-                        <p className="text-sm text-slate-400">{submission.actor?.email}</p>
-                      </div>
-                      <div className="flex items-center gap-2 flex-shrink-0">
-                        {idx < 3 && (
-                          <Award className="w-5 h-5 text-yellow-400 animate-pulse" />
+            return (
+              <Card
+                ref={(el) => {
+                  cardRefs.current[submission._id] = el;
+                }}
+                key={submission._id}
+                className="cursor-pointer overflow-hidden border-slate-800 bg-slate-900/80 transition-all duration-300 hover:border-cyan-500/50 hover:bg-slate-900"
+                onClick={() => {
+                  if (isExpanded) {
+                    setLastCollapsedId(submission._id);
+                  }
+                  setExpandedSubmission(isExpanded ? null : submission._id);
+                }}
+              >
+                <CardContent className="p-4 sm:p-5">
+                  <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                    <div className="flex min-w-0 flex-1 gap-4">
+                      <div
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (submission.actor?._id) {
+                            navigate(`/profile/${submission.actor._id}`);
+                          }
+                        }}
+                        className="group relative h-20 w-20 flex-shrink-0 cursor-pointer overflow-hidden rounded-xl border-2 border-slate-700 bg-slate-800 transition-all hover:border-cyan-400 hover:shadow-lg hover:shadow-cyan-500/20 sm:h-24 sm:w-24"
+                      >
+                        {submission.actor?.profileImage ? (
+                          <img
+                            src={submission.actor.profileImage}
+                            alt={submission.actor?.name || 'Actor'}
+                            className="h-full w-full object-cover transition-transform group-hover:scale-110"
+                          />
+                        ) : (
+                          <div className="flex h-full w-full items-center justify-center text-3xl transition-transform group-hover:scale-110">{emotionIcons.neutral}</div>
                         )}
-                        {submission.status && (
-                          <Badge className={`whitespace-nowrap ${
-                            submission.status === 'Accepted' ? 'bg-green-600 text-white' : 
-                            submission.status === 'Rejected' ? 'bg-red-600 text-white' : 
-                            'bg-yellow-600 text-white'
-                          }`}>
-                            {submission.status}
-                          </Badge>
-                        )}
+                        <div className="absolute inset-0 bg-black/0 transition-all group-hover:bg-black/20" />
+                        <div className="absolute inset-0 flex items-center justify-center opacity-0 transition-opacity group-hover:opacity-100">
+                          <div className="rounded-full bg-cyan-500/90 p-1.5 text-white shadow-lg">
+                            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                            </svg>
+                          </div>
+                        </div>
                       </div>
-                    </div>
 
-                    {/* AI Analysis Summary (Always Visible) */}
-                    {submission.aiAnalyzed ? (
-                      <div className="mt-4 bg-gradient-to-br from-slate-700/50 to-slate-800/50 rounded-lg border-2 border-blue-500/30 p-4 space-y-3">
-                        {/* Emotion Comparison */}
-                        <div className="flex items-center justify-between gap-4">
-                          <div className="flex items-center gap-3">
-                            <div className="text-center">
-                              <div className="text-xs text-slate-400 mb-1 font-medium">Expected</div>
-                              <div className="flex items-center gap-2 bg-slate-700 px-3 py-2 rounded-lg">
-                                <span className="text-2xl">{emotionIcons[submission.requiredEmotion]}</span>
-                                <span className="text-sm font-semibold text-white capitalize">{submission.requiredEmotion}</span>
-                              </div>
-                            </div>
-                            <div className="text-blue-400 text-xl">→</div>
-                            <div className="text-center">
-                              <div className="text-xs text-slate-400 mb-1 font-medium">Detected</div>
-                              <div className="flex items-center gap-2 bg-slate-700 px-3 py-2 rounded-lg">
-                                <span className="text-2xl">{emotionIcons[submission.detectedEmotion]}</span>
-                                <span className="text-sm font-semibold text-white capitalize">{submission.detectedEmotion}</span>
-                              </div>
-                            </div>
+                      <div className="min-w-0 flex-1 space-y-3">
+                        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                          <div className="min-w-0">
+                            <h3 className="truncate text-lg font-semibold text-slate-100 sm:text-xl">{submission.actor?.name || 'Unknown candidate'}</h3>
+                            <p className="mt-0.5 flex items-center gap-2 truncate text-sm text-slate-400">
+                              <Mail className="h-3.5 w-3.5" />
+                              {submission.actor?.email || 'No email available'}
+                            </p>
+                          </div>
+                          <div className="flex flex-wrap items-center gap-2">
+                            {submission.status && (
+                              <Badge className={`border ${getStatusTone(submission.status)}`}>
+                                {submission.status}
+                              </Badge>
+                            )}
+                            <Badge className={`border ${getMatchTone(match)}`}>
+                              Match {Math.round(match)}%
+                            </Badge>
                           </div>
                         </div>
 
-                        {/* Scores Row */}
-                        <div className="grid grid-cols-3 gap-3">
-                          <div className="bg-slate-700/80 rounded-lg p-3 text-center">
-                            <div className={`text-2xl font-bold ${getScoreBadgeColor(submission.overallScore).split(' ')[1]}`}>
-                              {submission.overallScore.toFixed(1)}
-                            </div>
-                            <div className="text-xs text-slate-400 mt-1">Overall Score</div>
+                        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                          <div className="rounded-lg border border-slate-800 bg-slate-950/80 p-3">
+                            <p className="text-xs uppercase tracking-wider text-slate-500">Required</p>
+                            <p className="mt-1 flex items-center gap-1.5 text-sm capitalize text-slate-200">
+                              <span>{emotionIcons[submission.requiredEmotion] || emotionIcons.neutral}</span>
+                              {submission.requiredEmotion || 'neutral'}
+                            </p>
                           </div>
-                          <div className="bg-slate-700/80 rounded-lg p-3 text-center">
-                            <div className="text-2xl font-bold text-blue-400">
-                              {submission.emotionMatchScore}%
-                            </div>
-                            <div className="text-xs text-slate-400 mt-1">Match</div>
+                          <div className="rounded-lg border border-slate-800 bg-slate-950/80 p-3">
+                            <p className="text-xs uppercase tracking-wider text-slate-500">Detected</p>
+                            <p className="mt-1 flex items-center gap-1.5 text-sm capitalize text-slate-200">
+                              <span>{emotionIcons[submission.detectedEmotion] || emotionIcons.neutral}</span>
+                              {submission.detectedEmotion || 'pending'}
+                            </p>
                           </div>
-                          <div className="bg-slate-700/80 rounded-lg p-3 text-center">
-                            <div className="text-2xl font-bold text-purple-400">
-                              {(submission.confidence * 100).toFixed(0)}%
-                            </div>
-                            <div className="text-xs text-slate-400 mt-1">Confidence</div>
+                          <div className="rounded-lg border border-slate-800 bg-slate-950/80 p-3">
+                            <p className="text-xs uppercase tracking-wider text-slate-500">Overall</p>
+                            <p className={`mt-1 text-lg font-semibold ${getScoreTone(score)}`}>{score.toFixed(1)}</p>
+                          </div>
+                          <div className="rounded-lg border border-slate-800 bg-slate-950/80 p-3">
+                            <p className="text-xs uppercase tracking-wider text-slate-500">Confidence</p>
+                            <p className="mt-1 text-lg font-semibold text-slate-200">{Math.round(confidence)}%</p>
                           </div>
                         </div>
 
-                        {/* Feedback Preview (Collapsed State) */}
-                        {submission.feedback && expandedSubmission !== submission._id && (
-                          <div className="bg-slate-700/50 rounded-lg p-3 border-l-4 border-blue-500">
-                            <div className="flex items-start gap-2">
-                              <Brain className="w-4 h-4 text-blue-400 mt-0.5 flex-shrink-0" />
-                              <div className="flex-1">
-                                <p className="text-xs text-slate-400 font-semibold mb-1">AI Feedback</p>
-                                <p className="text-sm text-slate-300" style={{
+                        {submission.aiAnalyzed ? (
+                          <div className="space-y-2 rounded-lg border border-cyan-900/40 bg-cyan-950/20 p-3">
+                            <div className="flex items-center justify-between text-xs text-slate-300">
+                              <span>Performance score</span>
+                              <span className={getScoreTone(score)}>{score.toFixed(1)} / 100</span>
+                            </div>
+                            <div className="h-2 overflow-hidden rounded-full bg-slate-800">
+                              <div
+                                className="h-full rounded-full bg-gradient-to-r from-cyan-500 via-blue-500 to-emerald-400"
+                                style={{ width: `${Math.min(Math.max(score, 0), 100)}%` }}
+                              />
+                            </div>
+                            {submission.feedback && !isExpanded && (
+                              <p
+                                className="text-sm text-slate-300"
+                                style={{
                                   display: '-webkit-box',
                                   WebkitLineClamp: 2,
                                   WebkitBoxOrient: 'vertical',
-                                  overflow: 'hidden'
-                                }}>{submission.feedback}</p>
-                              </div>
-                            </div>
+                                  overflow: 'hidden',
+                                }}
+                              >
+                                {submission.feedback}
+                              </p>
+                            )}
+                            {submission.framesAnalyzed && (
+                              <p className="inline-flex items-center gap-1 text-xs text-slate-400">
+                                <Sparkles className="h-3 w-3" />
+                                {submission.framesAnalyzed} frames analyzed
+                              </p>
+                            )}
                           </div>
-                        )}
-
-                        {/* Stats Badge */}
-                        {submission.framesAnalyzed && (
-                          <div className="flex items-center justify-center gap-2 text-xs text-slate-400">
-                            <Sparkles className="w-3 h-3" />
-                            <span>Analyzed {submission.framesAnalyzed} frames</span>
+                        ) : (
+                          <div className="rounded-lg border border-dashed border-slate-700 bg-slate-900/70 p-3 text-sm text-slate-400">
+                            AI analysis is in progress. This card auto-refreshes every 5 seconds.
                           </div>
                         )}
                       </div>
-                    ) : (
-                      <div className="mt-4 bg-slate-700/30 rounded-lg border-2 border-dashed border-slate-600 p-6 text-center">
-                        <div className="w-12 h-12 border-4 border-slate-600 border-t-blue-400 rounded-full animate-spin mx-auto mb-3"></div>
-                        <p className="text-sm text-slate-400 font-medium">AI Analysis in Progress...</p>
-                        <p className="text-xs text-slate-500 mt-1">Analyzing video for emotion detection</p>
-                      </div>
-                    )}
-                  </div>
+                    </div>
 
-                  {/* Right Section - Expand Control */}
-                  <div className="flex items-center gap-2 ml-4 flex-shrink-0">
-                    {/* Chevron */}
-                    <div className="flex flex-col items-center">
-                      <ChevronDown 
-                        className={`w-8 h-8 text-slate-400 transition-transform duration-300 group-hover:text-blue-400 ${
-                          expandedSubmission === submission._id ? 'rotate-180' : ''
-                        }`}
-                      />
-                      <p className="text-xs text-slate-500 mt-1">
-                        {expandedSubmission === submission._id ? 'Less' : 'More'}
-                      </p>
+                    <div className="flex items-center self-center lg:self-start">
+                      <div className="flex items-center gap-2 rounded-lg border border-slate-800 bg-slate-950/70 px-3 py-2 text-xs text-slate-400">
+                        <span>{isExpanded ? 'Collapse' : 'Expand'}</span>
+                        <ChevronDown className={`h-4 w-4 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+                      </div>
                     </div>
                   </div>
-                </div>
 
-                {/* Expanded Details */}
-                {expandedSubmission === submission._id && (
-                  <div className="mt-6 pt-6 border-t border-slate-700 space-y-6 transition-all duration-300">
-                    {/* Applicant Details */}
-                    {submission.actor && (
-                      <div className="bg-slate-800 rounded-xl p-4 space-y-4">
-                        <h4 className="text-sm font-bold text-slate-200">Applicant Details</h4>
-                        <div className="flex gap-4">
-                          {submission.actor.profileImage && (
-                            <img 
-                              src={submission.actor.profileImage} 
-                              alt={submission.actor.name}
-                              className="w-20 h-20 rounded-lg object-cover border-2 border-slate-700"
-                            />
-                          )}
-                          <div className="flex-1 space-y-2">
+                  {isExpanded && (
+                    <div className="mt-5 space-y-5 border-t border-slate-800 pt-5">
+                      <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
+                        <Card className="border-slate-800 bg-slate-950/70 xl:col-span-1">
+                          <CardHeader className="pb-3">
+                            <CardTitle className="text-sm font-semibold text-slate-200">Candidate Details</CardTitle>
+                          </CardHeader>
+                          <CardContent className="space-y-4 text-sm">
+                            {submission.actor?.profileImage && (
+                              <div
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  navigate(`/profile/${submission.actor._id}`);
+                                }}
+                                className="group relative mx-auto h-32 w-32 cursor-pointer overflow-hidden rounded-xl border-2 border-slate-700 bg-slate-800 transition-all hover:border-cyan-400 hover:shadow-lg hover:shadow-cyan-500/30"
+                              >
+                                <img
+                                  src={submission.actor.profileImage}
+                                  alt={submission.actor.name}
+                                  className="h-full w-full object-cover transition-transform group-hover:scale-110"
+                                />
+                                <div className="absolute inset-0 bg-black/0 transition-all group-hover:bg-black/20" />
+                                <div className="absolute inset-0 flex items-center justify-center opacity-0 transition-opacity group-hover:opacity-100">
+                                  <div className="rounded-full bg-cyan-500/90 p-2 text-white shadow-lg">
+                                    <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                    </svg>
+                                  </div>
+                                </div>
+                              </div>
+                            )}
                             <div>
-                              <p className="text-xs text-slate-500">Name</p>
-                              <p className="text-sm text-white font-medium">{submission.actor.name}</p>
+                              <p className="mb-1 text-xs uppercase tracking-wider text-slate-500">Full Name</p>
+                              <p className="font-semibold text-slate-100">{submission.actor?.name || 'Unknown'}</p>
                             </div>
-                            <div>
-                              <p className="text-xs text-slate-500">Email</p>
-                              <p className="text-sm text-slate-300">{submission.actor.email}</p>
+                            <div className="flex items-start gap-2 text-slate-300">
+                              <Mail className="mt-0.5 h-4 w-4 text-slate-400" />
+                              <span className="break-all">{submission.actor?.email || submission.email || 'Not provided'}</span>
                             </div>
-                            {submission.gender && (
+                            {submission.phoneNumber && (
+                              <div className="flex items-start gap-2 text-slate-300">
+                                <Phone className="mt-0.5 h-4 w-4 text-slate-400" />
+                                <span className="font-mono">{submission.phoneNumber}</span>
+                              </div>
+                            )}
+                            {submission.livingCity && (
+                              <div className="flex items-start gap-2 text-slate-300">
+                                <MapPin className="mt-0.5 h-4 w-4 text-slate-400" />
+                                <span>{submission.livingCity}</span>
+                              </div>
+                            )}
+                            <div className="flex items-start gap-2 text-slate-300">
+                              <Calendar className="mt-0.5 h-4 w-4 text-slate-400" />
+                              <span>Submitted {formatDateTime(submission.createdAt)}</span>
+                            </div>
+
+                            {(submission.age || submission.height || submission.weight) && (
+                              <div className="grid grid-cols-3 gap-2 pt-2">
+                                {submission.age && <div className="rounded-md border border-slate-800 bg-slate-900 p-2 text-center"><p className="text-xs text-slate-500">Age</p><p className="text-slate-200">{submission.age}</p></div>}
+                                {submission.height && <div className="rounded-md border border-slate-800 bg-slate-900 p-2 text-center"><p className="text-xs text-slate-500">Height</p><p className="text-slate-200">{submission.height}</p></div>}
+                                {submission.weight && <div className="rounded-md border border-slate-800 bg-slate-900 p-2 text-center"><p className="text-xs text-slate-500">Weight</p><p className="text-slate-200">{submission.weight}</p></div>}
+                              </div>
+                            )}
+
+                            {submission.skills?.length > 0 && (
                               <div>
-                                <p className="text-xs text-slate-500">Gender</p>
-                                <p className="text-sm text-slate-300 capitalize">{submission.gender}</p>
+                                <p className="mb-2 text-xs uppercase tracking-wider text-slate-500">Skills</p>
+                                <div className="flex flex-wrap gap-2">
+                                  {submission.skills.map((skill, i) => (
+                                    <span key={i} className="rounded-md border border-cyan-700/30 bg-cyan-900/20 px-2 py-1 text-xs text-cyan-200">
+                                      {skill}
+                                    </span>
+                                  ))}
+                                </div>
                               </div>
                             )}
-                          </div>
-                        </div>
 
-                        {/* Physical Details */}
-                        {(submission.age || submission.height || submission.weight) && (
-                          <div className="grid grid-cols-3 gap-3 pt-3 border-t border-slate-700">
-                            {submission.age && (
-                              <div className="text-center">
-                                <p className="text-xs text-slate-500">Age</p>
-                                <p className="text-sm text-slate-300">{submission.age}</p>
+                            {(submission.portfolioUrl || submission.idProofUrl) && (
+                              <div className="grid grid-cols-1 gap-2 pt-1 sm:grid-cols-2">
+                                {submission.portfolioUrl && (
+                                  <a
+                                    href={submission.portfolioUrl}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    onClick={(e) => e.stopPropagation()}
+                                    className="rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-center text-xs text-slate-200 transition hover:border-cyan-500/60 hover:text-cyan-200"
+                                  >
+                                    View Portfolio
+                                  </a>
+                                )}
+                                {submission.idProofUrl && (
+                                  <a
+                                    href={submission.idProofUrl}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    onClick={(e) => e.stopPropagation()}
+                                    className="rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-center text-xs text-slate-200 transition hover:border-cyan-500/60 hover:text-cyan-200"
+                                  >
+                                    View ID Proof
+                                  </a>
+                                )}
                               </div>
                             )}
-                            {submission.height && (
-                              <div className="text-center">
-                                <p className="text-xs text-slate-500">Height</p>
-                                <p className="text-sm text-slate-300">{submission.height}</p>
+
+                            {submission.videoUrl && (
+                              <div className="pt-2">
+                                <p className="mb-2 text-xs uppercase tracking-wider text-slate-500">Submitted Video</p>
+                                <video
+                                  src={submission.videoUrl}
+                                  controls
+                                  className="w-full rounded-lg border border-slate-800 bg-black"
+                                  onClick={(e) => e.stopPropagation()}
+                                />
                               </div>
                             )}
-                            {submission.weight && (
-                              <div className="text-center">
-                                <p className="text-xs text-slate-500">Weight</p>
-                                <p className="text-sm text-slate-300">{submission.weight}</p>
-                              </div>
-                            )}
-                          </div>
-                        )}
+                          </CardContent>
+                        </Card>
 
-                        {/* Skills */}
-                        {submission.skills && submission.skills.length > 0 && (
-                          <div className="pt-3 border-t border-slate-700">
-                            <p className="text-xs text-slate-500 mb-2">Skills</p>
-                            <div className="flex flex-wrap gap-2">
-                              {submission.skills.map((skill, i) => (
-                                <span key={i} className="px-2 py-1 bg-blue-900/30 text-blue-300 text-xs rounded-md border border-blue-700/50">
-                                  {skill}
-                                </span>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    )}
-
-                    {/* Portfolio and ID Proof */}
-                    <div className="grid grid-cols-2 gap-3">
-                      {submission.portfolioUrl && (
-                        <a
-                          href={submission.portfolioUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="flex items-center gap-2 px-3 py-2 bg-slate-800 hover:bg-slate-700 rounded-lg border border-slate-700 transition text-sm text-slate-300 hover:text-white"
-                        >
-                          <Award className="w-4 h-4" />
-                          View Portfolio
-                        </a>
-                      )}
-                      {submission.idProofUrl && (
-                        <a
-                          href={submission.idProofUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="flex items-center gap-2 px-3 py-2 bg-slate-800 hover:bg-slate-700 rounded-lg border border-slate-700 transition text-sm text-slate-300 hover:text-white"
-                        >
-                          <AlertCircle className="w-4 h-4" />
-                          View ID Proof
-                        </a>
-                      )}
-                    </div>
-
-                    {/* Full AI Analysis Display */}
-                    {submission.aiAnalyzed ? (
-                      <div className="bg-gradient-to-br from-slate-700 to-slate-800 rounded-xl p-1">
-                        <div className="bg-slate-900 rounded-lg p-4">
-                          <EmotionAnalysisDisplay submission={submission} darkTheme={true} />
-                        </div>
-                      </div>
-                    ) : (
-                      <Alert className="bg-slate-700 border-slate-600">
-                        <AlertCircle className="h-4 w-4" />
-                        <AlertTitle>Analysis Pending</AlertTitle>
-                        <AlertDescription>
-                          AI analysis is in progress. Please refresh to see results.
-                        </AlertDescription>
-                      </Alert>
-                    )}
-
-                    {/* Video Preview */}
-                    {submission.videoUrl && (
-                      <div className="mt-4">
-                        <div className="flex items-center gap-2 mb-3">
-                          <span className="text-sm text-slate-400 font-medium">Audition Video</span>
-                        </div>
-                        <video
-                          src={submission.videoUrl}
-                          controls
-                          className="w-full rounded-lg bg-black max-h-96 border-2 border-slate-700 hover:border-blue-500 transition"
-                        />
-                      </div>
-                    )}
-
-                    {/* Action Buttons */}
-                    <div className="space-y-3">
-                      {/* Accept/Reject Buttons */}
-                      <div className="grid grid-cols-2 gap-3">
-                        <Button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setUpdatingStatusId(submission._id);
-                            updateStatusMutation.mutate({
-                              submissionId: submission._id,
-                              status: 'Accepted'
-                            });
-                          }}
-                          disabled={updatingStatusId === submission._id}
-                          className="flex-1 bg-green-600 hover:bg-green-700 text-white disabled:opacity-75"
-                        >
-                          {updatingStatusId === submission._id ? (
-                            <>
-                              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                              Accepting...
-                            </>
+                        <div className="space-y-4 xl:col-span-2">
+                          {submission.aiAnalyzed ? (
+                            <Card className="border-slate-800 bg-slate-950/70">
+                              <CardContent className="p-4">
+                                <EmotionAnalysisDisplay submission={submission} darkTheme={true} />
+                              </CardContent>
+                            </Card>
                           ) : (
-                            <>
-                              <CheckCircle2 className="w-4 h-4 mr-2" />
-                              Accept
-                            </>
+                            <Alert className="border-slate-700 bg-slate-900/80 text-slate-200">
+                              <AlertCircle className="h-4 w-4" />
+                              <AlertTitle>Analysis Pending</AlertTitle>
+                              <AlertDescription>
+                                AI analysis is still running for this audition. Use re-analyze if needed.
+                              </AlertDescription>
+                            </Alert>
                           )}
-                        </Button>
 
-                        <Button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setUpdatingStatusId(submission._id);
-                            updateStatusMutation.mutate({
-                              submissionId: submission._id,
-                              status: 'Rejected'
-                            });
-                          }}
-                          disabled={updatingStatusId === submission._id}
-                          className="flex-1 bg-red-600 hover:bg-red-700 text-white disabled:opacity-75"
-                        >
-                          {updatingStatusId === submission._id ? (
-                            <>
-                              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                              Rejecting...
-                            </>
-                          ) : (
-                            <>
-                              <XCircle className="w-4 h-4 mr-2" />
-                              Reject
-                            </>
-                          )}
-                        </Button>
-                      </div>
+                          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                            <Button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setUpdatingStatusId(submission._id);
+                                updateStatusMutation.mutate({
+                                  submissionId: submission._id,
+                                  status: 'Accepted',
+                                });
+                              }}
+                              disabled={updatingStatusId === submission._id}
+                              className="bg-emerald-600 text-white hover:bg-emerald-700"
+                            >
+                              {updatingStatusId === submission._id ? (
+                                <>
+                                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                  Accepting...
+                                </>
+                              ) : (
+                                <>
+                                  <CheckCircle2 className="mr-2 h-4 w-4" />
+                                  Accept Candidate
+                                </>
+                              )}
+                            </Button>
 
-                      {/* Re-analyze and Portfolio Buttons */}
-                      <div className="flex gap-3">
-                        <Button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setReanalyzingId(submission._id);
-                            reanalyzeMutation.mutate(submission._id);
-                          }}
-                          disabled={reanalyzingId === submission._id}
-                          className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
-                        >
-                          {reanalyzingId === submission._id ? (
-                            <>
-                              <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
-                              Re-analyzing...
-                            </>
-                          ) : (
-                            <>
-                              <RefreshCw className="w-4 h-4 mr-2" />
-                              Re-analyze Emotion
-                            </>
-                          )}
-                        </Button>
+                            <Button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setUpdatingStatusId(submission._id);
+                                updateStatusMutation.mutate({
+                                  submissionId: submission._id,
+                                  status: 'Rejected',
+                                });
+                              }}
+                              disabled={updatingStatusId === submission._id}
+                              className="bg-rose-600 text-white hover:bg-rose-700"
+                            >
+                              {updatingStatusId === submission._id ? (
+                                <>
+                                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                  Rejecting...
+                                </>
+                              ) : (
+                                <>
+                                  <XCircle className="mr-2 h-4 w-4" />
+                                  Reject Candidate
+                                </>
+                              )}
+                            </Button>
 
-                        {/* View Full Portfolio Button */}
-                        <Button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            navigate(`/actor/${submission.actor?._id}`);
-                          }}
-                          variant="outline"
-                          className="flex-1 border-slate-600 text-slate-300 hover:bg-slate-700"
-                        >
-                          View Full Portfolio
-                        </Button>
+                            <Button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setReanalyzingId(submission._id);
+                                reanalyzeMutation.mutate(submission._id);
+                              }}
+                              disabled={reanalyzingId === submission._id}
+                              className="border border-cyan-500/40 bg-cyan-600/10 text-cyan-200 hover:bg-cyan-600/20"
+                            >
+                              {reanalyzingId === submission._id ? (
+                                <>
+                                  <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+                                  Re-analyzing...
+                                </>
+                              ) : (
+                                <>
+                                  <RefreshCw className="mr-2 h-4 w-4" />
+                                  Re-analyze Emotion
+                                </>
+                              )}
+                            </Button>
+
+                            <Button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                navigate(`/profile/${submission.actor?._id}`);
+                              }}
+                              variant="outline"
+                              className="border-slate-700 bg-slate-900 text-slate-200 hover:bg-slate-800"
+                            >
+                              View Full Portfolio
+                            </Button>
+                          </div>
+
+                          <p className="text-center text-xs text-slate-500">Submitted on {formatDate(submission.createdAt)}</p>
+                        </div>
                       </div>
                     </div>
-
-                    {/* Submission Date */}
-                    <p className="text-xs text-slate-500 text-center mt-4">
-                      Submitted: {new Date(submission.createdAt).toLocaleDateString('en-US', {
-                        year: 'numeric',
-                        month: 'long',
-                        day: 'numeric',
-                        hour: '2-digit',
-                        minute: '2-digit'
-                      })}
-                    </p>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          ))}
+                  )}
+                </CardContent>
+              </Card>
+            );
+          })}
         </div>
       </div>
     </div>

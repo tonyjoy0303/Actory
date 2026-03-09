@@ -80,6 +80,7 @@ app.use('/api/v1/teams', require('./routes/teams'));
 app.use('/api/v1/team-invitations', require('./routes/teamInvitations'));
 app.use('/api/v1/projects', require('./routes/projects'));
 app.use('/api/v1/submissions', require('./routes/submissions'));
+app.use('/api/v1/auditions', require('./routes/auditions'));
 app.use('/api', require('./routes/prediction'));
 
 // Handle OPTIONS preflight requests

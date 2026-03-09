@@ -182,6 +182,20 @@ function validateDates(submissionDeadline, auditionDate, shootStartDate, shootEn
   return null;
 }
 
+// Clean up heightRange if both min and max are undefined
+CastingCallSchema.pre('save', function (next) {
+  if (this.heightRange && typeof this.heightRange === 'object') {
+    const hasMin = typeof this.heightRange.min === 'number';
+    const hasMax = typeof this.heightRange.max === 'number';
+    
+    // If neither min nor max are set, remove heightRange entirely
+    if (!hasMin && !hasMax) {
+      this.heightRange = undefined;
+    }
+  }
+  next();
+});
+
 // Ensure date ordering on create/save
 CastingCallSchema.pre('save', function (next) {
   const errMsg = validateDates(
@@ -199,6 +213,16 @@ CastingCallSchema.pre('findOneAndUpdate', async function (next) {
   try {
     const update = this.getUpdate() || {};
     const set = update.$set || {};
+
+    // Clean up heightRange if both min and max are undefined in the update
+    if (set.heightRange) {
+      const hasMin = typeof set.heightRange.min === 'number';
+      const hasMax = typeof set.heightRange.max === 'number';
+      
+      if (!hasMin && !hasMax) {
+        set.heightRange = undefined;
+      }
+    }
 
     // Load current doc
     const current = await this.model.findOne(this.getQuery()).lean();

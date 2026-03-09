@@ -96,13 +96,31 @@ export default function EditCastingCall() {
           castingCall={castingCall} 
           onSubmit={async (formData) => {
             try {
+              // Remove heightRange if both min and max are undefined
+              if (formData.heightRange) {
+                const hasMin = typeof formData.heightRange.min === 'number';
+                const hasMax = typeof formData.heightRange.max === 'number';
+                if (!hasMin && !hasMax) {
+                  delete formData.heightRange;
+                }
+              }
+              
               await API.put(`/casting/${id}`, formData);
               handleSuccess();
             } catch (error) {
               console.error('Error updating casting call:', error);
+              
+              // Display detailed validation errors if available
+              let errorMessage = 'Failed to update casting call.';
+              if (error.response?.data?.errors && Array.isArray(error.response.data.errors)) {
+                errorMessage = error.response.data.errors.join(', ');
+              } else if (error.response?.data?.message) {
+                errorMessage = error.response.data.message;
+              }
+              
               toast({
                 title: 'Error',
-                description: error.response?.data?.message || 'Failed to update casting call.',
+                description: errorMessage,
                 variant: 'destructive',
               });
             }

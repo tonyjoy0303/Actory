@@ -8,7 +8,7 @@ const FilmProject = require('../models/FilmProject');
 const mongoose = require('mongoose');
 const cloudinary = require('cloudinary').v2;
 const { createNotification } = require('../utils/notificationService');
-const { safeAnalyzeVideo, validateVideoFile } = require('../utils/aiIntegration');
+const { safeAnalyzeVideo, validateVideoFile } = require('../utils/aiServiceClient');
 
 // Helper: authorize casting call access.
 // allowWrite=false → any team member (or producer) can read.
@@ -84,6 +84,10 @@ exports.getVideos = async (req, res, next) => {
 // @route   POST /api/v1/casting/:castingCallId/videos
 // @access  Private (Actor only)
 exports.addVideo = async (req, res, next) => {
+  console.log(`🎬 [VIDEO UPLOAD] Received video upload request from user: ${req.user?._id}`);
+  console.log(`🎬 [VIDEO UPLOAD] Casting call ID: ${req.params.castingCallId}`);
+  console.log(`🎬 [VIDEO UPLOAD] Video URL: ${req.body.videoUrl}`);
+  
   try {
     req.body.castingCall = req.params.castingCallId;
     req.body.actor = req.user._id;
@@ -230,23 +234,24 @@ exports.addVideo = async (req, res, next) => {
             video.videoUrl,
             castingCall.requiredEmotion || 'neutral'
           );
+          const analysisData = analysisResult.data || analysisResult;
 
           if (analysisResult.success) {
             // Update video with AI results
             video.aiAnalysis = {
               analyzed: true,
-              requiredEmotion: analysisResult.requiredEmotion,
-              detectedEmotion: analysisResult.detectedEmotion,
-              emotionScores: analysisResult.emotionScores,
-              emotionMatchScore: analysisResult.emotionMatchScore,
-              confidence: analysisResult.confidence,
-              overallScore: analysisResult.overallScore,
-              feedback: analysisResult.feedback,
-              framesAnalyzed: analysisResult.framesAnalyzed || 0,
+              requiredEmotion: analysisData.requiredEmotion,
+              detectedEmotion: analysisData.detectedEmotion,
+              emotionScores: analysisData.emotionScores,
+              emotionMatchScore: analysisData.emotionMatchScore,
+              confidence: analysisData.confidence || 0,
+              overallScore: analysisData.overallScore || analysisData.emotionMatchScore || 0,
+              feedback: analysisData.feedback,
+              framesAnalyzed: analysisData.framesAnalyzed || 0,
               analyzedAt: new Date(),
               error: null,
             };
-            console.log(`[AI] Analysis complete for video ${video._id}: score=${analysisResult.overallScore}`);
+            console.log(`[AI] Analysis complete for video ${video._id}: score=${analysisData.overallScore || analysisData.emotionMatchScore || 0}`);
           } else {
             // Save error
             video.aiAnalysis = {
@@ -281,17 +286,18 @@ exports.addVideo = async (req, res, next) => {
               video.videoUrl,
               'neutral'
             );
+            const analysisData = analysisResult.data || analysisResult;
             if (analysisResult.success) {
               video.aiAnalysis = {
                 analyzed: true,
-                requiredEmotion: analysisResult.requiredEmotion,
-                detectedEmotion: analysisResult.detectedEmotion,
-                emotionScores: analysisResult.emotionScores,
-                emotionMatchScore: analysisResult.emotionMatchScore,
-                confidence: analysisResult.confidence,
-                overallScore: analysisResult.overallScore,
-                feedback: analysisResult.feedback,
-                framesAnalyzed: analysisResult.framesAnalyzed || 0,
+                requiredEmotion: analysisData.requiredEmotion,
+                detectedEmotion: analysisData.detectedEmotion,
+                emotionScores: analysisData.emotionScores,
+                emotionMatchScore: analysisData.emotionMatchScore,
+                confidence: analysisData.confidence || 0,
+                overallScore: analysisData.overallScore || analysisData.emotionMatchScore || 0,
+                feedback: analysisData.feedback,
+                framesAnalyzed: analysisData.framesAnalyzed || 0,
                 analyzedAt: new Date(),
                 error: null,
               };

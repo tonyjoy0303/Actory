@@ -10,7 +10,7 @@ const {
   safeAnalyzeVideo,
   validateVideoFile,
   validateEmotion,
-} = require('../utils/aiIntegration');
+} = require('../utils/aiServiceClient');
 
 // Simple console-based logger
 const logger = {
@@ -89,7 +89,7 @@ const getSubmissions = async (req, res, next) => {
     let query = Video.find({ castingCall: castingId, type: 'audition' })
       .populate('actor', 'name email gender profileImage')
       .select(
-        'actor videoUrl castingCall status aiAnalysis qualityAssessment createdAt portfolioUrl idProofUrl skills age height weight'
+        'actor videoUrl castingCall status aiAnalysis qualityAssessment createdAt portfolioUrl idProofUrl webcamPhotoUrl skills age height weight phoneNumber email permanentAddress livingCity dateOfBirth'
       )
       .lean();
 
@@ -122,6 +122,20 @@ const getSubmissions = async (req, res, next) => {
       videoUrl: submission.videoUrl,
       status: submission.status,
       createdAt: submission.createdAt,
+      // Personal Details
+      age: submission.age,
+      height: submission.height,
+      weight: submission.weight,
+      skills: submission.skills,
+      phoneNumber: submission.phoneNumber,
+      email: submission.email,
+      permanentAddress: submission.permanentAddress,
+      livingCity: submission.livingCity,
+      dateOfBirth: submission.dateOfBirth,
+      // Media Files
+      portfolioUrl: submission.portfolioUrl,
+      idProofUrl: submission.idProofUrl,
+      webcamPhotoUrl: submission.webcamPhotoUrl,
       // AI Analysis fields
       aiAnalyzed: submission.aiAnalysis?.analyzed || false,
       analyzedAt: submission.aiAnalysis?.analyzedAt,
@@ -204,6 +218,7 @@ const reanalyzeSubmission = async (req, res, next) => {
       audition.videoUrl,
       casting.requiredEmotion || 'neutral'
     );
+    const analysisData = analysisResult.data || analysisResult;
 
     if (!analysisResult.success) {
       logger.error(`Analysis failed: ${analysisResult.error}`);
@@ -225,14 +240,14 @@ const reanalyzeSubmission = async (req, res, next) => {
     // Update audition with AI results
     audition.aiAnalysis = {
       analyzed: true,
-      requiredEmotion: analysisResult.requiredEmotion,
-      detectedEmotion: analysisResult.detectedEmotion,
-      emotionScores: analysisResult.emotionScores,
-      emotionMatchScore: analysisResult.emotionMatchScore,
-      confidence: analysisResult.confidence,
-      overallScore: analysisResult.overallScore,
-      feedback: analysisResult.feedback,
-      framesAnalyzed: analysisResult.framesAnalyzed || 0,
+      requiredEmotion: analysisData.requiredEmotion,
+      detectedEmotion: analysisData.detectedEmotion,
+      emotionScores: analysisData.emotionScores,
+      emotionMatchScore: analysisData.emotionMatchScore,
+      confidence: analysisData.confidence || 0,
+      overallScore: analysisData.overallScore || analysisData.emotionMatchScore || 0,
+      feedback: analysisData.feedback,
+      framesAnalyzed: analysisData.framesAnalyzed || 0,
       analyzedAt: new Date(),
       error: null,
     };

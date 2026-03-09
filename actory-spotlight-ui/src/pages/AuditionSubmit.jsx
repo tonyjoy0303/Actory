@@ -31,6 +31,7 @@ export default function AuditionSubmit() {
   const [phoneNumber, setPhoneNumber] = useState('');
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
+  const [analyzingAI, setAnalyzingAI] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [portfolioFile, setPortfolioFile] = useState(null);
   const [portfolioUploadProgress, setPortfolioUploadProgress] = useState(0);
@@ -330,7 +331,11 @@ export default function AuditionSubmit() {
       );
       const webcamPhotoUrl = _optionalChain([webcamRes, 'access', _ => _.data, 'optionalAccess', _2 => _2.secure_url]);
 
-      // 2. Submit to our backend
+      // 2. Submit to our backend (with AI analysis)
+      setUploadProgress(100);
+      setAnalyzingAI(true);
+      toast.info('Upload complete! Analyzing your video performance... This may take a few minutes.');
+      
       const response = await API.post(`/casting/${castingCallId}/videos`,
         { 
           title,
@@ -357,7 +362,7 @@ export default function AuditionSubmit() {
           retakes: 1
         },
         {
-          timeout: 180000 // 3 minutes to allow for AI emotion analysis
+          timeout: 360000 // 6 minutes to allow for video download and AI emotion analysis
         }
       );
 
@@ -393,6 +398,7 @@ export default function AuditionSubmit() {
       toast.error(msg);
     } finally {
       setLoading(false);
+      setAnalyzingAI(false);
     }
   };
 
@@ -563,7 +569,7 @@ export default function AuditionSubmit() {
               )
               , React.createElement('div', { className: "mt-2 flex justify-end"  , __self: this, __source: {fileName: _jsxFileName, lineNumber: 231}}
                 , React.createElement(Button, { variant: "hero", className: "hover-scale", onClick: handleSubmit, disabled: loading || !file || !portfolioFile || !idProofFile || !webcamPhoto, __self: this, __source: {fileName: _jsxFileName, lineNumber: 232}}
-                  , loading ? `Uploading... ${uploadProgress}%` : 'Submit Audition'
+                  , loading ? (analyzingAI ? '🤖 Analyzing video performance... Please wait' : `Uploading... ${uploadProgress}%`) : 'Submit Audition'
                 )
               )
             )

@@ -1,12 +1,14 @@
 /**
  * AI Integration Module for Video Emotion Analysis
  * 
- * This module handles communication between Node.js backend and Python AI scripts.
- * It spawns Python processes to analyze audition videos and parse their results.
+ * This module handles communication between Node.js backend and Python AI microservice.
+ * It makes HTTP API calls to the separate AI service instead of spawning Python processes.
  */
 
-const { spawn } = require('child_process');
-const path = require('path');
+const axios = require('axios');
+
+// AI Service URL from environment variable or default to localhost
+const AI_SERVICE_URL = process.env.AI_SERVICE_URL || 'http://localhost:10000';
 
 /**
  * Validate emotion string
@@ -46,100 +48,78 @@ const validateVideoFile = (videoUrl) => {
 };
 
 /**
- * Execute Python emotion analyzer script
+ * Execute Python emotion analyzer via HTTP API
  * @param {string} videoUrl - URL to the video file
  * @param {string} requiredEmotion - Required emotion for the casting
  * @returns {Promise<Object>} - Analysis results
  */
-const analyzeVideoEmotion = (videoUrl, requiredEmotion) => {
-  return new Promise((resolve, reject) => {
-    // Validate inputs
-    if (!validateVideoFile(videoUrl)) {
-      return reject(new Error('Invalid video URL format'));
+const analyzeVideoEmotion = async (videoUrl, requiredEmotion) => {
+  // Validate inputs
+  if (!validateVideoFile(videoUrl)) {
+    throw new Error('Invalid video URL format');
+  }
+  
+  if (!validateEmotion(requiredEmotion)) {
+    throw new Error(`Invalid emotion: ${requiredEmotion}. Must be one of: happy, sad, angry, fear, surprise, neutral, disgust`);
+  }
+  
+  console.log(`[AI] Calling AI service for emotion analysis...`);
+  console.log(`[AI] Service URL: ${AI_SERVICE_URL}`);
+  console.log(`[AI] Video: ${videoUrl}`);
+  console.log(`[AI] Required Emotion: ${requiredEmotion}`);
+  
+  try {
+    // Call AI service via HTTP
+    const response = await axios.get(`${AI_SERVICE_URL}/analyze`, {
+      params: {
+        video_url: videoUrl,
+        required_emotion: requiredEmotion
+      },
+      timeout: 5 * 60 * 1000, // 5 minutes timeout
+      validateStatus: (status) => status < 600 // Don't throw on 4xx/5xx, handle manually
+    });
+    
+    console.log(`[AI] AI service responded with status: ${response.status}`);
+    
+    // Handle error responses
+    if (response.status !== 200) {
+      const errorData = response.data;
+      const errorMessage = errorData.error || errorData.detail || 'Analysis failed';
+      console.error(`[AI] AI service error: ${errorMessage}`);
+      throw new Error(errorMessage);
     }
     
-    if (!validateEmotion(requiredEmotion)) {
-      return reject(new Error(`Invalid emotion: ${requiredEmotion}. Must be one of: happy, sad, angry, fear, surprise, neutral, disgust`));
+    const result = response.data;
+    
+    // Check if analysis was successful
+    if (!result.success) {
+      throw new Error(result.error || 'Analysis failed');
     }
     
-    // Path to Python script
-    const scriptPath = path.join(__dirname, '..', 'ai', 'emotion_video_analyzer.py');
+    console.log(`[AI] Analysis successful: ${result.detectedEmotion} (match: ${result.emotionMatchScore}%)`);
+    return result;
     
-    console.log(`[AI] Spawning Python process for emotion analysis...`);
-    console.log(`[AI] Script: ${scriptPath}`);
-    console.log(`[AI] Video: ${videoUrl}`);
-    console.log(`[AI] Required Emotion: ${requiredEmotion}`);
+  } catch (error) {
+    // Handle network/timeout errors
+    if (error.code === 'ECONNREFUSED') {
+      console.error(`[AI] Cannot connect to AI service at ${AI_SERVICE_URL}`);
+      throw new Error('AI service is not available. Please ensure the AI microservice is running.');
+    }
     
-    // Spawn Python process
-    const pythonProcess = spawn('python', [
-      scriptPath,
-      videoUrl,
-      requiredEmotion
-    ]);
+    if (error.code === 'ETIMEDOUT' || error.code === 'ECONNABORTED') {
+      console.error(`[AI] AI service timeout`);
+      throw new Error('Analysis timeout: Request took longer than 5 minutes');
+    }
     
-    let stdoutData = '';
-    let stderrData = '';
+    // Re-throw the error if already processed
+    if (error.message.includes('AI service') || error.message.includes('Invalid')) {
+      throw error;
+    }
     
-    // Collect stdout data
-    pythonProcess.stdout.on('data', (data) => {
-      stdoutData += data.toString();
-    });
-    
-    // Collect stderr data (for logging)
-    pythonProcess.stderr.on('data', (data) => {
-      stderrData += data.toString();
-      console.log(`[AI Python] ${data.toString().trim()}`);
-    });
-    
-    // Handle process completion
-    pythonProcess.on('close', (code) => {
-      console.log(`[AI] Python process exited with code ${code}`);
-      
-      if (code !== 0) {
-        console.error(`[AI] Python stderr: ${stderrData}`);
-        
-        // Try to parse error JSON from stderr
-        try {
-          const errorJson = JSON.parse(stderrData);
-          return reject(new Error(errorJson.error || 'Python analysis failed'));
-        } catch (e) {
-          return reject(new Error(`Python process failed with code ${code}: ${stderrData}`));
-        }
-      }
-      
-      // Parse JSON result from stdout
-      try {
-        const result = JSON.parse(stdoutData);
-        
-        if (!result.success) {
-          return reject(new Error(result.error || 'Analysis failed'));
-        }
-        
-        console.log(`[AI] Analysis successful: ${result.detectedEmotion} (match: ${result.emotionMatchScore}%)`);
-        resolve(result);
-        
-      } catch (parseError) {
-        console.error(`[AI] Failed to parse Python output: ${stdoutData}`);
-        reject(new Error(`Failed to parse analysis result: ${parseError.message}`));
-      }
-    });
-    
-    // Handle process errors
-    pythonProcess.on('error', (error) => {
-      console.error(`[AI] Failed to spawn Python process: ${error.message}`);
-      reject(new Error(`Failed to start Python analysis: ${error.message}`));
-    });
-    
-    // Set timeout (5 minutes max)
-    const timeout = setTimeout(() => {
-      pythonProcess.kill();
-      reject(new Error('Analysis timeout: Process took longer than 5 minutes'));
-    }, 5 * 60 * 1000);
-    
-    pythonProcess.on('close', () => {
-      clearTimeout(timeout);
-    });
-  });
+    // Generic error
+    console.error(`[AI] Unexpected error: ${error.message}`);
+    throw new Error(`AI analysis failed: ${error.message}`);
+  }
 };
 
 /**
@@ -177,6 +157,17 @@ const safeAnalyzeVideo = async (videoUrl, requiredEmotion) => {
  */
 const testAIIntegration = async (videoUrl = 'https://test-videos.co.uk/vids/bigbuckbunny/mp4/h264/360/Big_Buck_Bunny_360_10s_1MB.mp4') => {
   console.log('[AI TEST] Starting AI integration test...');
+  console.log(`[AI TEST] AI Service URL: ${AI_SERVICE_URL}`);
+  
+  try {
+    // First check if AI service is reachable
+    const healthCheck = await axios.get(`${AI_SERVICE_URL}/health`, { timeout: 5000 });
+    console.log('[AI TEST] ✓ AI service is reachable');
+    console.log(`[AI TEST] Health status: ${JSON.stringify(healthCheck.data)}`);
+  } catch (error) {
+    console.error('[AI TEST] ✗ Cannot reach AI service');
+    throw new Error(`AI service not available at ${AI_SERVICE_URL}: ${error.message}`);
+  }
   
   try {
     const result = await analyzeVideoEmotion(videoUrl, 'happy');

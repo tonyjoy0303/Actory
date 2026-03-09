@@ -1,6 +1,8 @@
 """
 Emotion Detection Model Loader
-Loads the trained Keras CNN model for emotion classification
+
+Loads the trained Keras CNN model for emotion classification.
+Model has internal Rescaling layer - NO manual normalization needed.
 """
 
 import os
@@ -9,10 +11,10 @@ import numpy as np
 from tensorflow import keras
 
 class EmotionModelLoader:
-    # Emotion labels matching model output
+    # Emotion labels matching model output (7 classes)
     EMOTION_LABELS = ['angry', 'disgust', 'fear', 'happy', 'sad', 'surprise', 'neutral']
     
-    def __init__(self, model_path='ai/fea-iter-2.keras'):
+    def __init__(self, model_path='models/fea-iter-2.keras'):
         """
         Initialize and load the emotion detection model
         
@@ -26,14 +28,18 @@ class EmotionModelLoader:
     def load_model(self):
         """Load the Keras model from disk"""
         if not os.path.exists(self.model_path):
+            print(f"❌ [ERROR] Model file not found at: {self.model_path}", flush=True)
             raise FileNotFoundError(f"Model file not found at: {self.model_path}")
         
         try:
+            print(f"📥 [LOADING] Loading emotion detection model...", flush=True)
             self.model = keras.models.load_model(self.model_path)
-            print(f"[OK] Model loaded successfully from {self.model_path}", file=sys.stderr)
-            print(f"[OK] Model input shape: {self.model.input_shape}", file=sys.stderr)
-            print(f"[OK] Model output shape: {self.model.output_shape}", file=sys.stderr)
+            print(f"✅ [MODEL LOADED] Successfully loaded from {self.model_path}", flush=True)
+            print(f"📐 [MODEL INFO] Input shape: {self.model.input_shape}", flush=True)
+            print(f"📐 [MODEL INFO] Output shape: {self.model.output_shape} (7 emotions)", flush=True)
+            print(f"🎭 [MODEL INFO] Emotions: {', '.join(self.EMOTION_LABELS)}", flush=True)
         except Exception as e:
+            print(f"❌ [ERROR] Failed to load model: {str(e)}", flush=True)
             raise RuntimeError(f"Failed to load model: {str(e)}")
     
     def predict_emotion(self, face_image):
@@ -47,7 +53,7 @@ class EmotionModelLoader:
             dict: {
                 'emotion': str (dominant emotion),
                 'confidence': float (0-1),
-                'scores': dict (emotion: probability)
+                'scores': dict (emotion: probability for all 7 emotions)
             }
         """
         # Validate input shape
@@ -57,8 +63,9 @@ class EmotionModelLoader:
         # Expand dimensions for batch processing
         face_batch = np.expand_dims(face_image, axis=0)
         
-        # IMPORTANT: Do NOT normalize - model has internal Rescaling layer
-        # The model expects raw RGB values (0-255)
+        # CRITICAL: Do NOT normalize manually
+        # The model has internal Rescaling layer (scale=1/255)
+        # Feed raw RGB values (0-255) directly
         
         # Predict
         predictions = self.model.predict(face_batch, verbose=0)[0]
@@ -68,7 +75,7 @@ class EmotionModelLoader:
         dominant_emotion = self.EMOTION_LABELS[dominant_idx]
         confidence = float(predictions[dominant_idx])
         
-        # Create emotion scores dictionary
+        # Create emotion scores dictionary for all emotions
         emotion_scores = {
             emotion: float(predictions[i])
             for i, emotion in enumerate(self.EMOTION_LABELS)
@@ -96,7 +103,7 @@ class EmotionModelLoader:
         # Stack images into batch
         face_batch = np.array(face_images)
         
-        # Predict
+        # Predict (no manual normalization)
         predictions = self.model.predict(face_batch, verbose=0)
         
         # Convert to result format
