@@ -237,21 +237,26 @@ exports.addVideo = async (req, res, next) => {
           const analysisData = analysisResult.data || analysisResult;
 
           if (analysisResult.success) {
-            // Update video with AI results
+            // Update video with AI results including new performance metrics
             video.aiAnalysis = {
               analyzed: true,
               requiredEmotion: analysisData.requiredEmotion,
               detectedEmotion: analysisData.detectedEmotion,
               emotionScores: analysisData.emotionScores,
               emotionMatchScore: analysisData.emotionMatchScore,
+              emotionConsistency: analysisData.emotionConsistency || 0,
+              expressionIntensity: analysisData.expressionIntensity || 0,
+              faceVisibility: analysisData.faceVisibility || 0,
+              overallPerformanceScore: analysisData.overallPerformanceScore || 0,
+              emotionTimeline: analysisData.emotionTimeline || [],
               confidence: analysisData.confidence || 0,
-              overallScore: analysisData.overallScore || analysisData.emotionMatchScore || 0,
+              overallScore: analysisData.overallPerformanceScore || analysisData.emotionMatchScore || 0,
               feedback: analysisData.feedback,
               framesAnalyzed: analysisData.framesAnalyzed || 0,
               analyzedAt: new Date(),
               error: null,
             };
-            console.log(`[AI] Analysis complete for video ${video._id}: score=${analysisData.overallScore || analysisData.emotionMatchScore || 0}`);
+            console.log(`[AI] Analysis complete for video ${video._id}: performance=${analysisData.overallPerformanceScore || 0}% match=${analysisData.emotionMatchScore || 0}%`);
           } else {
             // Save error
             video.aiAnalysis = {
@@ -294,8 +299,13 @@ exports.addVideo = async (req, res, next) => {
                 detectedEmotion: analysisData.detectedEmotion,
                 emotionScores: analysisData.emotionScores,
                 emotionMatchScore: analysisData.emotionMatchScore,
+                emotionConsistency: analysisData.emotionConsistency || 0,
+                expressionIntensity: analysisData.expressionIntensity || 0,
+                faceVisibility: analysisData.faceVisibility || 0,
+                overallPerformanceScore: analysisData.overallPerformanceScore || 0,
+                emotionTimeline: analysisData.emotionTimeline || [],
                 confidence: analysisData.confidence || 0,
-                overallScore: analysisData.overallScore || analysisData.emotionMatchScore || 0,
+                overallScore: analysisData.overallPerformanceScore || analysisData.emotionMatchScore || 0,
                 feedback: analysisData.feedback,
                 framesAnalyzed: analysisData.framesAnalyzed || 0,
                 analyzedAt: new Date(),

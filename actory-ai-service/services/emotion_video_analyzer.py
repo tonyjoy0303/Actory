@@ -77,7 +77,7 @@ class VideoEmotionAnalyzer:
             print(f"❌ [ERROR] Video download failed: {str(e)}", flush=True)
             raise Exception(f"Video download failed: {str(e)}")
     
-    def extract_frames(self, video_path: str) -> List[np.ndarray]:
+    def extract_frames(self, video_path: str) -> tuple:
         """
         Extract frames from video (every 10th frame, max 100 frames)
         
@@ -85,7 +85,7 @@ class VideoEmotionAnalyzer:
             video_path: Path to video file
             
         Returns:
-            List of frame images (BGR format from OpenCV)
+            Tuple of (frames_list, fps, total_frames_in_video)
         """
         print(f"\n🎬 [EXTRACT] Extracting frames from video...", flush=True)
         
@@ -127,28 +127,36 @@ class VideoEmotionAnalyzer:
         cap.release()
         
         print(f"✅ [EXTRACTED] {len(frames)} frames ready for emotion analysis", flush=True)
-        return frames
+        return frames, fps, total_frames
     
-    def analyze_frames(self, frames: List[np.ndarray]) -> List[Dict]:
+    def analyze_frames(self, frames: List[np.ndarray], fps: float) -> tuple:
         """
-        Analyze emotion in each frame
+        Analyze emotion in each frame with timestamp tracking
         
         Args:
             frames: List of video frames (BGR format)
+            fps: Video frames per second for timestamp calculation
             
         Returns:
-            List of emotion predictions for frames with detected faces
+            Tuple of (predictions_list, frame_results_list, total_frames_processed, frames_with_faces)
         """
         print(f"\n🔍 [ANALYZE] Analyzing emotions in {len(frames)} frames...", flush=True)
         print(f"⏳ Processing frames: ", end='', flush=True)
         
         predictions = []
+        frame_results = []
         faces_detected = 0
+        total_frames_processed = len(frames)
         
         for idx, frame in enumerate(frames):
             # Show progress every 10 frames
             if idx % 10 == 0:
                 print(f"{idx}...", end='', flush=True)
+            
+            # Calculate timestamp for this frame
+            # Frame index in sampled frames * FRAME_SKIP gives actual frame number
+            # Divide by FPS to get seconds
+            timestamp = (idx * self.FRAME_SKIP) / fps if fps > 0 else idx * 0.1
             
             # Detect and extract face
             face = self.face_detector.detect_and_extract(frame, target_size=(48, 48))
@@ -161,6 +169,13 @@ class VideoEmotionAnalyzer:
             # Predict emotion (face is already 48x48 RGB, no normalization needed)
             prediction = self.model_loader.predict_emotion(face)
             predictions.append(prediction)
+            
+            # Store frame-level data for performance metrics
+            frame_results.append({
+                'emotion': prediction['emotion'],
+                'confidence': prediction['confidence'],
+                'time': round(timestamp, 2)
+            })
         
         print(f" Done!", flush=True)
         
@@ -171,7 +186,7 @@ class VideoEmotionAnalyzer:
             print(f"❌ [ERROR] No faces detected in any frame", flush=True)
             raise Exception("No faces detected in video frames")
         
-        return predictions
+        return predictions, frame_results, total_frames_processed, faces_detected
     
     def aggregate_predictions(self, predictions: List[Dict]) -> Dict:
         """
@@ -277,16 +292,150 @@ class VideoEmotionAnalyzer:
         else:
             return f"Low match. Actor primarily shows '{detected_emotion}' instead of required '{required_emotion}'."
     
+    def calculate_emotion_consistency(self, frame_results: List[Dict], required_emotion: str) -> int:
+        """
+        Calculate emotion consistency score (0-100)
+        
+        Args:
+            frame_results: List of frame-level emotion data
+            required_emotion: Required emotion from casting
+            
+        Returns:
+            int: Consistency score (0-100)
+        """
+        if not frame_results:
+            return 0
+        
+        required_emotion = required_emotion.lower()
+        frames_with_required = sum(1 for frame in frame_results if frame['emotion'] == required_emotion)
+        total_frames = len(frame_results)
+        
+        consistency = (frames_with_required / total_frames) * 100
+        return int(round(consistency))
+    
+    def calculate_expression_intensity(self, frame_results: List[Dict], required_emotion: str) -> int:
+        """
+        Calculate expression intensity score (0-100)
+        
+        Args:
+            frame_results: List of frame-level emotion data
+            required_emotion: Required emotion from casting
+            
+        Returns:
+            int: Intensity score (0-100)
+        """
+        required_emotion = required_emotion.lower()
+        
+        # Get confidence scores for frames where required emotion was detected
+        required_confidences = [
+            frame['confidence'] for frame in frame_results 
+            if frame['emotion'] == required_emotion
+        ]
+        
+        if not required_confidences:
+            return 0
+        
+        # Calculate average confidence
+        avg_confidence = sum(required_confidences) / len(required_confidences)
+        intensity = avg_confidence * 100
+        
+        return int(round(intensity))
+    
+    def calculate_face_visibility(self, frames_with_faces: int, total_frames_processed: int) -> int:
+        """
+        Calculate face visibility score (0-100)
+        
+        Args:
+            frames_with_faces: Number of frames where face was detected
+            total_frames_processed: Total number of frames analyzed
+            
+        Returns:
+            int: Visibility score (0-100)
+        """
+        if total_frames_processed == 0:
+            return 0
+        
+        visibility = (frames_with_faces / total_frames_processed) * 100
+        return int(round(visibility))
+    
+    def calculate_overall_performance_score(self, emotion_match_score: int, consistency: int, 
+                                           intensity: int, visibility: int) -> int:
+        """
+        Calculate overall performance score using weighted average (0-100)
+        
+        Weights:
+        - Emotion Match Score: 40%
+        - Emotion Consistency: 25%
+        - Expression Intensity: 20%
+        - Face Visibility: 15%
+        
+        Args:
+            emotion_match_score: Emotion match score (0-100)
+            consistency: Emotion consistency score (0-100)
+            intensity: Expression intensity score (0-100)
+            visibility: Face visibility score (0-100)
+            
+        Returns:
+            int: Overall performance score (0-100)
+        """
+        overall = (
+            (emotion_match_score * 0.40) +
+            (consistency * 0.25) +
+            (intensity * 0.20) +
+            (visibility * 0.15)
+        )
+        
+        return int(round(overall))
+    
+    def generate_emotion_timeline(self, frame_results: List[Dict]) -> List[Dict]:
+        """
+        Generate emotion timeline showing emotion transitions over time
+        
+        Args:
+            frame_results: List of frame-level emotion data
+            
+        Returns:
+            List of timeline segments with emotion, start, and end times
+        """
+        if not frame_results:
+            return []
+        
+        timeline = []
+        current_emotion = frame_results[0]['emotion']
+        start_time = frame_results[0]['time']
+        
+        for i in range(1, len(frame_results)):
+            if frame_results[i]['emotion'] != current_emotion:
+                # Emotion changed - save current segment
+                timeline.append({
+                    'emotion': current_emotion,
+                    'start': start_time,
+                    'end': frame_results[i-1]['time']
+                })
+                
+                # Start new segment
+                current_emotion = frame_results[i]['emotion']
+                start_time = frame_results[i]['time']
+        
+        # Add final segment
+        timeline.append({
+            'emotion': current_emotion,
+            'start': start_time,
+            'end': frame_results[-1]['time']
+        })
+        
+        return timeline
+    
     def analyze_video(self, video_url: str, required_emotion: str) -> Dict:
         """
-        Complete video emotion analysis pipeline
+        Complete video emotion analysis pipeline with performance metrics
         
         Args:
             video_url: Cloudinary video URL
             required_emotion: Required emotion from casting
             
         Returns:
-            Dict: Complete analysis results
+            Dict: Complete analysis results with performance metrics
         """
         video_path = None
         
@@ -300,45 +449,73 @@ class VideoEmotionAnalyzer:
             # Step 1: Download video
             video_path = self.download_video(video_url)
             
-            # Step 2: Extract frames
-            frames = self.extract_frames(video_path)
+            # Step 2: Extract frames (now returns fps and total_frames too)
+            frames, fps, total_frames = self.extract_frames(video_path)
             
-            # Step 3: Analyze frames
-            predictions = self.analyze_frames(frames)
+            # Step 3: Analyze frames (now returns frame_results and detection stats)
+            predictions, frame_results, total_frames_processed, frames_with_faces = self.analyze_frames(frames, fps)
             
             # Step 4: Aggregate results
             aggregated = self.aggregate_predictions(predictions)
             
-            # Step 5: Calculate match score
+            # Step 5: Calculate emotion match score
             emotion_match_score = self.calculate_emotion_match(
                 required_emotion,
                 aggregated['detectedEmotion'],
                 aggregated['emotionScores']
             )
             
-            # Step 6: Generate feedback
+            # Step 6: Calculate performance metrics
+            print(f"\n📊 [METRICS] Calculating performance metrics...", flush=True)
+            
+            emotion_consistency = self.calculate_emotion_consistency(frame_results, required_emotion)
+            expression_intensity = self.calculate_expression_intensity(frame_results, required_emotion)
+            face_visibility = self.calculate_face_visibility(frames_with_faces, total_frames_processed)
+            
+            overall_performance_score = self.calculate_overall_performance_score(
+                emotion_match_score,
+                emotion_consistency,
+                expression_intensity,
+                face_visibility
+            )
+            
+            # Step 7: Generate emotion timeline
+            emotion_timeline = self.generate_emotion_timeline(frame_results)
+            
+            # Step 8: Generate feedback
             feedback = self.generate_feedback(
                 emotion_match_score,
                 required_emotion,
                 aggregated['detectedEmotion']
             )
             
-            # Prepare final result
+            # Prepare final result with all metrics
             result = {
+                'success': True,
                 'requiredEmotion': required_emotion.lower(),
                 'detectedEmotion': aggregated['detectedEmotion'],
                 'emotionScores': aggregated['emotionScores'],
                 'emotionMatchScore': emotion_match_score,
-                'feedback': feedback,
-                'framesAnalyzed': len(predictions)
+                'emotionConsistency': emotion_consistency,
+                'expressionIntensity': expression_intensity,
+                'faceVisibility': face_visibility,
+                'overallPerformanceScore': overall_performance_score,
+                'emotionTimeline': emotion_timeline,
+                'framesAnalyzed': len(predictions),
+                'feedback': feedback
             }
             
             print(f"\n{'='*80}", flush=True)
             print(f"✅ [SUCCESS] ANALYSIS COMPLETE", flush=True)
             print(f"🎯 Required: {required_emotion} | Detected: {aggregated['detectedEmotion']}", flush=True)
             print(f"[ANALYZED_EMOTION] {aggregated['detectedEmotion']}", flush=True)
-            print(f"📈 Match Score: {emotion_match_score}%", flush=True)
-            print(f"📊 Frames Analyzed: {len(predictions)}", flush=True)
+            print(f"\n📈 PERFORMANCE METRICS:", flush=True)
+            print(f"   • Emotion Match Score:    {emotion_match_score}%", flush=True)
+            print(f"   • Emotion Consistency:    {emotion_consistency}%", flush=True)
+            print(f"   • Expression Intensity:   {expression_intensity}%", flush=True)
+            print(f"   • Face Visibility:        {face_visibility}%", flush=True)
+            print(f"   • Overall Performance:    {overall_performance_score}%", flush=True)
+            print(f"\n📊 Frames Analyzed: {len(predictions)}", flush=True)
             print(f"💬 Feedback: {feedback}", flush=True)
             print(f"{'='*80}\n", flush=True)
             

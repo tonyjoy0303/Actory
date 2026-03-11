@@ -4,7 +4,7 @@ FastAPI Routes for Video Emotion Analysis
 
 from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel, Field
-from typing import Dict
+from typing import Dict, List
 from services.emotion_video_analyzer import VideoEmotionAnalyzer
 
 # Initialize router
@@ -42,13 +42,24 @@ class EmotionScores(BaseModel):
     surprise: float
     neutral: float
 
+class EmotionTimelineSegment(BaseModel):
+    emotion: str
+    start: float
+    end: float
+
 class AnalyzeVideoResponse(BaseModel):
+    success: bool
     requiredEmotion: str
     detectedEmotion: str
     emotionScores: EmotionScores
     emotionMatchScore: int = Field(..., ge=0, le=100)
-    feedback: str
+    emotionConsistency: int = Field(..., ge=0, le=100)
+    expressionIntensity: int = Field(..., ge=0, le=100)
+    faceVisibility: int = Field(..., ge=0, le=100)
+    overallPerformanceScore: int = Field(..., ge=0, le=100)
+    emotionTimeline: List[EmotionTimelineSegment]
     framesAnalyzed: int
+    feedback: str
 
 @router.post("/analyze-video", response_model=AnalyzeVideoResponse, status_code=status.HTTP_200_OK)
 async def analyze_video(request: AnalyzeVideoRequest):

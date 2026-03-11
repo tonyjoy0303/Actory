@@ -95,7 +95,7 @@ const getSubmissions = async (req, res, next) => {
 
     // Apply sorting
     if (sort === 'overallScore') {
-      query = query.sort({ 'aiAnalysis.overallScore': -1 });
+      query = query.sort({ 'aiAnalysis.overallPerformanceScore': -1, 'aiAnalysis.overallScore': -1 });
     } else if (sort === 'newest') {
       query = query.sort({ createdAt: -1 });
     } else if (sort === 'oldest') {
@@ -109,7 +109,7 @@ const getSubmissions = async (req, res, next) => {
     if (filter) {
       const minScore = parseInt(filter, 10);
       filtered = submissions.filter(
-        s => s.aiAnalysis?.overallScore >= minScore
+        s => (s.aiAnalysis?.overallPerformanceScore ?? s.aiAnalysis?.overallScore ?? 0) >= minScore
       );
     }
 
@@ -143,8 +143,13 @@ const getSubmissions = async (req, res, next) => {
       detectedEmotion: submission.aiAnalysis?.detectedEmotion,
       emotionScores: submission.aiAnalysis?.emotionScores || null,
       emotionMatchScore: submission.aiAnalysis?.emotionMatchScore || 0,
+      emotionConsistency: submission.aiAnalysis?.emotionConsistency || 0,
+      expressionIntensity: submission.aiAnalysis?.expressionIntensity || 0,
+      faceVisibility: submission.aiAnalysis?.faceVisibility || 0,
+      overallPerformanceScore: submission.aiAnalysis?.overallPerformanceScore || 0,
+      emotionTimeline: submission.aiAnalysis?.emotionTimeline || [],
       confidence: submission.aiAnalysis?.confidence || 0,
-      overallScore: submission.aiAnalysis?.overallScore || 0,
+      overallScore: submission.aiAnalysis?.overallPerformanceScore || submission.aiAnalysis?.overallScore || 0,
       feedback: submission.aiAnalysis?.feedback,
       framesAnalyzed: submission.aiAnalysis?.framesAnalyzed || 0,
       // Quality assessment
@@ -244,8 +249,13 @@ const reanalyzeSubmission = async (req, res, next) => {
       detectedEmotion: analysisData.detectedEmotion,
       emotionScores: analysisData.emotionScores,
       emotionMatchScore: analysisData.emotionMatchScore,
+      emotionConsistency: analysisData.emotionConsistency || 0,
+      expressionIntensity: analysisData.expressionIntensity || 0,
+      faceVisibility: analysisData.faceVisibility || 0,
+      overallPerformanceScore: analysisData.overallPerformanceScore || 0,
+      emotionTimeline: analysisData.emotionTimeline || [],
       confidence: analysisData.confidence || 0,
-      overallScore: analysisData.overallScore || analysisData.emotionMatchScore || 0,
+      overallScore: analysisData.overallPerformanceScore || analysisData.overallScore || analysisData.emotionMatchScore || 0,
       feedback: analysisData.feedback,
       framesAnalyzed: analysisData.framesAnalyzed || 0,
       analyzedAt: new Date(),

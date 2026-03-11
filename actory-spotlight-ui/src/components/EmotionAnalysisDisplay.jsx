@@ -16,6 +16,11 @@ const EmotionAnalysisDisplay = ({ submission, darkTheme = false }) => {
     detectedEmotion,
     emotionScores,
     emotionMatchScore,
+    emotionConsistency,
+    expressionIntensity,
+    faceVisibility,
+    overallPerformanceScore,
+    emotionTimeline,
     confidence,
     overallScore,
     feedback,
@@ -63,6 +68,15 @@ const EmotionAnalysisDisplay = ({ submission, darkTheme = false }) => {
     ? 'emotion-analysis-card dark-theme' 
     : 'emotion-analysis-card';
 
+  const displayOverallScore = Number(overallPerformanceScore ?? overallScore ?? 0);
+
+  const metricCards = [
+    { key: 'match', label: 'Emotion Match', value: Number(emotionMatchScore || 0) },
+    { key: 'consistency', label: 'Consistency', value: Number(emotionConsistency || 0) },
+    { key: 'intensity', label: 'Intensity', value: Number(expressionIntensity || 0) },
+    { key: 'visibility', label: 'Face Visibility', value: Number(faceVisibility || 0) },
+  ];
+
   // Render loading state
   if (!aiAnalyzed) {
     return (
@@ -93,14 +107,32 @@ const EmotionAnalysisDisplay = ({ submission, darkTheme = false }) => {
       {/* Overall Score */}
       <div className="overall-score-section">
         <div className="score-circle" style={{ 
-          borderColor: getScoreColor(overallScore),
+          borderColor: getScoreColor(displayOverallScore),
           background: darkTheme ? '#1e293b' : 'white'
         }}>
-          <div className="score-value" style={{ color: getScoreColor(overallScore) }}>
-            {overallScore}
+          <div className="score-value" style={{ color: getScoreColor(displayOverallScore) }}>
+            {Math.round(displayOverallScore)}
           </div>
-          <div className="score-label" style={darkTheme ? {color: '#94a3b8'} : {}}>Overall Score</div>
+          <div className="score-label" style={darkTheme ? {color: '#94a3b8'} : {}}>Overall Performance</div>
         </div>
+      </div>
+
+      <div className="metrics-grid">
+        {metricCards.map((metric) => (
+          <div key={metric.key} className="metric-card" style={darkTheme ? { background: '#1e293b', borderColor: '#334155' } : {}}>
+            <div className="metric-label" style={darkTheme ? { color: '#94a3b8' } : {}}>{metric.label}</div>
+            <div className="metric-value" style={{ color: getScoreColor(metric.value) }}>{Math.round(metric.value)}%</div>
+            <div className="metric-track" style={darkTheme ? { background: '#334155' } : {}}>
+              <div
+                className="metric-fill"
+                style={{
+                  width: `${Math.min(Math.max(metric.value, 0), 100)}%`,
+                  backgroundColor: getScoreColor(metric.value),
+                }}
+              ></div>
+            </div>
+          </div>
+        ))}
       </div>
 
       {/* Emotion Comparison */}
@@ -142,6 +174,24 @@ const EmotionAnalysisDisplay = ({ submission, darkTheme = false }) => {
           ></div>
         </div>
       </div>
+
+      {Array.isArray(emotionTimeline) && emotionTimeline.length > 0 && (
+        <div className="timeline-section">
+          <h4 style={darkTheme ? {color: '#e2e8f0'} : {}}>Emotion Timeline</h4>
+          <div className="timeline-list">
+            {emotionTimeline.slice(0, 6).map((segment, index) => (
+              <div key={`${segment.emotion}-${segment.start}-${index}`} className="timeline-item" style={darkTheme ? {background: '#1e293b', borderColor: '#334155'} : {}}>
+                <span className="timeline-emotion" style={darkTheme ? {color: '#e2e8f0'} : {}}>
+                  {emotionIcons[segment.emotion] || emotionIcons.neutral} {segment.emotion}
+                </span>
+                <span className="timeline-range" style={darkTheme ? {color: '#94a3b8'} : {}}>
+                  {Number(segment.start || 0).toFixed(1)}s - {Number(segment.end || 0).toFixed(1)}s
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Emotion Distribution Chart */}
       {emotionScores && (
@@ -210,6 +260,11 @@ EmotionAnalysisDisplay.propTypes = {
     detectedEmotion: PropTypes.string,
     emotionScores: PropTypes.object,
     emotionMatchScore: PropTypes.number,
+    emotionConsistency: PropTypes.number,
+    expressionIntensity: PropTypes.number,
+    faceVisibility: PropTypes.number,
+    overallPerformanceScore: PropTypes.number,
+    emotionTimeline: PropTypes.array,
     confidence: PropTypes.number,
     overallScore: PropTypes.number,
     feedback: PropTypes.string,

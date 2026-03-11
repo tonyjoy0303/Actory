@@ -357,8 +357,11 @@ const SubmissionsPage = () => {
         <div className="space-y-4">
           {submissions.map((submission) => {
             const isExpanded = expandedSubmission === submission._id;
-            const score = Number(submission.overallScore || 0);
+            const score = Number(submission.overallPerformanceScore ?? submission.overallScore ?? 0);
             const match = Number(submission.emotionMatchScore || 0);
+            const consistency = Number(submission.emotionConsistency || 0);
+            const intensity = Number(submission.expressionIntensity || 0);
+            const visibility = Number(submission.faceVisibility || 0);
             const confidence = Number(submission.confidence || 0) * 100;
 
             return (
@@ -478,6 +481,24 @@ const SubmissionsPage = () => {
                                 {submission.feedback}
                               </p>
                             )}
+                            <div className="grid grid-cols-2 gap-2 pt-1 sm:grid-cols-4">
+                              <div className="rounded-md border border-slate-800 bg-slate-950/70 px-2 py-1.5 text-center">
+                                <p className="text-[10px] uppercase tracking-wider text-slate-500">Match</p>
+                                <p className="text-sm font-semibold text-cyan-200">{Math.round(match)}%</p>
+                              </div>
+                              <div className="rounded-md border border-slate-800 bg-slate-950/70 px-2 py-1.5 text-center">
+                                <p className="text-[10px] uppercase tracking-wider text-slate-500">Consistency</p>
+                                <p className="text-sm font-semibold text-cyan-200">{Math.round(consistency)}%</p>
+                              </div>
+                              <div className="rounded-md border border-slate-800 bg-slate-950/70 px-2 py-1.5 text-center">
+                                <p className="text-[10px] uppercase tracking-wider text-slate-500">Intensity</p>
+                                <p className="text-sm font-semibold text-cyan-200">{Math.round(intensity)}%</p>
+                              </div>
+                              <div className="rounded-md border border-slate-800 bg-slate-950/70 px-2 py-1.5 text-center">
+                                <p className="text-[10px] uppercase tracking-wider text-slate-500">Visibility</p>
+                                <p className="text-sm font-semibold text-cyan-200">{Math.round(visibility)}%</p>
+                              </div>
+                            </div>
                             {submission.framesAnalyzed && (
                               <p className="inline-flex items-center gap-1 text-xs text-slate-400">
                                 <Sparkles className="h-3 w-3" />

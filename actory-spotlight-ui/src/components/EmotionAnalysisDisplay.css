@@ -83,6 +83,48 @@
   margin-top: 4px;
 }
 
+/* Metrics Grid */
+.metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin: 20px 0 28px;
+}
+
+.metric-card {
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  padding: 12px;
+  background: #f9fafb;
+}
+
+.metric-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #6b7280;
+}
+
+.metric-value {
+  margin-top: 6px;
+  margin-bottom: 8px;
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.metric-track {
+  height: 8px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: #e5e7eb;
+}
+
+.metric-fill {
+  height: 100%;
+  border-radius: 999px;
+  transition: width 0.3s ease;
+}
+
 /* Emotion Comparison */
 .emotion-comparison {
   display: flex;
@@ -224,6 +266,45 @@
   border-radius: 4px;
 }
 
+/* Emotion Timeline */
+.timeline-section {
+  margin: 28px 0;
+}
+
+.timeline-section h4 {
+  font-size: 16px;
+  color: #1f2937;
+  margin-bottom: 12px;
+}
+
+.timeline-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.timeline-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 10px 12px;
+  background: #f9fafb;
+}
+
+.timeline-emotion {
+  text-transform: capitalize;
+  font-size: 14px;
+  color: #1f2937;
+}
+
+.timeline-range {
+  font-size: 12px;
+  color: #6b7280;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
+}
+
 /* AI Feedback */
 .ai-feedback {
   background: #f9fafb;
@@ -290,6 +371,10 @@
 
 /* Responsive Design */
 @media (max-width: 768px) {
+  .metrics-grid {
+    grid-template-columns: 1fr;
+  }
+
   .emotion-comparison {
     gap: 16px;
   }
@@ -311,5 +396,11 @@
 
   .score-value {
     font-size: 28px;
+  }
+
+  .timeline-item {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
   }
 }

@@ -213,6 +213,37 @@ const VideoSchema = new mongoose.Schema({
       min: 0,
       max: 100,
     },
+    // Performance Metrics (0-100)
+    emotionConsistency: {
+      type: Number,
+      min: 0,
+      max: 100,
+    },
+    expressionIntensity: {
+      type: Number,
+      min: 0,
+      max: 100,
+    },
+    faceVisibility: {
+      type: Number,
+      min: 0,
+      max: 100,
+    },
+    // Overall performance score combining all metrics (0-100)
+    overallPerformanceScore: {
+      type: Number,
+      min: 0,
+      max: 100,
+    },
+    // Emotion timeline showing transitions over time
+    emotionTimeline: [{
+      emotion: {
+        type: String,
+        enum: ['happy', 'sad', 'angry', 'fear', 'surprise', 'disgust', 'neutral'],
+      },
+      start: Number, // seconds
+      end: Number,   // seconds
+    }],
     // Number of frames analyzed in the video
     framesAnalyzed: {
       type: Number,
@@ -224,7 +255,7 @@ const VideoSchema = new mongoose.Schema({
       min: 0,
       max: 1,
     },
-    // Overall score combining emotion match and confidence (0-100)
+    // Legacy overall score (deprecated in favor of overallPerformanceScore)
     overallScore: {
       type: Number,
       min: 0,

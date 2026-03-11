@@ -143,6 +143,12 @@ const safeAnalyzeVideo = async (videoUrl, requiredEmotion) => {
       detectedEmotion: null,
       emotionScores: null,
       emotionMatchScore: 0,
+      emotionConsistency: 0,
+      expressionIntensity: 0,
+      faceVisibility: 0,
+      overallPerformanceScore: 0,
+      emotionTimeline: [],
+      framesAnalyzed: 0,
       confidence: 0,
       overallScore: 0,
       feedback: `Analysis failed: ${error.message}`
