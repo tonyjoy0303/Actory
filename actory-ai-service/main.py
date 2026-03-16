@@ -8,6 +8,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from api.routes import router
 import uvicorn
+import sys
 
 # Create FastAPI app
 app = FastAPI(
@@ -38,6 +39,7 @@ async def startup_event():
     print("🌐 Host: 0.0.0.0:8000", flush=True)
     print("📊 Model: fea-iter-2.keras (7 emotions)", flush=True)
     print("🎭 Emotions: angry, disgust, fear, happy, sad, surprise, neutral", flush=True)
+    print(f"🐍 Python: {sys.executable}", flush=True)
     print("📡 Endpoints: POST /api/analyze-video | GET /api/health", flush=True)
     print("="*80, flush=True)
     print("✅ Service initialized and ready for requests\n", flush=True)

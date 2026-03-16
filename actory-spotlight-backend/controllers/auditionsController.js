@@ -5,6 +5,7 @@
 const Audition = require('../models/AuditionWithAI');
 const CastingCall = require('../models/CastingCall');
 const { safeAnalyzeVideo, checkAIServiceHealth } = require('../utils/aiServiceClient');
+const { extractEmotionFromDescription } = require('../utils/emotionExtractor');
 
 /**
  * Submit audition with AI emotion analysis
@@ -183,24 +184,6 @@ exports.checkAIStatus = async (req, res) => {
     });
   }
 };
-
-// ============= Helper Functions =============
-
-/**
- * Extract emotion keyword from casting description
- */
-function extractEmotionFromDescription(description) {
-  const emotions = ['angry', 'disgust', 'fear', 'happy', 'sad', 'surprise', 'neutral'];
-  const lowerDescription = description.toLowerCase();
-  
-  for (const emotion of emotions) {
-    if (lowerDescription.includes(emotion)) {
-      return emotion;
-    }
-  }
-  
-  return null;
-}
 
 /**
  * Analyze audition asynchronously (non-blocking)

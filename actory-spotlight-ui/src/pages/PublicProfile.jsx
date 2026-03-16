@@ -18,6 +18,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import VideoList from "@/components/profile/VideoList";
+import VideoUploadForm from "@/components/profile/VideoUploadForm";
 import ContactModal from "@/components/ContactModal";
 import API from "@/lib/api";
 
@@ -42,6 +43,7 @@ const PublicProfile = () => {
   const [profileImageFile, setProfileImageFile] = useState(null);
   const [profileImagePreview, setProfileImagePreview] = useState(null);
   const [imageKey, setImageKey] = useState(Date.now());
+  const [showUploadForm, setShowUploadForm] = useState(false);
 
   const queryClient = useQueryClient();
 
@@ -229,6 +231,15 @@ const PublicProfile = () => {
       navigator.clipboard.writeText(shareUrl);
       toast.success('Profile link copied to clipboard!');
     }
+  };
+
+  const handleMediaUploaded = () => {
+    setShowUploadForm(false);
+    queryClient.invalidateQueries({ queryKey: ['publicProfile', id] });
+  };
+
+  const handleMediaDeleted = () => {
+    queryClient.invalidateQueries({ queryKey: ['publicProfile', id] });
   };
 
   if (isLoading) {
@@ -605,18 +616,38 @@ const PublicProfile = () => {
               className="space-y-6"
             >
               <TabsList>
-                <TabsTrigger value="videos">Videos</TabsTrigger>
+                <TabsTrigger value="videos">Media</TabsTrigger>
                 <TabsTrigger value="about">About</TabsTrigger>
                 <TabsTrigger value="experience">Experience</TabsTrigger>
               </TabsList>
 
               <TabsContent value="videos" className="space-y-6">
+                {isOwner && (
+                  showUploadForm ? (
+                    <Card>
+                      <CardContent className="pt-6">
+                        <VideoUploadForm
+                          onUploadSuccess={handleMediaUploaded}
+                          onCancel={() => setShowUploadForm(false)}
+                        />
+                      </CardContent>
+                    </Card>
+                  ) : (
+                    <div className="flex justify-end">
+                      <Button onClick={() => setShowUploadForm(true)}>
+                        <Upload className="h-4 w-4 mr-2" />
+                        Add Photo or Video
+                      </Button>
+                    </div>
+                  )
+                )}
                 <VideoList
                   videos={profile?.videos || []}
                   user={currentUser}
-                  ownerName={profile?.name}
+                  ownerName={displayName}
                   ownerAvatar={profile?.profileImage ? `${profile?.profileImage}?t=${imageKey}` : undefined}
                   profileOwnerId={profile?._id}
+                  onVideoDeleted={handleMediaDeleted}
                 />
               </TabsContent>
 

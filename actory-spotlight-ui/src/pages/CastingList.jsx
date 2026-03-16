@@ -191,20 +191,20 @@ export default function CastingList() {
   }
 
   return (
-    <div className="container py-8">
+    <div className="container space-y-6 py-6 sm:py-8">
       <SEO 
         title="Casting Calls - Actory" 
         description="Browse and apply to the latest casting calls from top producers."
       />
 
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold tracking-tight mb-2">Casting Calls</h1>
-        <p className="text-muted-foreground">
+      <div className="rounded-2xl border border-border/70 bg-card/75 p-5 shadow-[var(--shadow-elegant)] sm:p-6">
+        <h1 className="mb-2 text-2xl font-bold tracking-tight leading-tight sm:text-3xl">Casting Calls</h1>
+        <p className="max-w-2xl text-sm leading-relaxed text-muted-foreground sm:text-base">
           Find your next acting opportunity from our curated list of casting calls.
         </p>
       </div>
 
-      <div className="mb-6 space-y-4">
+      <div className="space-y-4 rounded-2xl border border-border/70 bg-card/70 p-4 sm:p-5">
         <div className="relative max-w-2xl">
           <Input
             placeholder="Search by role, location, skill..."
@@ -232,7 +232,7 @@ export default function CastingList() {
           <select
             value={filters.experienceLevel}
             onChange={(e) => setFilters({...filters, experienceLevel: e.target.value})}
-            className="h-9 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm"
+            className="h-9 rounded-md border border-input bg-background/90 px-3 py-1 text-sm shadow-sm transition-colors focus:border-ring focus:outline-none"
           >
             <option value="">All Experience Levels</option>
             <option value="beginner">Beginner</option>
@@ -243,7 +243,7 @@ export default function CastingList() {
           <select
             value={filters.genderRequirement}
             onChange={(e) => setFilters({...filters, genderRequirement: e.target.value})}
-            className="h-9 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm"
+            className="h-9 rounded-md border border-input bg-background/90 px-3 py-1 text-sm shadow-sm transition-colors focus:border-ring focus:outline-none"
           >
             <option value="">All Genders</option>
             <option value="male">Male</option>
@@ -295,13 +295,13 @@ export default function CastingList() {
           {filtered.map((casting) => (
             <Card 
               key={casting._id} 
-              className="flex flex-col h-full casting-card cursor-pointer"
+              className="casting-card flex h-full cursor-pointer flex-col border-border/70 bg-card/85"
               onClick={() => navigate(`/casting/${casting._id}`)}
             >
               <CardHeader className="pb-3">
                 <div className="flex justify-between items-start">
                   <div className="flex-1">
-                    <CardTitle className="text-xl">{casting.roleTitle}</CardTitle>
+                    <CardTitle className="text-lg leading-snug sm:text-xl">{casting.roleTitle}</CardTitle>
                     {casting.project && (
                       <p className="text-sm text-muted-foreground mt-1">
                         Project: <span className="font-medium">{casting.project.name}</span>
@@ -322,13 +322,13 @@ export default function CastingList() {
               </CardHeader>
               
               <CardContent className="flex-1">
-                <p className="text-sm text-muted-foreground line-clamp-3 mb-4">
+                <p className="mb-4 line-clamp-3 text-sm leading-relaxed text-muted-foreground">
                   {casting.description}
                 </p>
 
                 {casting.project && (
                   <div className="mb-3 flex items-center justify-between gap-2">
-                    <div className="text-sm text-muted-foreground">
+                    <div className="text-sm leading-relaxed text-muted-foreground">
                       <span className="font-medium text-foreground">Project:</span>{' '}
                       {casting.project.name}
                     </div>
@@ -345,7 +345,7 @@ export default function CastingList() {
                   </div>
                 )}
 
-                <div className="space-y-2 text-sm">
+                <div className="space-y-2 text-sm leading-relaxed">
                   <div className="flex items-center">
                     <User className="h-4 w-4 mr-2 text-muted-foreground" />
                     <span className="font-medium">Gender:</span>
@@ -402,7 +402,7 @@ export default function CastingList() {
                 )}
               </CardContent>
 
-              <CardFooter className="pt-4 border-t">
+              <CardFooter className="border-t border-border/70 pt-4">
                 <Button 
                   variant="outline" 
                   className="w-full"

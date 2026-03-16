@@ -340,11 +340,34 @@ exports.deleteCastingCall = async (req, res, next) => {
       return res.status(404).json({ success: false, message: 'Casting call not found' });
     }
 
-    // Make sure user is casting call owner
-    if (castingCall.producer.toString() !== String(req.user._id)) {
-      return res.status(401).json({ 
-        success: false, 
-        message: 'Not authorized to delete this casting call' 
+    // Authorization rules:
+    // - Single casting (no project): only casting owner can delete.
+    // - Project casting: any member/owner of the linked team can delete.
+    let canDelete = false;
+
+    if (castingCall.project) {
+      const project = await FilmProject.findById(castingCall.project).select('team');
+      const teamId = project?.team || castingCall.team;
+
+      if (teamId) {
+        const team = await ProductionTeam.findById(teamId).select('owner members.user');
+        if (team) {
+          const requesterId = String(req.user._id);
+          const isTeamOwner = String(team.owner) === requesterId;
+          const isTeamMember = (team.members || []).some(
+            (member) => String(member.user) === requesterId
+          );
+          canDelete = isTeamOwner || isTeamMember;
+        }
+      }
+    } else {
+      canDelete = castingCall.producer.toString() === String(req.user._id);
+    }
+
+    if (!canDelete) {
+      return res.status(401).json({
+        success: false,
+        message: 'Not authorized to delete this casting call'
       });
     }
 

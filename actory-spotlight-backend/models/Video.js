@@ -5,6 +5,16 @@ const VideoSchema = new mongoose.Schema({
     type: String,
     required: [true, 'Please add a title'],
   },
+  mediaType: {
+    type: String,
+    enum: ['video', 'image'],
+    default: 'video',
+  },
+  resourceType: {
+    type: String,
+    enum: ['video', 'image'],
+    default: 'video',
+  },
   videoUrl: {
     type: String,
     required: true,
@@ -228,6 +238,30 @@ const VideoSchema = new mongoose.Schema({
       type: Number,
       min: 0,
       max: 100,
+    },
+    // Multimodal voice + face fields
+    faceEmotion: {
+      type: String,
+      enum: ['happy', 'sad', 'angry', 'fear', 'surprise', 'disgust', 'neutral'],
+    },
+    voiceEmotion: {
+      type: String,
+      enum: ['happy', 'sad', 'angry', 'neutral'],
+    },
+    faceConfidence: {
+      type: Number,
+      min: 0,
+      max: 1,
+    },
+    voiceConfidence: {
+      type: Number,
+      min: 0,
+      max: 1,
+    },
+    combinedEmotionConfidence: {
+      type: Number,
+      min: 0,
+      max: 1,
     },
     // Overall performance score combining all metrics (0-100)
     overallPerformanceScore: {

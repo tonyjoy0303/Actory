@@ -249,10 +249,15 @@ exports.addVideo = async (req, res, next) => {
               faceVisibility: analysisData.faceVisibility || 0,
               overallPerformanceScore: analysisData.overallPerformanceScore || 0,
               emotionTimeline: analysisData.emotionTimeline || [],
-              confidence: analysisData.confidence || 0,
+              confidence: analysisData.confidence || analysisData.combinedEmotionConfidence || 0,
               overallScore: analysisData.overallPerformanceScore || analysisData.emotionMatchScore || 0,
               feedback: analysisData.feedback,
               framesAnalyzed: analysisData.framesAnalyzed || 0,
+              faceEmotion: analysisData.faceEmotion || analysisData.detectedEmotion || null,
+              voiceEmotion: analysisData.voiceEmotion || 'neutral',
+              faceConfidence: analysisData.faceConfidence || 0,
+              voiceConfidence: analysisData.voiceConfidence || 0,
+              combinedEmotionConfidence: analysisData.combinedEmotionConfidence || 0,
               analyzedAt: new Date(),
               error: null,
             };
@@ -304,10 +309,15 @@ exports.addVideo = async (req, res, next) => {
                 faceVisibility: analysisData.faceVisibility || 0,
                 overallPerformanceScore: analysisData.overallPerformanceScore || 0,
                 emotionTimeline: analysisData.emotionTimeline || [],
-                confidence: analysisData.confidence || 0,
+                confidence: analysisData.confidence || analysisData.combinedEmotionConfidence || 0,
                 overallScore: analysisData.overallPerformanceScore || analysisData.emotionMatchScore || 0,
                 feedback: analysisData.feedback,
                 framesAnalyzed: analysisData.framesAnalyzed || 0,
+                faceEmotion: analysisData.faceEmotion || analysisData.detectedEmotion || null,
+                voiceEmotion: analysisData.voiceEmotion || 'neutral',
+                faceConfidence: analysisData.faceConfidence || 0,
+                voiceConfidence: analysisData.voiceConfidence || 0,
+                combinedEmotionConfidence: analysisData.combinedEmotionConfidence || 0,
                 analyzedAt: new Date(),
                 error: null,
               };
@@ -356,7 +366,7 @@ exports.getMyVideos = async (req, res, next) => {
   }
 };
 
-// @desc    Get all public videos for feeds
+// @desc    Get all public profile media for feeds
 // @route   GET /api/v1/videos/public
 // @access  Public
 exports.getPublicVideos = async (req, res, next) => {
@@ -384,7 +394,10 @@ exports.getPublicVideos = async (req, res, next) => {
         _id: video._id,
         title: video.title,
         description: video.description,
+        mediaType: video.mediaType || 'video',
+        resourceType: video.resourceType || (video.mediaType === 'image' ? 'image' : 'video'),
         videoUrl: video.url,
+        mediaUrl: video.url,
         thumbnailUrl: video.thumbnailUrl,
         duration: video.duration,
         views: video.views,
@@ -432,9 +445,12 @@ exports.getPublicVideos = async (req, res, next) => {
       return {
         ...video,
         _id: (video._id && video._id.toString) ? video._id.toString() : String(video._id || ''),
-        thumbnailUrl: video.thumbnailUrl || (video.videoUrl ? 
-          video.videoUrl.replace(/\.(mp4|mov|avi|wmv|flv|webm)$/i, '.jpg') : 
-          'https://via.placeholder.com/300x169?text=No+Thumbnail'),
+        mediaType: video.mediaType || (video.resourceType === 'image' ? 'image' : 'video'),
+        resourceType: video.resourceType || (video.mediaType === 'image' ? 'image' : 'video'),
+        mediaUrl: video.mediaUrl || video.videoUrl,
+        thumbnailUrl: video.thumbnailUrl || (video.videoUrl
+          ? video.videoUrl.replace(/\.(mp4|mov|avi|wmv|flv|webm)$/i, '.jpg')
+          : 'https://via.placeholder.com/300x169?text=No+Thumbnail'),
         views: video.views || 0,
         likes: video.likes || 0,
         comments: video.comments || 0,
@@ -442,7 +458,7 @@ exports.getPublicVideos = async (req, res, next) => {
         duration: video.duration || 0,
         uploadedAt: video.uploadedAt || video.createdAt || new Date(),
         createdAt: video.createdAt || video.uploadedAt || new Date(),
-        category: video.category || 'Profile Video'
+        category: video.category || (video.mediaType === 'image' ? 'Photo' : 'Profile Video')
       };
     });
     
@@ -468,9 +484,9 @@ exports.getPublicVideos = async (req, res, next) => {
   }
 };
 
-// @desc    Get current actor's profile videos
+// @desc    Get current user's profile media
 // @route   GET /api/v1/videos/profile
-// @access  Private (Actor)
+// @access  Private
 exports.getMyProfileVideos = async (req, res, next) => {
   try {
     console.log('Getting profile videos for user:', req.user._id);
@@ -501,7 +517,10 @@ exports.getMyProfileVideos = async (req, res, next) => {
       _id: v._id,
       title: v.title,
       description: v.description,
+      mediaType: v.mediaType || 'video',
+      resourceType: v.resourceType || (v.mediaType === 'image' ? 'image' : 'video'),
       videoUrl: v.url, // map to common field
+      mediaUrl: v.url,
       thumbnailUrl: v.thumbnailUrl,
       duration: v.duration,
       views: v.views,
@@ -539,6 +558,9 @@ exports.getMyProfileVideos = async (req, res, next) => {
     const transformedVideos = videos.map(video => ({
       ...video,
       _id: (video._id && video._id.toString) ? video._id.toString() : String(video._id || ''),
+      mediaType: video.mediaType || (video.resourceType === 'image' ? 'image' : 'video'),
+      resourceType: video.resourceType || (video.mediaType === 'image' ? 'image' : 'video'),
+      mediaUrl: video.mediaUrl || video.videoUrl,
       thumbnailUrl: video.thumbnailUrl || (video.videoUrl ? 
         video.videoUrl.replace(/\.(mp4|mov|avi|wmv|flv|webm)$/i, '.jpg') : 
         'https://via.placeholder.com/300x169?text=No+Thumbnail'),
@@ -548,7 +570,7 @@ exports.getMyProfileVideos = async (req, res, next) => {
       likedBy: Array.isArray(video.likedBy) ? video.likedBy : [],
       duration: video.duration || 0,
       uploadedAt: video.uploadedAt || video.createdAt || new Date(),
-      category: video.category || 'Profile Video'
+      category: video.category || (video.mediaType === 'image' ? 'Photo' : 'Profile Video')
     }));
     
     console.log('Returning profile videos:', {
@@ -632,31 +654,31 @@ exports.deleteVideo = async (req, res, next) => {
   }
 };
 
-// @desc    Upload a profile video
+// @desc    Upload a profile media item
 // @route   POST /api/v1/profile/videos
-// @access  Private (Actor)
+// @access  Private
 exports.uploadProfileVideo = async (req, res, next) => {
   try {
-    // Check if file was uploaded
-    if (!req.files || !req.files.video) {
+    if (!req.file) {
       return res.status(400).json({
         success: false,
-        message: 'Please upload a video file'
+        message: 'Please upload an image or video file'
       });
     }
 
-    const videoFile = req.files.video;
+    const mediaType = req.file.mimetype.startsWith('image/') ? 'image' : 'video';
+    const resourceType = mediaType === 'image' ? 'image' : 'video';
     
-    // Upload to Cloudinary (or your preferred storage)
-    const result = await cloudinary.uploader.upload(videoFile.tempFilePath, {
-      resource_type: 'video',
-      folder: 'profile-videos',
+    const result = await cloudinary.uploader.upload(req.file.path, {
+      resource_type: resourceType,
+      folder: 'profile-media',
     });
 
-    // Create video in database
     const video = await Video.create({
-      title: req.body.description?.slice(0, 80) || 'Profile Video',
+      title: req.body.description?.slice(0, 80) || (mediaType === 'image' ? 'Profile Photo' : 'Profile Video'),
       description: req.body.description || '',
+      mediaType,
+      resourceType,
       videoUrl: result.secure_url,
       cloudinaryId: result.public_id,
       actor: req.user._id,
@@ -669,17 +691,17 @@ exports.uploadProfileVideo = async (req, res, next) => {
       data: video
     });
   } catch (err) {
-    console.error('Error uploading profile video:', err);
+    console.error('Error uploading profile media:', err);
     res.status(500).json({
       success: false,
-      message: 'Error uploading video. Please try again.'
+      message: 'Error uploading media. Please try again.'
     });
   }
 };
 
-// @desc    Delete a profile video
+// @desc    Delete a profile media item
 // @route   DELETE /api/v1/videos/profile/videos/:id
-// @access  Private (Actor)
+// @access  Private
 exports.deleteProfileVideo = async (req, res, next) => {
   try {
     const videoId = req.params.id;
@@ -690,7 +712,7 @@ exports.deleteProfileVideo = async (req, res, next) => {
       // Admin can delete any profile video
       video = await Video.findOne({ _id: videoId, type: 'profile' });
     } else {
-      // Actor can only delete their own videos
+      // Users can only delete their own profile media
       video = await Video.findOne({ _id: videoId, actor: req.user._id, type: 'profile' });
     }
 
@@ -709,7 +731,7 @@ exports.deleteProfileVideo = async (req, res, next) => {
       // Find the user who owns the embedded video
       user = await User.findOne({ 'videos._id': videoId });
     } else {
-      // Actor can only access their own profile
+      // Users can only access their own profile
       user = await User.findById(req.user._id);
     }
 
@@ -717,10 +739,15 @@ exports.deleteProfileVideo = async (req, res, next) => {
       const videoIndex = user.videos.findIndex(v => v._id.toString() === videoId);
       if (videoIndex !== -1) {
         const video = user.videos[videoIndex];
-        // Delete from cloudinary for embedded videos
-        if (video.url) {
+        if (video.cloudinaryId) {
+          await cloudinary.uploader.destroy(video.cloudinaryId, {
+            resource_type: video.resourceType || (video.mediaType === 'image' ? 'image' : 'video')
+          });
+        } else if (video.url) {
           const publicId = video.url.split('/').pop().split('.')[0];
-          await cloudinary.uploader.destroy(`actory/videos/${user._id}/${publicId}`, { resource_type: 'video' });
+          await cloudinary.uploader.destroy(`actory/profile-media/${user._id}/${publicId}`, {
+            resource_type: video.resourceType || (video.mediaType === 'image' ? 'image' : 'video')
+          });
         }
         user.videos.splice(videoIndex, 1);
         await user.save();

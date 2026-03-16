@@ -2,16 +2,23 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Trash2, Eye, Heart, MessageCircle, Share2 } from 'lucide-react';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Textarea } from '@/components/ui/textarea';
 import API from '@/lib/api';
 import { toast } from 'sonner';
+import { format } from 'date-fns';
 
 // Inline autoplay previews + full-size modal on click
 const VideoList = ({ videos = [], user, onVideoDeleted, ownerName, ownerAvatar, profileOwnerId }) => {
   const [open, setOpen] = useState(false);
-  const [activeSrc, setActiveSrc] = useState('');
+  const [activeItem, setActiveItem] = useState(null);
   const [deletingVideoId, setDeletingVideoId] = useState(null);
   const [items, setItems] = useState(videos || []);
   const [currentUserId, setCurrentUserId] = useState(null);
+  const [isCommentModalOpen, setIsCommentModalOpen] = useState(false);
+  const [selectedItemForComments, setSelectedItemForComments] = useState(null);
+  const [newComment, setNewComment] = useState('');
+  const [mediaComments, setMediaComments] = useState({});
   const videoRef = useRef(null);
 
   // Load current user id and keep items in sync with props
@@ -54,36 +61,41 @@ const VideoList = ({ videos = [], user, onVideoDeleted, ownerName, ownerAvatar, 
   if (!Array.isArray(videos) || videos.length === 0) {
     return (
       <div className="text-center py-12">
-        <p className="text-muted-foreground">No videos uploaded yet</p>
+        <p className="text-muted-foreground">No media uploaded yet</p>
       </div>
     );
   }
 
-  const openModal = (src) => {
+  const isImageItem = (item) => item?.mediaType === 'image' || item?.resourceType === 'image';
+  const getMediaSrc = (item) => item?.mediaUrl || item?.videoUrl || item?.url || '';
+
+  const openModal = (item) => {
+    const src = getMediaSrc(item);
     if (!src) return;
-    setActiveSrc(src);
+    setActiveItem({ ...item, src });
     setOpen(true);
   };
 
   const handleShare = (src) => {
     if (!src) return;
     if (navigator.share) {
-      navigator.share({ title: 'Actory Video', url: src }).catch(() => {});
+      navigator.share({ title: 'Actory Media', url: src }).catch(() => {});
     } else {
       navigator.clipboard.writeText(src);
-      toast.success('Video link copied');
+      toast.success('Media link copied');
     }
   };
 
   const handleToggleLike = async (videoId) => {
     if (!videoId) return;
     if (!currentUserId) {
-      toast.error('Please login to like videos');
+      toast.error('Please login to like posts');
       return;
     }
     try {
       const { data } = await API.put(`/videos/${videoId}/like`, { userId: currentUserId });
       if (data?.success) {
+        let updatedActiveItem = null;
         setItems((prev) => prev.map(v => (
           v._id === videoId ? {
             ...v,
@@ -98,16 +110,111 @@ const VideoList = ({ videos = [], user, onVideoDeleted, ownerName, ownerAvatar, 
             })()
           } : v
         )));
+
+        setActiveItem((prev) => {
+          if (!prev || prev._id !== videoId) return prev;
+          updatedActiveItem = {
+            ...prev,
+            likes: data.likes,
+            isLiked: data.isLiked,
+            likedBy: (() => {
+              const set = new Set((prev.likedBy || []).map(x => String(x)));
+              if (data.isLiked) set.add(String(currentUserId)); else set.delete(String(currentUserId));
+              return Array.from(set);
+            })()
+          };
+          return updatedActiveItem;
+        });
+
+        if (selectedItemForComments?._id === videoId && updatedActiveItem) {
+          setSelectedItemForComments(updatedActiveItem);
+        }
       }
     } catch (e) {
-      toast.error('Failed to like video');
+      toast.error('Failed to like post');
+    }
+  };
+
+  const openCommentModal = async (item) => {
+    if (!item?._id) return;
+    if (!currentUserId) {
+      toast.error('Please login to comment on posts');
+      return;
+    }
+
+    setSelectedItemForComments(item);
+    setIsCommentModalOpen(true);
+
+    try {
+      const { data } = await API.get(`/videos/${item._id}/comments`);
+      if (data?.success) {
+        setMediaComments((prev) => ({
+          ...prev,
+          [item._id]: data.data || []
+        }));
+      }
+    } catch (error) {
+      setMediaComments((prev) => ({
+        ...prev,
+        [item._id]: prev[item._id] || []
+      }));
+    }
+  };
+
+  const closeCommentModal = () => {
+    setIsCommentModalOpen(false);
+    setSelectedItemForComments(null);
+    setNewComment('');
+  };
+
+  const handleAddComment = async () => {
+    if (!selectedItemForComments?._id || !newComment.trim() || !currentUserId) return;
+
+    try {
+      const { data } = await API.post(`/videos/${selectedItemForComments._id}/comment`, {
+        userId: currentUserId,
+        comment: newComment.trim()
+      });
+
+      if (data?.success) {
+        const createdComment = data.comment;
+
+        setMediaComments((prev) => ({
+          ...prev,
+          [selectedItemForComments._id]: [
+            createdComment,
+            ...(prev[selectedItemForComments._id] || [])
+          ]
+        }));
+
+        setItems((prev) => prev.map(v => (
+          v._id === selectedItemForComments._id
+            ? { ...v, comments: data.comments }
+            : v
+        )));
+
+        setActiveItem((prev) => (
+          prev && prev._id === selectedItemForComments._id
+            ? { ...prev, comments: data.comments }
+            : prev
+        ));
+
+        setSelectedItemForComments((prev) => (
+          prev ? { ...prev, comments: data.comments } : prev
+        ));
+
+        setNewComment('');
+        toast.success('Comment added');
+      }
+    } catch (error) {
+      toast.error('Failed to add comment');
     }
   };
 
   const handleDeleteVideo = async (videoId) => {
     if (!videoId) return;
 
-    const confirmed = window.confirm('Are you sure you want to delete this video? This action cannot be undone.');
+    const confirmed = window.confirm('Are you sure you want to delete this media post? This action cannot be undone.');
     if (!confirmed) return;
 
     setDeletingVideoId(videoId);
@@ -115,15 +222,15 @@ const VideoList = ({ videos = [], user, onVideoDeleted, ownerName, ownerAvatar, 
     try {
       const response = await API.delete(`/videos/profile/videos/${videoId}`);
       if (response.data.success) {
-        toast.success('Video deleted successfully');
+        toast.success('Media deleted successfully');
         // Notify parent component to update the video list
         if (onVideoDeleted) {
           onVideoDeleted(videoId);
         }
       }
     } catch (error) {
-      console.error('Error deleting video:', error);
-      const message = error.response?.data?.message || 'Failed to delete video';
+      console.error('Error deleting media:', error);
+      const message = error.response?.data?.message || 'Failed to delete media';
       toast.error(message);
     } finally {
       setDeletingVideoId(null);
@@ -138,11 +245,11 @@ const VideoList = ({ videos = [], user, onVideoDeleted, ownerName, ownerAvatar, 
     
     // If profileOwnerId is provided, check if current user is the profile owner
     if (profileOwnerId) {
-      return user?.id === profileOwnerId;
+      return String(user?.id || user?._id || '') === String(profileOwnerId);
     }
     
     // Fallback: Actors can only delete their own videos (for backward compatibility)
-    if (user?.role === 'Actor' && video.actor === user?.id) {
+    if (String(video.actor) === String(user?.id || user?._id || '')) {
       return true;
     }
     
@@ -153,8 +260,9 @@ const VideoList = ({ videos = [], user, onVideoDeleted, ownerName, ownerAvatar, 
     <>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {items.map((video) => {
-          const src = video?.videoUrl || video?.url || '';
+          const src = getMediaSrc(video);
           const poster = video?.thumbnailUrl || '';
+          const isImage = isImageItem(video);
           if (!src) return null;
 
           const showDeleteButton = canDeleteVideo(video);
@@ -177,25 +285,32 @@ const VideoList = ({ videos = [], user, onVideoDeleted, ownerName, ownerAvatar, 
               </div>
               <button
                 type="button"
-                onClick={() => openModal(src)}
+                onClick={() => openModal(video)}
                 className="w-full"
-                aria-label="Open video"
+                aria-label="Open media"
               >
-                <video
-                  src={src}
-                  poster={poster || undefined}
-                  autoPlay
-                  muted
-                  loop
-                  playsInline
-                  preload="metadata"
-                  className="w-full aspect-[9/16] rounded-md bg-black object-contain transition-transform group-hover:scale-[1.01]"
-                  onError={(e) => {
-                    // If playback fails, fallback to opening in a new tab
-                    const open = window.confirm('Video failed to load. Open in a new tab?');
-                    if (open && src) window.open(src, '_blank');
-                  }}
-                />
+                {isImage ? (
+                  <img
+                    src={src}
+                    alt={video.description || video.title || 'Profile media'}
+                    className="w-full aspect-[9/16] rounded-md bg-black/5 object-contain transition-transform group-hover:scale-[1.01]"
+                  />
+                ) : (
+                  <video
+                    src={src}
+                    poster={poster || undefined}
+                    autoPlay
+                    muted
+                    loop
+                    playsInline
+                    preload="metadata"
+                    className="w-full aspect-[9/16] rounded-md bg-black object-contain transition-transform group-hover:scale-[1.01]"
+                    onError={() => {
+                      const shouldOpen = window.confirm('Media failed to load. Open in a new tab?');
+                      if (shouldOpen && src) window.open(src, '_blank');
+                    }}
+                  />
+                )}
               </button>
 
               {/* Actions */}
@@ -208,7 +323,7 @@ const VideoList = ({ videos = [], user, onVideoDeleted, ownerName, ownerAvatar, 
                     <span className="text-xs text-muted-foreground">{video.likes || 0}</span>
                   </div>
                   <div className="flex items-center gap-1">
-                    <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => openModal(src)}>
+                    <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => openModal(video)}>
                       <MessageCircle className="h-5 w-5" />
                     </Button>
                     <span className="text-xs text-muted-foreground">{video.comments || 0}</span>
@@ -243,18 +358,126 @@ const VideoList = ({ videos = [], user, onVideoDeleted, ownerName, ownerAvatar, 
       </div>
 
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="sm:max-w-[500px] sm:max-h-[90vh] p-0 bg-black">
-          <div className="w-full h-full bg-black flex items-center justify-center">
-            {activeSrc && (
-              <video
-                ref={videoRef}
-                key={activeSrc}
-                src={activeSrc}
-                controls
-                autoPlay
-                className="max-w-full max-h-full object-contain"
-              />
+        <DialogContent className="w-[96vw] max-w-[96vw] h-[96vh] max-h-[96vh] p-0 bg-black">
+          <div className="w-full h-full bg-black flex flex-col">
+            <div className="flex-1 min-h-0 relative overflow-hidden">
+              {activeItem && (
+                isImageItem(activeItem) ? (
+                  <img
+                    src={activeItem.src}
+                    alt={activeItem.description || activeItem.title || 'Profile media'}
+                    className="absolute inset-0 w-full h-full object-contain"
+                  />
+                ) : (
+                  <video
+                    ref={videoRef}
+                    key={activeItem.src}
+                    src={activeItem.src}
+                    controls
+                    autoPlay
+                    className="absolute inset-0 w-full h-full object-contain"
+                  />
+                )
+              )}
+            </div>
+
+            {activeItem && (
+              <div className="px-4 py-3 bg-background border-t">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-1">
+                      <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => handleToggleLike(activeItem._id)}>
+                        <Heart className={`h-5 w-5 ${(activeItem.isLiked || (currentUserId && (activeItem.likedBy || []).some(id => String(id) === String(currentUserId)))) ? 'fill-red-500 text-red-500' : ''}`} />
+                      </Button>
+                      <span className="text-xs text-muted-foreground">{activeItem.likes || 0}</span>
+                    </div>
+
+                    <div className="flex items-center gap-1">
+                      <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => openCommentModal(activeItem)}>
+                        <MessageCircle className="h-5 w-5" />
+                      </Button>
+                      <span className="text-xs text-muted-foreground">{activeItem.comments || 0}</span>
+                    </div>
+
+                    <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => handleShare(activeItem.src)}>
+                      <Share2 className="h-5 w-5" />
+                    </Button>
+                  </div>
+
+                  <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                    <span className="flex items-center">
+                      <Eye className="h-3 w-3 mr-1" />
+                      {activeItem.views || 0}
+                    </span>
+                  </div>
+                </div>
+              </div>
             )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isCommentModalOpen} onOpenChange={closeCommentModal}>
+        <DialogContent className="sm:max-w-[600px] sm:max-h-[80vh] p-0">
+          <div className="p-6 pb-4 border-b">
+            <h3 className="text-lg font-semibold">
+              Comments ({selectedItemForComments ? (mediaComments[selectedItemForComments._id] || []).length : 0})
+            </h3>
+            <p className="text-sm text-muted-foreground">View and add comments for this post</p>
+          </div>
+
+          <div className="flex flex-col h-[60vh]">
+            <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
+              {(() => {
+                const currentComments = selectedItemForComments ? (mediaComments[selectedItemForComments._id] || []) : [];
+                if (currentComments.length === 0) {
+                  return (
+                    <div className="text-center text-muted-foreground py-8">
+                      <MessageCircle className="h-10 w-10 mx-auto mb-3 opacity-50" />
+                      <p>No comments yet. Be the first to comment!</p>
+                    </div>
+                  );
+                }
+
+                return currentComments.map((comment) => {
+                  const displayName = comment?.user?.name || comment?.user?.companyName || 'Unknown User';
+                  const displayInitial = comment?.user?.name?.charAt(0) || comment?.user?.companyName?.charAt(0) || 'U';
+
+                  return (
+                    <div key={comment._id} className="flex space-x-3">
+                      <Avatar className="h-8 w-8">
+                        <AvatarImage src={comment?.user?.profileImage || undefined} />
+                        <AvatarFallback>{displayInitial}</AvatarFallback>
+                      </Avatar>
+
+                      <div className="flex-1 space-y-1">
+                        <div className="flex items-center space-x-2">
+                          <span className="font-medium text-sm">{displayName}</span>
+                          <span className="text-xs text-muted-foreground">
+                            {comment?.createdAt ? format(new Date(comment.createdAt), 'MMM d, h:mm a') : ''}
+                          </span>
+                        </div>
+                        <p className="text-sm text-foreground">{comment.comment}</p>
+                      </div>
+                    </div>
+                  );
+                });
+              })()}
+            </div>
+
+            <div className="border-t p-4 space-y-3">
+              <Textarea
+                placeholder="Write a comment..."
+                value={newComment}
+                onChange={(e) => setNewComment(e.target.value)}
+                className="min-h-[80px]"
+              />
+              <div className="flex justify-end">
+                <Button onClick={handleAddComment} disabled={!newComment.trim()}>
+                  Post Comment
+                </Button>
+              </div>
+            </div>
           </div>
         </DialogContent>
       </Dialog>

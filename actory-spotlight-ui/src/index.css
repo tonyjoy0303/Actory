@@ -9,56 +9,58 @@ All colors MUST be HSL.
 @layer base {
   :root {
     /* Core palette */
-    --background: 0 0% 100%;           /* White */
-    --foreground: 215 28% 12%;
+    --background: 210 45% 98%;
+    --foreground: 215 34% 13%;
 
     --card: 0 0% 100%;
-    --card-foreground: 215 28% 12%;
+    --card-foreground: 215 34% 13%;
 
-    --popover: 0 0% 100%;
-    --popover-foreground: 215 28% 12%;
+    --popover: 210 40% 99%;
+    --popover-foreground: 215 34% 13%;
 
     /* Deep navy primary (Actory) */
-    --primary: 210 50% 12%;            /* Approx #0E1E2A */
+    --primary: 214 57% 17%;
     --primary-foreground: 0 0% 100%;
 
     /* Muted surfaces */
-    --secondary: 210 40% 96%;
-    --secondary-foreground: 215 28% 15%;
+    --secondary: 210 34% 94%;
+    --secondary-foreground: 215 28% 18%;
 
-    --muted: 210 40% 96%;
-    --muted-foreground: 215 16% 47%;
+    --muted: 210 34% 94%;
+    --muted-foreground: 216 15% 40%;
 
     /* Gold accent */
-    --accent: 51 100% 50%;             /* Gold */
+    --accent: 45 100% 52%;
     --accent-foreground: 215 70% 12%;
 
     --destructive: 0 84% 60%;
     --destructive-foreground: 210 40% 98%;
 
-    --border: 214 32% 91%;
-    --input: 214 32% 91%;
-    --ring: 51 100% 50%;               /* Gold focus ring */
+    --border: 214 24% 86%;
+    --input: 214 24% 86%;
+    --ring: 45 100% 52%;
 
     --radius: 0.75rem;
 
     /* Sidebar tokens */
-    --sidebar-background: 0 0% 98%;
-    --sidebar-foreground: 240 5% 26%;
-    --sidebar-primary: 210 50% 12%;
+    --sidebar-background: 210 40% 97%;
+    --sidebar-foreground: 215 24% 24%;
+    --sidebar-primary: 214 57% 17%;
     --sidebar-primary-foreground: 0 0% 98%;
-    --sidebar-accent: 210 40% 96%;
-    --sidebar-accent-foreground: 215 28% 12%;
-    --sidebar-border: 220 13% 91%;
-    --sidebar-ring: 51 100% 50%;
+    --sidebar-accent: 210 34% 94%;
+    --sidebar-accent-foreground: 215 28% 14%;
+    --sidebar-border: 214 24% 86%;
+    --sidebar-ring: 45 100% 52%;
 
     /* Brand and effects */
-    --brand: 51 100% 50%;              /* Gold */
+    --brand: 45 100% 52%;
     --brand-foreground: 215 28% 12%;
-    --gradient-primary: linear-gradient(135deg, hsl(var(--primary) / 0.98), hsl(215 28% 12%));
-    --gradient-glow: radial-gradient(600px 200px at 50% -20%, hsl(var(--brand) / 0.22), transparent 60%);
-    --shadow-elegant: 0 18px 40px -10px hsl(var(--primary) / 0.25);
-    --shadow-glow: 0 10px 30px -8px hsl(var(--brand) / 0.35);
+    --gradient-primary: linear-gradient(135deg, hsl(var(--primary) / 0.98), hsl(220 44% 23%));
+    --gradient-glow:
+      radial-gradient(820px 260px at 8% -14%, hsl(214 92% 58% / 0.14), transparent 64%),
+      radial-gradient(700px 260px at 92% -12%, hsl(var(--brand) / 0.2), transparent 62%);
+    --shadow-elegant: 0 16px 36px -14px hsl(var(--primary) / 0.24);
+    --shadow-glow: 0 14px 34px -14px hsl(var(--brand) / 0.42);
   }
 
   .dark {
@@ -109,8 +111,15 @@ All colors MUST be HSL.
 
   body {
     @apply bg-background text-foreground font-sans antialiased;
-    background-image: var(--gradient-glow);
+    background-image:
+      var(--gradient-glow),
+      linear-gradient(180deg, hsl(var(--background)), hsl(210 32% 96%));
     background-repeat: no-repeat;
+    background-size: 100% 100%, 100% 100%;
+  }
+
+  .dark body {
+    background-image: var(--gradient-glow);
     background-size: 100% 100%;
   }
   html { scroll-behavior: smooth; }

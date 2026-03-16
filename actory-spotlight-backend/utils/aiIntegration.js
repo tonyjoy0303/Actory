@@ -8,7 +8,7 @@
 const axios = require('axios');
 
 // AI Service URL from environment variable or default to localhost
-const AI_SERVICE_URL = process.env.AI_SERVICE_URL || 'http://localhost:10000';
+const AI_SERVICE_URL = process.env.AI_SERVICE_URL || 'http://localhost:8000';
 
 /**
  * Validate emotion string
@@ -70,15 +70,15 @@ const analyzeVideoEmotion = async (videoUrl, requiredEmotion) => {
   
   try {
     // Call AI service via HTTP
-    const response = await axios.get(`${AI_SERVICE_URL}/analyze`, {
-      params: {
-        video_url: videoUrl,
-        required_emotion: requiredEmotion
-      },
-      timeout: 5 * 60 * 1000, // 5 minutes timeout
-      validateStatus: (status) => status < 600 // Don't throw on 4xx/5xx, handle manually
-    });
-    
+    const response = await axios.post(
+      `${AI_SERVICE_URL}/api/analyze-video`,
+      { videoURL: videoUrl, requiredEmotion: requiredEmotion },
+      {
+        timeout: 5 * 60 * 1000, // 5 minutes timeout
+        validateStatus: (status) => status < 600 // Don't throw on 4xx/5xx, handle manually
+      }
+    );
+
     console.log(`[AI] AI service responded with status: ${response.status}`);
     
     // Handle error responses
@@ -151,7 +151,12 @@ const safeAnalyzeVideo = async (videoUrl, requiredEmotion) => {
       framesAnalyzed: 0,
       confidence: 0,
       overallScore: 0,
-      feedback: `Analysis failed: ${error.message}`
+      feedback: `Analysis failed: ${error.message}`,
+      faceEmotion: null,
+      voiceEmotion: 'neutral',
+      faceConfidence: 0,
+      voiceConfidence: 0,
+      combinedEmotionConfidence: 0,
     };
   }
 };

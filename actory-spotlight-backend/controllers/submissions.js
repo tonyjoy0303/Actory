@@ -152,6 +152,11 @@ const getSubmissions = async (req, res, next) => {
       overallScore: submission.aiAnalysis?.overallPerformanceScore || submission.aiAnalysis?.overallScore || 0,
       feedback: submission.aiAnalysis?.feedback,
       framesAnalyzed: submission.aiAnalysis?.framesAnalyzed || 0,
+      faceEmotion: submission.aiAnalysis?.faceEmotion || submission.aiAnalysis?.detectedEmotion || null,
+      voiceEmotion: submission.aiAnalysis?.voiceEmotion || 'neutral',
+      faceConfidence: submission.aiAnalysis?.faceConfidence || 0,
+      voiceConfidence: submission.aiAnalysis?.voiceConfidence || 0,
+      combinedEmotionConfidence: submission.aiAnalysis?.combinedEmotionConfidence || 0,
       // Quality assessment
       qualityScore: submission.qualityAssessment?.score || 0,
     }));
@@ -254,10 +259,15 @@ const reanalyzeSubmission = async (req, res, next) => {
       faceVisibility: analysisData.faceVisibility || 0,
       overallPerformanceScore: analysisData.overallPerformanceScore || 0,
       emotionTimeline: analysisData.emotionTimeline || [],
-      confidence: analysisData.confidence || 0,
+      confidence: analysisData.confidence || analysisData.combinedEmotionConfidence || 0,
       overallScore: analysisData.overallPerformanceScore || analysisData.overallScore || analysisData.emotionMatchScore || 0,
       feedback: analysisData.feedback,
       framesAnalyzed: analysisData.framesAnalyzed || 0,
+      faceEmotion: analysisData.faceEmotion || analysisData.detectedEmotion || null,
+      voiceEmotion: analysisData.voiceEmotion || 'neutral',
+      faceConfidence: analysisData.faceConfidence || 0,
+      voiceConfidence: analysisData.voiceConfidence || 0,
+      combinedEmotionConfidence: analysisData.combinedEmotionConfidence || 0,
       analyzedAt: new Date(),
       error: null,
     };

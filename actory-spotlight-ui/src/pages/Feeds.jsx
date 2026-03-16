@@ -45,6 +45,8 @@ const Feeds = () => {
   });
 
   const videos = videosData?.data || [];
+  const isImagePost = (item) => item?.mediaType === 'image' || item?.resourceType === 'image';
+  const getMediaSrc = (item) => item?.mediaUrl || item?.videoUrl || item?.url;
 
   // Handle keyboard navigation when video modal is open
   useEffect(() => {
@@ -145,6 +147,11 @@ const Feeds = () => {
             ? { ...video, likes: data.likes, isLiked: data.isLiked }
             : video
         );
+
+        // Keep fullscreen modal data in sync when liking from modal
+        if (selectedVideo?._id === videoId) {
+          setSelectedVideo(prev => prev ? { ...prev, likes: data.likes, isLiked: data.isLiked } : prev);
+        }
         
         // Update the videos data directly
         queryClient.setQueryData(['publicVideos'], (oldData) => ({
@@ -245,6 +252,11 @@ const Feeds = () => {
             ? { ...v, comments: data.comments }
             : v
         );
+
+        // Keep fullscreen modal data in sync when commenting from modal
+        if (selectedVideo?._id === selectedVideoForComments._id) {
+          setSelectedVideo(prev => prev ? { ...prev, comments: data.comments } : prev);
+        }
         
         queryClient.setQueryData(['publicVideos'], (oldData) => ({
           ...oldData,
@@ -269,12 +281,12 @@ const Feeds = () => {
   if (error) {
     return (
       <div className="min-h-screen bg-background">
-        <SEO title="Feeds - Actory" description="Discover videos from talented actors" />
+        <SEO title="Feeds - Actory" description="Discover photos and videos from talented creators" />
         <div className="container mx-auto px-4 py-8">
           <div className="text-center">
             <h1 className="text-2xl font-bold text-destructive mb-4">Error Loading Feeds</h1>
             <p className="text-muted-foreground mb-4">
-              {error.response?.data?.message || 'Failed to load videos'}
+              {error.response?.data?.message || 'Failed to load media'}
             </p>
             <Button onClick={() => refetch()}>Try Again</Button>
           </div>
@@ -285,14 +297,14 @@ const Feeds = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      <SEO title="Feeds - Actory" description="Discover videos from talented actors" />
+      <SEO title="Feeds - Actory" description="Discover photos and videos from talented creators" />
       
       <div className="container mx-auto px-4 py-8">
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-3xl font-bold mb-2">Discover Videos</h1>
+          <h1 className="text-3xl font-bold mb-2">Discover Media</h1>
           <p className="text-muted-foreground">
-            Explore amazing content from talented actors in our community
+            Explore photos and videos from talented creators in our community
           </p>
         </div>
 
@@ -321,7 +333,7 @@ const Feeds = () => {
         ) : videos.length === 0 ? (
           <div className="text-center py-12">
             <div className="text-6xl mb-4">🎬</div>
-            <h2 className="text-2xl font-semibold mb-2">No Videos Yet</h2>
+            <h2 className="text-2xl font-semibold mb-2">No Posts Yet</h2>
             <p className="text-muted-foreground">
               Be the first to share your talent with the community!
             </p>
@@ -331,35 +343,31 @@ const Feeds = () => {
             {videos.map((video) => (
               <Card key={video._id} className="overflow-hidden hover:shadow-lg transition-shadow">
                 <CardContent className="p-0">
-                  {/* Video Thumbnail */}
-                  <div className="relative group">
-                    <video
-                      src={video.videoUrl || video.url}
-                      poster={video.thumbnailUrl}
-                      className="w-full aspect-[9/16] object-cover cursor-pointer"
-                      onClick={() => openVideoModal(video)}
-                      onMouseEnter={(e) => e.target.play()}
-                      onMouseLeave={(e) => {
-                        e.target.pause();
-                        e.target.currentTime = 0;
-                      }}
-                      muted
-                      loop
-                      playsInline
-                    />
-                    
-                    {/* Overlay on hover */}
-                    <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                      <Button
-                        size="lg"
-                        variant="secondary"
+                  {/* Media Thumbnail */}
+                  <div className="relative">
+                    {isImagePost(video) ? (
+                      <img
+                        src={getMediaSrc(video)}
+                        alt={video.description || video.title || 'Profile media'}
+                        className="w-full aspect-[9/16] object-contain bg-black/5 cursor-pointer"
                         onClick={() => openVideoModal(video)}
-                        className="rounded-full"
-                      >
-                        <Eye className="h-5 w-5 mr-2" />
-                        Watch
-                      </Button>
-                    </div>
+                      />
+                    ) : (
+                      <video
+                        src={getMediaSrc(video)}
+                        poster={video.thumbnailUrl}
+                        className="w-full aspect-[9/16] object-contain bg-black/5 cursor-pointer"
+                        onClick={() => openVideoModal(video)}
+                        onMouseEnter={(e) => e.target.play()}
+                        onMouseLeave={(e) => {
+                          e.target.pause();
+                          e.target.currentTime = 0;
+                        }}
+                        muted
+                        loop
+                        playsInline
+                      />
+                    )}
                   </div>
 
                   {/* Video Info */}
@@ -385,7 +393,7 @@ const Feeds = () => {
                     {/* Video Description */}
                     <div className="space-y-1">
                       <h3 className="font-medium text-sm line-clamp-2">
-                        {video.title || 'Untitled Video'}
+                        {video.title || (isImagePost(video) ? 'Untitled Photo' : 'Untitled Video')}
                       </h3>
                       {video.description && (
                         <p className="text-xs text-muted-foreground line-clamp-2">
@@ -400,9 +408,9 @@ const Feeds = () => {
                         <Eye className="h-3 w-3 mr-1" />
                         {video.views || 0} views
                       </span>
-                      {video.duration && (
+                      {!isImagePost(video) && video.duration ? (
                         <span>{Math.floor(video.duration / 60)}:{(video.duration % 60).toString().padStart(2, '0')}</span>
-                      )}
+                      ) : null}
                     </div>
 
                     {/* Action Buttons */}
@@ -447,7 +455,7 @@ const Feeds = () => {
                       {/* Video Type Badge */}
                       {video.type && (
                         <Badge variant="secondary" className="text-xs">
-                          {video.type}
+                          {isImagePost(video) ? 'photo' : video.type}
                         </Badge>
                       )}
                     </div>
@@ -461,26 +469,37 @@ const Feeds = () => {
 
       {/* Video Modal */}
       <Dialog open={isVideoModalOpen} onOpenChange={setIsVideoModalOpen}>
-        <DialogContent className="sm:max-w-[800px] sm:max-h-[90vh] p-0 bg-black">
+        <DialogContent className="w-[96vw] max-w-[96vw] h-[96vh] max-h-[96vh] p-0 bg-black">
           {selectedVideo && (
             <div className="w-full h-full bg-black flex flex-col">
               {/* Video Navigation Header */}
-              <div className="flex items-center justify-end p-4 bg-black/50 text-white">
+              <div className="flex items-center justify-between p-4 bg-black/50 text-white">
+                <div className="text-xs text-gray-300">
+                  <span>{currentVideoIndex + 1} / {videos.length}</span>
+                </div>
                 <div className="flex items-center space-x-2 text-xs text-gray-300">
-                  <span>↑ Previous</span>
-                  <span>↓ Next</span>
+                  <span>← Previous</span>
+                  <span>→ Next</span>
                   <span>ESC Close</span>
                 </div>
               </div>
 
               {/* Video Player */}
-              <div className="flex-1 flex items-center justify-center relative">
-                <video
-                  src={selectedVideo.videoUrl || selectedVideo.url}
-                  controls
-                  autoPlay
-                  className="max-w-full max-h-full object-contain"
-                />
+              <div className="flex-1 min-h-0 relative overflow-hidden">
+                {isImagePost(selectedVideo) ? (
+                  <img
+                    src={getMediaSrc(selectedVideo)}
+                    alt={selectedVideo.description || selectedVideo.title || 'Profile media'}
+                    className="absolute inset-0 w-full h-full object-contain"
+                  />
+                ) : (
+                  <video
+                    src={getMediaSrc(selectedVideo)}
+                    controls
+                    autoPlay
+                    className="absolute inset-0 w-full h-full object-contain"
+                  />
+                )}
                 
                 {/* Navigation Buttons */}
                 <div className="absolute inset-0 flex items-center justify-between pointer-events-none">
@@ -523,7 +542,7 @@ const Feeds = () => {
                 </div>
                 
                 <h2 className="font-semibold mb-2">
-                  {selectedVideo.title || 'Untitled Video'}
+                  {selectedVideo.title || (isImagePost(selectedVideo) ? 'Untitled Photo' : 'Untitled Video')}
                 </h2>
                 
                 {selectedVideo.description && (
@@ -531,15 +550,62 @@ const Feeds = () => {
                     {selectedVideo.description}
                   </p>
                 )}
+
+                <div className="flex items-center justify-between pt-1 pb-3 border-b">
+                  <div className="flex items-center space-x-4">
+                    <div className="flex items-center space-x-1">
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => handleLike(selectedVideo._id)}
+                        className="h-8 w-8 p-0"
+                      >
+                        <Heart className={`h-4 w-4 ${selectedVideo.isLiked ? 'fill-red-500 text-red-500' : ''}`} />
+                      </Button>
+                      <span className="text-xs text-muted-foreground">
+                        {selectedVideo.likes || 0}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center space-x-1">
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => handleComment(selectedVideo)}
+                        className="h-8 w-8 p-0"
+                      >
+                        <MessageCircle className="h-4 w-4" />
+                      </Button>
+                      <span className="text-xs text-muted-foreground">
+                        {selectedVideo.comments || 0}
+                      </span>
+                    </div>
+
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => handleShare(selectedVideo)}
+                      className="h-8 w-8 p-0"
+                    >
+                      <Share2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+
+                  {selectedVideo.type && (
+                    <Badge variant="secondary" className="text-xs">
+                      {isImagePost(selectedVideo) ? 'photo' : selectedVideo.type}
+                    </Badge>
+                  )}
+                </div>
                 
                 <div className="flex items-center space-x-4 text-sm text-muted-foreground">
                   <span className="flex items-center">
                     <Eye className="h-4 w-4 mr-1" />
                     {selectedVideo.views || 0} views
                   </span>
-                  {selectedVideo.duration && (
+                  {!isImagePost(selectedVideo) && selectedVideo.duration ? (
                     <span>{Math.floor(selectedVideo.duration / 60)}:{(selectedVideo.duration % 60).toString().padStart(2, '0')}</span>
-                  )}
+                  ) : null}
                 </div>
               </div>
             </div>
@@ -555,7 +621,7 @@ const Feeds = () => {
               Comments ({selectedVideoForComments ? (videoComments[selectedVideoForComments._id] || []).length : 0})
             </DialogTitle>
             <DialogDescription>
-              View and add comments for this video
+              View and add comments for this post
             </DialogDescription>
           </DialogHeader>
           

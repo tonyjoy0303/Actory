@@ -13,6 +13,8 @@ import tempfile
 from typing import Dict, List, Optional
 from services.model_loader import EmotionModelLoader
 from services.face_detector import FaceDetector
+from services.audio_extractor import extract_audio_from_video
+from services.voice_emotion_analyzer import VoiceEmotionAnalyzer
 
 class VideoEmotionAnalyzer:
     # Frame sampling settings
@@ -29,6 +31,27 @@ class VideoEmotionAnalyzer:
         print("\n🔧 [INIT] Initializing Video Emotion Analyzer...", flush=True)
         self.model_loader = EmotionModelLoader(model_path)
         self.face_detector = FaceDetector()
+        self.require_voice_analysis = os.getenv("REQUIRE_VOICE_ANALYSIS", "false").strip().lower() in {
+            "1",
+            "true",
+            "yes",
+            "on",
+        }
+
+        # Voice analyzer is optional at runtime. If it fails to initialize,
+        # the facial pipeline still runs.
+        self.voice_analyzer: Optional[VoiceEmotionAnalyzer] = None
+        try:
+            self.voice_analyzer = VoiceEmotionAnalyzer()
+        except Exception as e:
+            print(f"⚠️  [VOICE] Voice analyzer unavailable at startup: {str(e)}", flush=True)
+            if self.require_voice_analysis:
+                raise RuntimeError(
+                    "Voice analyzer backend is required but unavailable. "
+                    "Run the AI service with the project venv interpreter "
+                    "(D:/Actoryy/actory-ai-service/venv/Scripts/python.exe)."
+                )
+
         print("✅ [READY] Video Emotion Analyzer initialized and ready\n", flush=True)
     
     def download_video(self, video_url: str) -> str:
@@ -438,6 +461,7 @@ class VideoEmotionAnalyzer:
             Dict: Complete analysis results with performance metrics
         """
         video_path = None
+        audio_path = None
         
         try:
             print(f"\n{'='*80}", flush=True)
@@ -448,24 +472,71 @@ class VideoEmotionAnalyzer:
             
             # Step 1: Download video
             video_path = self.download_video(video_url)
+
+            # Step 2: Extract audio + run voice emotion analysis
+            voice_result = {
+                'voiceEmotion': 'neutral',
+                'voiceConfidence': 0.0,
+                'voiceAvailable': False,
+            }
+
+            try:
+                print("🎙️  [VOICE][STATUS] Starting voice pipeline...", flush=True)
+                audio_path = extract_audio_from_video(video_path)
+
+                if self.voice_analyzer is None:
+                    self.voice_analyzer = VoiceEmotionAnalyzer()
+
+                voice_result = {
+                    **self.voice_analyzer.analyze(audio_path),
+                    'voiceAvailable': True,
+                }
+                print(
+                    f"🎙️  [VOICE][STATUS] available=True emotion={voice_result.get('voiceEmotion', 'neutral')} confidence={float(voice_result.get('voiceConfidence', 0.0)):.1%}",
+                    flush=True,
+                )
+            except Exception as e:
+                if self.require_voice_analysis:
+                    raise RuntimeError(
+                        "Voice emotion analysis failed in strict mode. "
+                        "Ensure the service uses the project venv interpreter with voice dependencies. "
+                        f"Root cause: {str(e)}"
+                    )
+                print(f"⚠️  [VOICE] Voice emotion analysis failed, continuing with facial analysis: {str(e)}", flush=True)
+                print("🎙️  [VOICE][STATUS] available=False emotion=neutral confidence=0.0% (fallback)", flush=True)
             
-            # Step 2: Extract frames (now returns fps and total_frames too)
+            # Step 3: Extract frames (now returns fps and total_frames too)
             frames, fps, total_frames = self.extract_frames(video_path)
             
-            # Step 3: Analyze frames (now returns frame_results and detection stats)
+            # Step 4: Analyze frames (now returns frame_results and detection stats)
             predictions, frame_results, total_frames_processed, frames_with_faces = self.analyze_frames(frames, fps)
             
-            # Step 4: Aggregate results
+            # Step 5: Aggregate results
             aggregated = self.aggregate_predictions(predictions)
+
+            face_emotion = aggregated['detectedEmotion']
+            face_confidence = float(aggregated['emotionScores'].get(face_emotion, 0.0))
+            voice_emotion = str(voice_result.get('voiceEmotion', 'neutral'))
+            voice_confidence = float(voice_result.get('voiceConfidence', 0.0))
+
+            if voice_result.get('voiceAvailable', False):
+                combined_confidence = (face_confidence * 0.6) + (voice_confidence * 0.4)
+            else:
+                combined_confidence = face_confidence
+
+            print(
+                f"🧾 [VOICE][SUMMARY] available={voice_result.get('voiceAvailable', False)} | face={face_emotion} ({face_confidence:.1%}) | voice={voice_emotion} ({voice_confidence:.1%})",
+                flush=True,
+            )
             
-            # Step 5: Calculate emotion match score
+            # Step 6: Calculate emotion match score
             emotion_match_score = self.calculate_emotion_match(
                 required_emotion,
                 aggregated['detectedEmotion'],
                 aggregated['emotionScores']
             )
             
-            # Step 6: Calculate performance metrics
+            # Step 7: Calculate performance metrics
             print(f"\n📊 [METRICS] Calculating performance metrics...", flush=True)
             
             emotion_consistency = self.calculate_emotion_consistency(frame_results, required_emotion)
@@ -479,10 +550,10 @@ class VideoEmotionAnalyzer:
                 face_visibility
             )
             
-            # Step 7: Generate emotion timeline
+            # Step 8: Generate emotion timeline
             emotion_timeline = self.generate_emotion_timeline(frame_results)
             
-            # Step 8: Generate feedback
+            # Step 9: Generate feedback
             feedback = self.generate_feedback(
                 emotion_match_score,
                 required_emotion,
@@ -493,6 +564,11 @@ class VideoEmotionAnalyzer:
             result = {
                 'success': True,
                 'requiredEmotion': required_emotion.lower(),
+                'faceEmotion': face_emotion,
+                'voiceEmotion': voice_emotion,
+                'faceConfidence': round(face_confidence, 4),
+                'voiceConfidence': round(voice_confidence, 4),
+                'combinedEmotionConfidence': round(combined_confidence, 4),
                 'detectedEmotion': aggregated['detectedEmotion'],
                 'emotionScores': aggregated['emotionScores'],
                 'emotionMatchScore': emotion_match_score,
@@ -509,6 +585,9 @@ class VideoEmotionAnalyzer:
             print(f"✅ [SUCCESS] ANALYSIS COMPLETE", flush=True)
             print(f"🎯 Required: {required_emotion} | Detected: {aggregated['detectedEmotion']}", flush=True)
             print(f"[ANALYZED_EMOTION] {aggregated['detectedEmotion']}", flush=True)
+            print(f"🎭 Face: {face_emotion} ({face_confidence:.1%})", flush=True)
+            print(f"🎙️  Voice: {voice_emotion} ({voice_confidence:.1%})", flush=True)
+            print(f"🧠 Combined Confidence: {combined_confidence:.1%}", flush=True)
             print(f"\n📈 PERFORMANCE METRICS:", flush=True)
             print(f"   • Emotion Match Score:    {emotion_match_score}%", flush=True)
             print(f"   • Emotion Consistency:    {emotion_consistency}%", flush=True)
@@ -529,10 +608,17 @@ class VideoEmotionAnalyzer:
             raise
             
         finally:
-            # Clean up temporary video file
+            # Clean up temporary files
             if video_path and os.path.exists(video_path):
                 try:
                     os.remove(video_path)
                     print(f"🧹 [CLEANUP] Temporary video file deleted: {video_path}\n", flush=True)
                 except Exception as e:
                     print(f"⚠️  [WARNING] Failed to delete temp file: {str(e)}\n", flush=True)
+
+            if audio_path and os.path.exists(audio_path):
+                try:
+                    os.remove(audio_path)
+                    print(f"🧹 [CLEANUP] Temporary audio file deleted: {audio_path}\n", flush=True)
+                except Exception as e:
+                    print(f"⚠️  [WARNING] Failed to delete temp audio file: {str(e)}\n", flush=True)

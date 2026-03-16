@@ -57,24 +57,23 @@ router.post('/:videoId/comment', addVideoComment);
 // ==============================
 
 // @route   GET /api/v1/videos/profile
-// @desc    Get current user's profile videos
-// @access  Private (Actor)
-router.get('/profile', protect, authorize('Actor'), getMyProfileVideos);
+// @desc    Get current user's profile media
+// @access  Private
+router.get('/profile', protect, getMyProfileVideos);
 
 // @route   POST /api/v1/profile/videos
-// @desc    Upload a profile video
-// @access  Private (Actor)
+// @desc    Upload a profile media item
+// @access  Private
 router.post('/profile/videos',
   protect,
-  authorize('Actor'),
   upload.single('video'),
   uploadProfileVideo
 );
 
 // @route   DELETE /api/v1/videos/profile/videos/:id
-// @desc    Delete a profile video
-// @access  Private (Actor)
-router.delete('/profile/videos/:id', protect, authorize('Actor'), deleteProfileVideo);
+// @desc    Delete a profile media item
+// @access  Private
+router.delete('/profile/videos/:id', protect, deleteProfileVideo);
 
 // ==============================
 // Audition Videos

@@ -69,18 +69,24 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
+  gap: 4px;
+  padding: 12px;
   background: white;
+  text-align: center;
 }
 
 .score-value {
   font-size: 36px;
   font-weight: bold;
+  line-height: 1;
 }
 
 .score-label {
   font-size: 12px;
   color: #6b7280;
-  margin-top: 4px;
+  line-height: 1.2;
+  max-width: 72px;
+  text-align: center;
 }
 
 /* Metrics Grid */
@@ -207,6 +213,102 @@
   border-radius: 12px;
 }
 
+/* Multimodal Analysis */
+.multimodal-analysis {
+  margin: 24px 0;
+  padding: 16px;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  background: #f8fafc;
+}
+
+.multimodal-analysis h4 {
+  margin: 0 0 16px 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: #1e293b;
+}
+
+.modality-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.modality-item {
+  padding: 12px;
+  border-radius: 8px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+}
+
+.modality-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #475569;
+}
+
+.modality-emotion {
+  font-size: 15px;
+  font-weight: 700;
+  color: #1e293b;
+  text-transform: capitalize;
+  margin-bottom: 8px;
+}
+
+.modality-confidence-bar {
+  height: 6px;
+  border-radius: 3px;
+  background: #e2e8f0;
+  overflow: hidden;
+  margin-bottom: 4px;
+}
+
+.modality-confidence-fill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.3s ease;
+}
+
+.modality-confidence-label {
+  font-size: 11px;
+  color: #64748b;
+}
+
+.combined-confidence {
+  border-top: 1px solid #e2e8f0;
+  padding-top: 12px;
+}
+
+.combined-label {
+  font-size: 12px;
+  color: #64748b;
+  margin-bottom: 8px;
+}
+
+.combined-bar-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.combined-bar-row .progress-bar {
+  flex: 1;
+  margin: 0;
+}
+
+.combined-value {
+  font-size: 13px;
+  font-weight: 700;
+  min-width: 48px;
+  text-align: right;
+}
+
 /* Emotion Distribution */
 .emotion-distribution {
   margin: 32px 0;
@@ -264,45 +366,6 @@
   height: 100%;
   transition: width 0.3s ease;
   border-radius: 4px;
-}
-
-/* Emotion Timeline */
-.timeline-section {
-  margin: 28px 0;
-}
-
-.timeline-section h4 {
-  font-size: 16px;
-  color: #1f2937;
-  margin-bottom: 12px;
-}
-
-.timeline-list {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.timeline-item {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  border: 1px solid #e5e7eb;
-  border-radius: 8px;
-  padding: 10px 12px;
-  background: #f9fafb;
-}
-
-.timeline-emotion {
-  text-transform: capitalize;
-  font-size: 14px;
-  color: #1f2937;
-}
-
-.timeline-range {
-  font-size: 12px;
-  color: #6b7280;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
 }
 
 /* AI Feedback */
@@ -396,11 +459,5 @@
 
   .score-value {
     font-size: 28px;
-  }
-
-  .timeline-item {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 4px;
   }
 }

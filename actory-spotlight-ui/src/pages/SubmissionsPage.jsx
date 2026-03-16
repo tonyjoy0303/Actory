@@ -20,6 +20,7 @@ import {
   MapPin,
   Calendar,
   Phone,
+  User,
 } from 'lucide-react';
 import API from '../lib/api';
 import { Alert, AlertTitle, AlertDescription } from '../components/ui/alert';
@@ -28,6 +29,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
 import { Badge } from '../components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import EmotionAnalysisDisplay from '../components/EmotionAnalysisDisplay';
+import '@/styles/submissions-light.css';
 
 const SubmissionsPage = () => {
   const { castingId } = useParams();
@@ -36,6 +38,23 @@ const SubmissionsPage = () => {
   
   const [sortBy, setSortBy] = useState('overallScore');
   const [filterScore, setFilterScore] = useState(0);
+  const [filterAgeMin, setFilterAgeMin] = useState('');
+  const [filterAgeMax, setFilterAgeMax] = useState('');
+  const [filterHeightMin, setFilterHeightMin] = useState('');
+  const [filterHeightMax, setFilterHeightMax] = useState('');
+  const [filterWeightMin, setFilterWeightMin] = useState('');
+  const [filterWeightMax, setFilterWeightMax] = useState('');
+  const [filterCity, setFilterCity] = useState('');
+  const [filterSkill, setFilterSkill] = useState('');
+  const [showFilterPanel, setShowFilterPanel] = useState(false);
+  const [draftFilterAgeMin, setDraftFilterAgeMin] = useState('');
+  const [draftFilterAgeMax, setDraftFilterAgeMax] = useState('');
+  const [draftFilterHeightMin, setDraftFilterHeightMin] = useState('');
+  const [draftFilterHeightMax, setDraftFilterHeightMax] = useState('');
+  const [draftFilterWeightMin, setDraftFilterWeightMin] = useState('');
+  const [draftFilterWeightMax, setDraftFilterWeightMax] = useState('');
+  const [draftFilterCity, setDraftFilterCity] = useState('');
+  const [draftFilterSkill, setDraftFilterSkill] = useState('');
   const [expandedSubmission, setExpandedSubmission] = useState(null);
   const [reanalyzingId, setReanalyzingId] = useState(null);
   const [updatingStatusId, setUpdatingStatusId] = useState(null);
@@ -44,11 +63,17 @@ const SubmissionsPage = () => {
   // Refs for each submission card to enable scroll-into-view
   const cardRefs = useRef({});
 
+  const apiSortBy = sortBy === 'date'
+    ? 'newest'
+    : sortBy === 'dateOldest'
+      ? 'oldest'
+      : sortBy;
+
   // Fetch submissions with AI analysis
   const { data: submissionsData, isLoading, error, refetch } = useQuery({
-    queryKey: ['submissions', castingId, sortBy, filterScore],
+    queryKey: ['submissions', castingId, apiSortBy, filterScore],
     queryFn: async () => {
-      const url = `/submissions/${castingId}/submissions?sort=${sortBy}&filter=${filterScore}`;
+      const url = `/submissions/${castingId}/submissions?sort=${apiSortBy}&filter=${filterScore}`;
       const response = await API.get(url);
       return response.data;
     },
@@ -105,6 +130,47 @@ const SubmissionsPage = () => {
     return submissionsData?.data || [];
   }, [submissionsData]);
 
+  const displayedSubmissions = useMemo(() => {
+    return submissions.filter((submission) => {
+      const age = Number(submission.age);
+      const height = Number(submission.height);
+      const weight = Number(submission.weight);
+
+      if (filterAgeMin !== '' && (!Number.isFinite(age) || age < Number(filterAgeMin))) return false;
+      if (filterAgeMax !== '' && (!Number.isFinite(age) || age > Number(filterAgeMax))) return false;
+
+      if (filterHeightMin !== '' && (!Number.isFinite(height) || height < Number(filterHeightMin))) return false;
+      if (filterHeightMax !== '' && (!Number.isFinite(height) || height > Number(filterHeightMax))) return false;
+
+      if (filterWeightMin !== '' && (!Number.isFinite(weight) || weight < Number(filterWeightMin))) return false;
+      if (filterWeightMax !== '' && (!Number.isFinite(weight) || weight > Number(filterWeightMax))) return false;
+
+      if (filterCity.trim()) {
+        const city = (submission.livingCity || '').toLowerCase();
+        if (!city.includes(filterCity.trim().toLowerCase())) return false;
+      }
+
+      if (filterSkill.trim()) {
+        const skillTerm = filterSkill.trim().toLowerCase();
+        const hasSkill = Array.isArray(submission.skills)
+          && submission.skills.some((skill) => String(skill).toLowerCase().includes(skillTerm));
+        if (!hasSkill) return false;
+      }
+
+      return true;
+    });
+  }, [
+    submissions,
+    filterAgeMin,
+    filterAgeMax,
+    filterHeightMin,
+    filterHeightMax,
+    filterWeightMin,
+    filterWeightMax,
+    filterCity,
+    filterSkill,
+  ]);
+
   // Scroll to expanded/collapsed card for better UX
   useEffect(() => {
     if (expandedSubmission && cardRefs.current[expandedSubmission]) {
@@ -128,22 +194,65 @@ const SubmissionsPage = () => {
 
   // Calculate statistics
   const stats = useMemo(() => {
-    if (!submissions || submissions.length === 0) {
+    if (!displayedSubmissions || displayedSubmissions.length === 0) {
       return { total: 0, analyzed: 0, avgScore: 0, topScore: 0 };
     }
 
-    const analyzed = submissions.filter(s => s.aiAnalyzed).length;
-    const scores = submissions
-      .filter(s => s.aiAnalyzed && s.overallScore > 0)
-      .map(s => s.overallScore);
+    const analyzed = displayedSubmissions.filter(s => s.aiAnalyzed).length;
+    const scores = displayedSubmissions
+      .filter(s => s.aiAnalyzed && Number(s.overallPerformanceScore ?? s.overallScore ?? 0) > 0)
+      .map(s => Number(s.overallPerformanceScore ?? s.overallScore ?? 0));
 
     return {
-      total: submissions.length,
+      total: displayedSubmissions.length,
       analyzed,
       avgScore: scores.length > 0 ? (scores.reduce((a, b) => a + b) / scores.length).toFixed(1) : 0,
       topScore: scores.length > 0 ? Math.max(...scores).toFixed(1) : 0,
     };
-  }, [submissions]);
+  }, [displayedSubmissions]);
+
+  const resetApplicationFilters = () => {
+    setFilterAgeMin('');
+    setFilterAgeMax('');
+    setFilterHeightMin('');
+    setFilterHeightMax('');
+    setFilterWeightMin('');
+    setFilterWeightMax('');
+    setFilterCity('');
+    setFilterSkill('');
+    setDraftFilterAgeMin('');
+    setDraftFilterAgeMax('');
+    setDraftFilterHeightMin('');
+    setDraftFilterHeightMax('');
+    setDraftFilterWeightMin('');
+    setDraftFilterWeightMax('');
+    setDraftFilterCity('');
+    setDraftFilterSkill('');
+  };
+
+  const openFilterPanel = () => {
+    setDraftFilterAgeMin(filterAgeMin);
+    setDraftFilterAgeMax(filterAgeMax);
+    setDraftFilterHeightMin(filterHeightMin);
+    setDraftFilterHeightMax(filterHeightMax);
+    setDraftFilterWeightMin(filterWeightMin);
+    setDraftFilterWeightMax(filterWeightMax);
+    setDraftFilterCity(filterCity);
+    setDraftFilterSkill(filterSkill);
+    setShowFilterPanel(true);
+  };
+
+  const applyApplicationFilters = () => {
+    setFilterAgeMin(draftFilterAgeMin);
+    setFilterAgeMax(draftFilterAgeMax);
+    setFilterHeightMin(draftFilterHeightMin);
+    setFilterHeightMax(draftFilterHeightMax);
+    setFilterWeightMin(draftFilterWeightMin);
+    setFilterWeightMax(draftFilterWeightMax);
+    setFilterCity(draftFilterCity);
+    setFilterSkill(draftFilterSkill);
+    setShowFilterPanel(false);
+  };
 
   const getScoreTone = (score) => {
     if (score >= 80) return 'text-emerald-300';
@@ -161,16 +270,6 @@ const SubmissionsPage = () => {
     if (status === 'Accepted') return 'bg-emerald-500/15 border-emerald-500/40 text-emerald-200';
     if (status === 'Rejected') return 'bg-rose-500/15 border-rose-500/40 text-rose-200';
     return 'bg-slate-500/15 border-slate-500/40 text-slate-200';
-  };
-
-  const emotionIcons = {
-    happy: '😊',
-    sad: '😢',
-    angry: '😠',
-    fear: '😨',
-    surprise: '😲',
-    disgust: '🤢',
-    neutral: '😐',
   };
 
   const formatDate = (date) => {
@@ -204,7 +303,7 @@ const SubmissionsPage = () => {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-slate-950 text-white p-4 sm:p-6">
+      <div className="submissions-page min-h-screen bg-slate-950 text-white p-4 sm:p-6">
         <div className="max-w-3xl mx-auto mt-8">
           <Alert variant="destructive">
             <AlertCircle className="h-4 w-4" />
@@ -223,7 +322,7 @@ const SubmissionsPage = () => {
   }
 
   return (
-      <div className="min-h-screen bg-slate-950 text-white p-4 sm:p-6">
+      <div className="submissions-page min-h-screen bg-slate-950 text-white p-4 sm:p-6">
       <div className="mx-auto max-w-7xl space-y-6">
         <Card className="overflow-hidden border-slate-800 bg-gradient-to-r from-slate-900 via-slate-900 to-slate-800">
           <CardContent className="p-0">
@@ -307,9 +406,21 @@ const SubmissionsPage = () => {
 
         <Card className="sticky top-2 z-20 border-slate-800 bg-slate-900/95 backdrop-blur">
           <CardContent className="p-4 sm:p-5">
-            <div className="mb-3 flex items-center gap-2 text-sm text-slate-300">
-              <SlidersHorizontal className="h-4 w-4" />
-              Review Controls
+            <div className="mb-3 flex items-center justify-between gap-2 text-sm text-slate-300">
+              <div className="flex items-center gap-2">
+                <SlidersHorizontal className="h-4 w-4" />
+                Review Controls
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={openFilterPanel}
+                  className="border-slate-700 bg-slate-900 text-slate-200 hover:bg-slate-800"
+                >
+                  Filter
+                </Button>
+              </div>
             </div>
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               <div>
@@ -320,6 +431,8 @@ const SubmissionsPage = () => {
                   </SelectTrigger>
                   <SelectContent className="border-slate-700 bg-slate-800 text-white">
                     <SelectItem value="overallScore">Highest score first</SelectItem>
+                    <SelectItem value="date">Sort by date</SelectItem>
+                    <SelectItem value="dateOldest">Sort by date (oldest first)</SelectItem>
                     <SelectItem value="newest">Newest first</SelectItem>
                     <SelectItem value="oldest">Oldest first</SelectItem>
                   </SelectContent>
@@ -341,21 +454,134 @@ const SubmissionsPage = () => {
                 />
               </div>
             </div>
+
+            {showFilterPanel && (
+            <div className="mt-5 border-t border-slate-800 pt-4">
+              <div className="mb-3 flex items-center justify-between gap-2">
+                <div className="text-xs uppercase tracking-wider text-slate-400">Application Filters</div>
+                <div className="flex items-center gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={resetApplicationFilters}
+                    className="border-slate-700 bg-slate-900 text-slate-200 hover:bg-slate-800"
+                  >
+                    Reset
+                  </Button>
+                  <Button
+                    type="button"
+                    onClick={applyApplicationFilters}
+                    className="bg-cyan-600 text-white hover:bg-cyan-700"
+                  >
+                    Done
+                  </Button>
+                </div>
+              </div>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                <div>
+                  <label className="mb-1 block text-[11px] uppercase tracking-wider text-slate-500">Age Min</label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={draftFilterAgeMin}
+                    onChange={(e) => setDraftFilterAgeMin(e.target.value)}
+                    className="w-full rounded-md border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-white outline-none focus:border-cyan-500"
+                    placeholder="Any"
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-[11px] uppercase tracking-wider text-slate-500">Age Max</label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={draftFilterAgeMax}
+                    onChange={(e) => setDraftFilterAgeMax(e.target.value)}
+                    className="w-full rounded-md border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-white outline-none focus:border-cyan-500"
+                    placeholder="Any"
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-[11px] uppercase tracking-wider text-slate-500">Height Min (cm)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={draftFilterHeightMin}
+                    onChange={(e) => setDraftFilterHeightMin(e.target.value)}
+                    className="w-full rounded-md border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-white outline-none focus:border-cyan-500"
+                    placeholder="Any"
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-[11px] uppercase tracking-wider text-slate-500">Height Max (cm)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={draftFilterHeightMax}
+                    onChange={(e) => setDraftFilterHeightMax(e.target.value)}
+                    className="w-full rounded-md border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-white outline-none focus:border-cyan-500"
+                    placeholder="Any"
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-[11px] uppercase tracking-wider text-slate-500">Weight Min (kg)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={draftFilterWeightMin}
+                    onChange={(e) => setDraftFilterWeightMin(e.target.value)}
+                    className="w-full rounded-md border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-white outline-none focus:border-cyan-500"
+                    placeholder="Any"
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-[11px] uppercase tracking-wider text-slate-500">Weight Max (kg)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={draftFilterWeightMax}
+                    onChange={(e) => setDraftFilterWeightMax(e.target.value)}
+                    className="w-full rounded-md border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-white outline-none focus:border-cyan-500"
+                    placeholder="Any"
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-[11px] uppercase tracking-wider text-slate-500">Living City</label>
+                  <input
+                    type="text"
+                    value={draftFilterCity}
+                    onChange={(e) => setDraftFilterCity(e.target.value)}
+                    className="w-full rounded-md border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-white outline-none focus:border-cyan-500"
+                    placeholder="e.g. Kochi"
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-[11px] uppercase tracking-wider text-slate-500">Skill</label>
+                  <input
+                    type="text"
+                    value={draftFilterSkill}
+                    onChange={(e) => setDraftFilterSkill(e.target.value)}
+                    className="w-full rounded-md border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-white outline-none focus:border-cyan-500"
+                    placeholder="e.g. Dancing"
+                  />
+                </div>
+              </div>
+            </div>
+            )}
           </CardContent>
         </Card>
 
-        {submissions.length === 0 && (
+        {displayedSubmissions.length === 0 && (
           <Card className="border-slate-800 bg-slate-900/80">
             <CardContent className="py-16 text-center">
               <AlertCircle className="mx-auto mb-4 h-12 w-12 text-slate-500" />
               <p className="text-lg text-slate-300">No submissions match this filter.</p>
-              <p className="mt-2 text-sm text-slate-500">Try lowering the minimum score or changing sort criteria.</p>
+              <p className="mt-2 text-sm text-slate-500">Try lowering the score threshold or relaxing application filters.</p>
             </CardContent>
           </Card>
         )}
 
         <div className="space-y-4">
-          {submissions.map((submission) => {
+          {displayedSubmissions.map((submission) => {
             const isExpanded = expandedSubmission === submission._id;
             const score = Number(submission.overallPerformanceScore ?? submission.overallScore ?? 0);
             const match = Number(submission.emotionMatchScore || 0);
@@ -397,7 +623,9 @@ const SubmissionsPage = () => {
                             className="h-full w-full object-cover transition-transform group-hover:scale-110"
                           />
                         ) : (
-                          <div className="flex h-full w-full items-center justify-center text-3xl transition-transform group-hover:scale-110">{emotionIcons.neutral}</div>
+                          <div className="flex h-full w-full items-center justify-center text-slate-300 transition-transform group-hover:scale-110">
+                            <User className="h-8 w-8" />
+                          </div>
                         )}
                         <div className="absolute inset-0 bg-black/0 transition-all group-hover:bg-black/20" />
                         <div className="absolute inset-0 flex items-center justify-center opacity-0 transition-opacity group-hover:opacity-100">
@@ -434,17 +662,11 @@ const SubmissionsPage = () => {
                         <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
                           <div className="rounded-lg border border-slate-800 bg-slate-950/80 p-3">
                             <p className="text-xs uppercase tracking-wider text-slate-500">Required</p>
-                            <p className="mt-1 flex items-center gap-1.5 text-sm capitalize text-slate-200">
-                              <span>{emotionIcons[submission.requiredEmotion] || emotionIcons.neutral}</span>
-                              {submission.requiredEmotion || 'neutral'}
-                            </p>
+                            <p className="mt-1 text-sm capitalize text-slate-200">{submission.requiredEmotion || 'neutral'}</p>
                           </div>
                           <div className="rounded-lg border border-slate-800 bg-slate-950/80 p-3">
                             <p className="text-xs uppercase tracking-wider text-slate-500">Detected</p>
-                            <p className="mt-1 flex items-center gap-1.5 text-sm capitalize text-slate-200">
-                              <span>{emotionIcons[submission.detectedEmotion] || emotionIcons.neutral}</span>
-                              {submission.detectedEmotion || 'pending'}
-                            </p>
+                            <p className="mt-1 text-sm capitalize text-slate-200">{submission.detectedEmotion || 'pending'}</p>
                           </div>
                           <div className="rounded-lg border border-slate-800 bg-slate-950/80 p-3">
                             <p className="text-xs uppercase tracking-wider text-slate-500">Overall</p>
@@ -739,7 +961,7 @@ const SubmissionsPage = () => {
                               variant="outline"
                               className="border-slate-700 bg-slate-900 text-slate-200 hover:bg-slate-800"
                             >
-                              View Full Portfolio
+                              View Profile
                             </Button>
                           </div>
 

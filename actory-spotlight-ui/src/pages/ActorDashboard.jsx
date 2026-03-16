@@ -430,13 +430,13 @@ export default function ActorDashboard() {
   }
 
   return (
-    <div className="container mx-auto px-4 py-8">
+    <div className="container mx-auto space-y-8 px-4 py-6 sm:py-8">
       <SEO title="Actor Dashboard | Actory" />
       
-      <div className="flex items-center justify-between mb-8">
+      <div className="flex items-center justify-between rounded-2xl border border-border/70 bg-card/70 p-6 shadow-[var(--shadow-elegant)]">
         <div>
-          <h1 className="text-3xl font-bold">Welcome back, {((user?.role === 'Producer' || user?.role === 'ProductionTeam') ? user?.companyName : user?.name) || 'Actor'}</h1>
-          <p className="text-muted-foreground">Manage your profile, videos, and submissions</p>
+          <h1 className="text-2xl font-bold leading-tight sm:text-3xl">Welcome back, {((user?.role === 'Producer' || user?.role === 'ProductionTeam') ? user?.companyName : user?.name) || 'Actor'}</h1>
+          <p className="text-sm leading-relaxed text-muted-foreground sm:text-base">Manage your profile, videos, and submissions</p>
         </div>
       </div>
 
@@ -445,10 +445,10 @@ export default function ActorDashboard() {
         onValueChange={setActiveTab}
         className="space-y-6"
       >
-        <TabsList>
+        <TabsList className="h-auto border border-border/70 bg-secondary/70 p-1">
           <TabsTrigger value="videos">
             <Video className="h-4 w-4 mr-2" />
-            My Videos
+            My Media
           </TabsTrigger>
           <TabsTrigger value="submissions">
             <Bell className="h-4 w-4 mr-2" />
@@ -467,7 +467,7 @@ export default function ActorDashboard() {
 
         <TabsContent value="videos" className="space-y-6">
           {showUploadForm ? (
-            <Card>
+            <Card className="border-border/70 bg-card/85">
               <CardContent className="pt-6">
                 <VideoUploadForm 
                   onUploadSuccess={handleVideoUploaded}
@@ -478,14 +478,14 @@ export default function ActorDashboard() {
           ) : (
             <div className="space-y-6">
               <div className="flex items-center justify-between">
-                <h2 className="text-2xl font-semibold">My Videos</h2>
+                <h2 className="text-xl font-semibold leading-tight sm:text-2xl">My Media</h2>
                 <Button onClick={() => setShowUploadForm(true)}>
                   <UploadIcon className="mr-2 h-4 w-4" />
-                  Showcase Your Skills
+                  Add Photo or Video
                 </Button>
               </div>
               
-              <Card>
+              <Card className="border-border/70 bg-card/85">
                 <CardContent className="pt-6">
                   <VideoList
                     videos={videos}
@@ -503,7 +503,7 @@ export default function ActorDashboard() {
         </TabsContent>
 
         <TabsContent value="submissions">
-          <Card>
+          <Card className="border-border/70 bg-card/90">
             <CardHeader>
               <div className="flex items-center justify-between">
                 <div>
@@ -514,7 +514,7 @@ export default function ActorDashboard() {
                 </div>
                 {submissions.length > 0 && (
                   <div className="flex items-center gap-2">
-                    <label className="text-sm font-medium">Sort by:</label>
+                    <label className="text-xs font-medium text-muted-foreground sm:text-sm">Sort by:</label>
                     <Select value={sortBy} onValueChange={setSortBy}>
                       <SelectTrigger className="w-[180px]">
                         <SelectValue placeholder="Sort submissions" />
@@ -550,14 +550,14 @@ export default function ActorDashboard() {
               ) : (
                 <div className="space-y-4">
                   {sortSubmissions(submissions, sortBy).map((submission) => (
-                    <Card key={submission._id} className="mb-4">
+                    <Card key={submission._id} className="mb-4 border-border/70 bg-card/85">
                       <CardContent className="p-4">
                         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                           <div className="space-y-1 flex-1">
-                            <h3 className="font-medium text-lg">
+                            <h3 className="text-base font-medium leading-snug sm:text-lg">
                               {submission.displayTitle}
                             </h3>
-                            <p className="text-sm text-muted-foreground">
+                            <p className="text-xs leading-relaxed text-muted-foreground sm:text-sm">
                               Submitted on {new Date(submission.createdAt).toLocaleDateString('en-US', {
                                 year: 'numeric',
                                 month: 'long',
@@ -566,7 +566,7 @@ export default function ActorDashboard() {
                                 minute: '2-digit'
                               })}
                             </p>
-                            <div className="text-xs text-muted-foreground mt-2 space-y-1">
+                            <div className="mt-2 space-y-1 text-[11px] leading-relaxed text-muted-foreground sm:text-xs">
                               <p>Address: {submission.permanentAddress}</p>
                               <p>City: {submission.livingCity} • DOB: {new Date(submission.dateOfBirth).toLocaleDateString()} • Phone: {submission.phoneNumber}</p>
                               {submission.email && (
@@ -617,7 +617,7 @@ export default function ActorDashboard() {
         </TabsContent>
 
         <TabsContent value="messages">
-          <Card>
+          <Card className="border-border/70 bg-card/90">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <MessageCircle className="h-5 w-5" />

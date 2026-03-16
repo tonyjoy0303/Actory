@@ -84,12 +84,34 @@ async function runTests() {
     const test1 = extractEmotionFromDescription('We need a happy and cheerful character');
     const test2 = extractEmotionFromDescription('Looking for someone who can portray sadness');
     const test3 = extractEmotionFromDescription('An angry and furious villain');
+    const test4 = extractEmotionFromDescription('Need a wide-eyed, speechless reaction to sudden news');
+    const test5 = extractEmotionFromDescription('The role needs a grossed-out, nauseous response');
+    const test6 = extractEmotionFromDescription('A calm, restrained, matter of fact performance');
+    const test7 = extractEmotionFromDescription('Looking for a villainous underworld boss character');
+    const test8 = extractEmotionFromDescription('Casting for a grieving mother in an emotional drama');
+    const test9 = extractEmotionFromDescription('Need a deadpan cop with dry delivery');
+    const test10 = extractEmotionFromDescription('Character is not angry, not furious, and stays calm');
+    const test11 = extractEmotionFromDescription('Character is angry at first, but calm now');
+    const test12 = extractEmotionFromDescription('Initially fearful, however composed and neutral by the end');
     
-    if (test1 === 'happy' && test2 === 'sad' && test3 === 'angry') {
+    if (
+      test1 === 'happy'
+      && test2 === 'sad'
+      && test3 === 'angry'
+      && test4 === 'surprise'
+      && test5 === 'disgust'
+      && test6 === 'neutral'
+      && test7 === 'angry'
+      && test8 === 'sad'
+      && test9 === 'neutral'
+      && test10 === 'neutral'
+      && test11 === 'neutral'
+      && test12 === 'neutral'
+    ) {
       console.log('✅ PASSED - Emotion extraction working\n');
       passed++;
     } else {
-      console.log(`❌ FAILED - Emotion extraction incorrect: ${test1}, ${test2}, ${test3}\n`);
+      console.log(`❌ FAILED - Emotion extraction incorrect: ${test1}, ${test2}, ${test3}, ${test4}, ${test5}, ${test6}, ${test7}, ${test8}, ${test9}, ${test10}, ${test11}, ${test12}\n`);
       failed++;
     }
   } catch (error) {

@@ -206,7 +206,7 @@ export default function Header() {
 
   return (
     <>
-      <header className="sticky top-0 z-40 w-full border-b bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+      <header className="sticky top-0 z-40 w-full border-b border-border/70 bg-background/85 shadow-[0_1px_0_hsl(var(--border)),0_8px_24px_-20px_hsl(var(--primary)/0.45)] backdrop-blur supports-[backdrop-filter]:bg-background/70 dark:shadow-none">
         <nav className="container h-16 flex items-center justify-between gap-4">
           <div className="flex items-center gap-2">
             <NavLink to="/" className="flex items-center gap-2" aria-label="Actory home">
@@ -226,6 +226,7 @@ export default function Header() {
 
           <div className="hidden md:flex items-center gap-6">
             <NavLink to="/casting" className={linkCls} end={true}>Castings</NavLink>
+            {user && <NavLink to="/feeds" className={linkCls} end={true}>Feeds</NavLink>}
             {canSeeProjects && <NavLink to="/my-projects" className={linkCls} end={true}>My Projects</NavLink>}
             {_optionalChain([user, 'optionalAccess', _ => _.role]) === 'Actor' && <NavLink to="/dashboard/actor" className={linkCls} end={true}>Dashboard</NavLink>}
             {(_optionalChain([user, 'optionalAccess', _2 => _2.role]) === 'Producer' || _optionalChain([user, 'optionalAccess', _3 => _3.role]) === 'ProductionTeam') && <NavLink to="/dashboard/producer" className={linkCls} end={true}>Dashboard</NavLink>}

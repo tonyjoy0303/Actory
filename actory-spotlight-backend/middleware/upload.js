@@ -11,19 +11,20 @@ const storage = multer.diskStorage({
     // Create a unique filename with original extension
     const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
     const ext = path.extname(file.originalname);
-    cb(null, `video-${uniqueSuffix}${ext}`);
+    const prefix = file.mimetype && file.mimetype.startsWith('image/') ? 'image' : 'media';
+    cb(null, `${prefix}-${uniqueSuffix}${ext}`);
   }
 });
 
-// File filter to only allow video files
+// File filter to only allow image and video files
 const fileFilter = (req, file, cb) => {
-  const allowedTypes = ['.mp4', '.mov', '.avi', '.wmv', '.webm'];
+  const allowedTypes = ['.mp4', '.mov', '.avi', '.wmv', '.webm', '.jpg', '.jpeg', '.png', '.gif', '.webp'];
   const ext = path.extname(file.originalname).toLowerCase();
   
   if (allowedTypes.includes(ext)) {
     cb(null, true);
   } else {
-    cb(new Error('Only video files are allowed!'), false);
+    cb(new Error('Only image and video files are allowed!'), false);
   }
 };
 

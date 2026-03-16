@@ -138,6 +138,37 @@ export default function ProducerDashboard() {
     navigate('/casting/new');
   };
 
+  const isCastingOwner = (call) => {
+    const producerId = call?.producer?._id || call?.producer;
+    const currentUserId = user?._id || user?.id;
+    return Boolean(producerId && currentUserId && String(producerId) === String(currentUserId));
+  };
+
+  const canDeleteCasting = (call) => {
+    // Project castings can be deleted by any team member.
+    if (call?.project) return true;
+    // Single castings can only be deleted by the casting owner.
+    return isCastingOwner(call);
+  };
+
+  const handleDeleteCasting = async (call) => {
+    if (!call?._id) return;
+
+    const castingName = call.roleTitle || call.roleName || 'this casting call';
+    if (!window.confirm(`Delete ${castingName}? This action cannot be undone.`)) {
+      return;
+    }
+
+    try {
+      await API.delete(`/casting/${call._id}`);
+      setCastingCalls((prev) => prev.filter((item) => item._id !== call._id));
+      toast.success('Casting call deleted successfully.');
+    } catch (error) {
+      const msg = error?.response?.data?.message || 'Failed to delete casting call.';
+      toast.error(msg);
+    }
+  };
+
   // Render submissions block
   const renderSubmissions = () => {
     if (submissionsLoading) {
@@ -355,6 +386,15 @@ export default function ProducerDashboard() {
                       >
                         View Submissions
                       </Button>
+                      {canDeleteCasting(call) && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleDeleteCasting(call)}
+                        >
+                          Delete
+                        </Button>
+                      )}
                     </div>
                   </div>
                 ))

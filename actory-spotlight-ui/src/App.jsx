@@ -68,7 +68,7 @@ const queryClient = new QueryClient();
 
 const App = () => (
   React.createElement(HelmetProvider, null
-    , React.createElement(ThemeProvider, { attribute: "class", defaultTheme: "system", enableSystem: true }
+    , React.createElement(ThemeProvider, { attribute: "class", defaultTheme: "dark", enableSystem: false }
       , React.createElement(QueryClientProvider, { client: queryClient }
         , React.createElement(TooltipProvider, null
           , React.createElement(Toaster, null )

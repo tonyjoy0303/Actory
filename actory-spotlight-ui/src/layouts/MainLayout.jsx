@@ -11,7 +11,7 @@ export default function MainLayout({ children }) {
       , React.createElement('main', { className: "flex-1", __self: this, __source: { fileName: _jsxFileName, lineNumber: 8 } }
         , children
       )
-      , React.createElement('footer', { className: "border-t", __self: this, __source: { fileName: _jsxFileName, lineNumber: 11 } }
+      , React.createElement('footer', { className: "border-t border-border/70 bg-background/70 backdrop-blur supports-[backdrop-filter]:bg-background/60", __self: this, __source: { fileName: _jsxFileName, lineNumber: 11 } }
         , React.createElement('div', { className: "container py-8 text-sm text-muted-foreground flex flex-col md:flex-row items-center justify-between gap-4", __self: this, __source: { fileName: _jsxFileName, lineNumber: 12 } }
           , React.createElement('p', { __self: this, __source: { fileName: _jsxFileName, lineNumber: 13 } }, "© ", new Date().getFullYear(), " Actory. All rights reserved.")
           , React.createElement('nav', { className: "flex items-center gap-6", __self: this, __source: { fileName: _jsxFileName, lineNumber: 14 } }

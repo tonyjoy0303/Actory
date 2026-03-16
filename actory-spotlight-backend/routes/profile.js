@@ -5,7 +5,6 @@ const { randomUUID } = require('crypto');
 const cloudinary = require('cloudinary').v2;
 const User = require('../models/User');
 const { protect } = require('../middleware/auth');
-const admin = require('../middleware/admin');
 
 // Configure Cloudinary
 cloudinary.config({
@@ -20,46 +19,51 @@ const upload = multer({
   storage: storage,
   limits: { fileSize: 50 * 1024 * 1024 }, // 50MB limit
   fileFilter: (req, file, cb) => {
-    if (file.mimetype.startsWith('video/')) {
+    if (file.mimetype.startsWith('video/') || file.mimetype.startsWith('image/')) {
       cb(null, true);
     } else {
-      cb(new Error('Only video files are allowed'), false);
+      cb(new Error('Only image and video files are allowed'), false);
     }
   }
 });
 
 // @route   POST /api/profile/videos
-// @desc    Upload a video to user's profile
-// @access  Private (Actor only)
+// @desc    Upload a media post to user's profile
+// @access  Private
 router.post('/videos', protect, upload.single('video'), async (req, res) => {
   try {
-    // Check if user is an actor
-    if (req.user.role !== 'Actor') {
-      return res.status(403).json({ message: 'Only actors can upload videos' });
-    }
-
     if (!req.file) {
-      return res.status(400).json({ message: 'No video file provided' });
+      return res.status(400).json({ message: 'No media file provided' });
     }
 
     const { title, description, category } = req.body;
-    const safeTitle = (title && title.trim()) ? title.trim() : (description ? String(description).slice(0, 80) : 'Profile Video');
+    const mediaType = req.file.mimetype.startsWith('image/') ? 'image' : 'video';
+    const resourceType = mediaType === 'image' ? 'image' : 'video';
+    const safeTitle = (title && title.trim())
+      ? title.trim()
+      : (description
+        ? String(description).slice(0, 80)
+        : (mediaType === 'image' ? 'Profile Photo' : 'Profile Video'));
 
-    // Upload video to Cloudinary
-    const videoResult = await new Promise((resolve) => {
+    const uploadOptions = {
+      resource_type: resourceType,
+      folder: `actory/profile-media/${req.user._id}`,
+      public_id: `${randomUUID()}-${Date.now()}`
+    };
+
+    if (mediaType === 'video') {
+      uploadOptions.eager = [
+        { width: 300, height: 300, crop: 'thumb', format: 'jpg' }
+      ];
+    }
+
+    const mediaResult = await new Promise((resolve) => {
       const stream = cloudinary.uploader.upload_stream(
-        {
-          resource_type: 'video',
-          folder: `actory/videos/${req.user._id}`,
-          public_id: `${randomUUID()}-${Date.now()}`,
-          eager: [
-            { width: 300, height: 300, crop: 'thumb', format: 'jpg' }
-          ]
-        },
+        uploadOptions,
         (error, result) => {
           if (error) {
             console.error('Cloudinary upload error:', error);
-            return res.status(500).json({ message: 'Error uploading video' });
+            return res.status(500).json({ message: 'Error uploading media' });
           }
           resolve(result);
         }
@@ -68,26 +72,30 @@ router.post('/videos', protect, upload.single('video'), async (req, res) => {
       stream.end(req.file.buffer);
     });
 
-    // Create video data object
-    const videoData = {
+    const mediaData = {
       title: safeTitle,
       description,
-      category: category || 'Other',
-      url: videoResult.secure_url,
-      thumbnailUrl: videoResult.eager[0].secure_url,
-      duration: Math.ceil(videoResult.duration || 0)
+      category: category || (mediaType === 'image' ? 'Photo' : 'Other'),
+      mediaType,
+      resourceType,
+      mimeType: req.file.mimetype,
+      cloudinaryId: mediaResult.public_id,
+      url: mediaResult.secure_url,
+      thumbnailUrl: mediaType === 'image'
+        ? mediaResult.secure_url
+        : (mediaResult.eager?.[0]?.secure_url || mediaResult.secure_url),
+      duration: mediaType === 'video' ? Math.ceil(mediaResult.duration || 0) : 0
     };
 
-    // Add video to user's profile
     const user = await User.findById(req.user._id);
-    const video = await user.addVideo(videoData);
+    const video = await user.addVideo(mediaData);
 
     res.status(201).json({
       success: true,
       data: video
     });
   } catch (error) {
-    console.error('Error uploading video:', error);
+    console.error('Error uploading media:', error);
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 });
@@ -306,9 +314,9 @@ router.put('/videos/:videoId/view', async (req, res) => {
 });
 
 // @route   DELETE /api/profile/videos/:videoId
-// @desc    Delete a video (Admin only)
-// @access  Private (Admin only)
-router.delete('/videos/:videoId', protect, admin, async (req, res) => {
+// @desc    Delete a profile media post
+// @access  Private (Owner or Admin)
+router.delete('/videos/:videoId', protect, async (req, res) => {
   try {
     const user = await User.findOne({ 'videos._id': req.params.videoId });
 
@@ -317,7 +325,7 @@ router.delete('/videos/:videoId', protect, admin, async (req, res) => {
     }
 
     // Only allow admins or the video owner to delete
-    if (user._id.toString() !== req.user._id && req.user.role !== 'Admin') {
+    if (user._id.toString() !== String(req.user._id) && req.user.role !== 'Admin') {
       return res.status(403).json({ message: 'Not authorized to delete this video' });
     }
 
@@ -326,11 +334,16 @@ router.delete('/videos/:videoId', protect, admin, async (req, res) => {
       return res.status(404).json({ message: 'Video not found' });
     }
 
-    // Delete from Cloudinary
-    const publicId = video.url.split('/').pop().split('.')[0];
-    await cloudinary.uploader.destroy(`actory/videos/${user._id}/${publicId}`, {
-      resource_type: 'video'
-    });
+    if (video.cloudinaryId) {
+      await cloudinary.uploader.destroy(video.cloudinaryId, {
+        resource_type: video.resourceType || (video.mediaType === 'image' ? 'image' : 'video')
+      });
+    } else {
+      const publicId = video.url.split('/').pop().split('.')[0];
+      await cloudinary.uploader.destroy(`actory/profile-media/${user._id}/${publicId}`, {
+        resource_type: video.resourceType || (video.mediaType === 'image' ? 'image' : 'video')
+      });
+    }
 
     // Remove from user's videos array
     await user.removeVideo(req.params.videoId);

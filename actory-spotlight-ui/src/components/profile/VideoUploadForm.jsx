@@ -10,14 +10,16 @@ import API from '@/lib/api';
 const VideoUploadForm = ({ onUploadSuccess, onCancel }) => {
   const [uploading, setUploading] = useState(false);
   const [preview, setPreview] = useState(null);
+  const [previewType, setPreviewType] = useState('video');
   const [formData, setFormData] = useState({
     description: '',
-    video: null
+    media: null
   });
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     accept: {
-      'video/*': ['.mp4', '.mov', '.avi', '.webm']
+      'video/*': ['.mp4', '.mov', '.avi', '.webm'],
+      'image/*': ['.jpg', '.jpeg', '.png', '.gif', '.webp']
     },
     maxSize: 50 * 1024 * 1024, // 50MB
     onDrop: acceptedFiles => {
@@ -25,8 +27,9 @@ const VideoUploadForm = ({ onUploadSuccess, onCancel }) => {
         const file = acceptedFiles[0];
         setFormData(prev => ({
           ...prev,
-          video: file
+          media: file
         }));
+        setPreviewType(file.type.startsWith('image/') ? 'image' : 'video');
         setPreview(URL.createObjectURL(file));
       }
     }
@@ -43,15 +46,14 @@ const VideoUploadForm = ({ onUploadSuccess, onCancel }) => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     
-    if (!formData.video) {
-      toast.error('Please select a video file');
+    if (!formData.media) {
+      toast.error('Please select an image or video file');
       return;
     }
 
     const formDataToSend = new FormData();
-    formDataToSend.append('video', formData.video);
+    formDataToSend.append('video', formData.media);
     formDataToSend.append('description', formData.description || '');
-    // Explicitly set the type to 'profile' for profile videos
     formDataToSend.append('type', 'profile');
 
     setUploading(true);
@@ -64,32 +66,33 @@ const VideoUploadForm = ({ onUploadSuccess, onCancel }) => {
       });
 
       if (data.success) {
-        toast.success('Video uploaded successfully!');
+        toast.success(previewType === 'image' ? 'Photo uploaded successfully!' : 'Video uploaded successfully!');
         if (onUploadSuccess) {
           onUploadSuccess(data.data);
         }
       } else {
-        throw new Error(data.message || 'Failed to upload video');
+        throw new Error(data.message || 'Failed to upload media');
       }
     } catch (error) {
-      console.error('Error uploading video:', error);
-      toast.error(error.response?.data?.message || 'Failed to upload video. Please try again.');
+      console.error('Error uploading media:', error);
+      toast.error(error.response?.data?.message || 'Failed to upload media. Please try again.');
     } finally {
       setUploading(false);
     }
   };
 
-  const removeVideo = () => {
+  const removeMedia = () => {
     setPreview(null);
+    setPreviewType('video');
     setFormData(prev => ({
       ...prev,
-      video: null
+      media: null
     }));
   };
 
   return (
     <div className="space-y-6">
-      <h2 className="text-2xl font-bold">Upload New Video</h2>
+      <h2 className="text-2xl font-bold">Upload New Media</h2>
       
       <form onSubmit={handleSubmit} className="space-y-4">
         <div className="space-y-2">
@@ -116,24 +119,34 @@ const VideoUploadForm = ({ onUploadSuccess, onCancel }) => {
             <div className="flex flex-col items-center justify-center space-y-2">
               <Upload className="h-10 w-10 text-muted-foreground" />
               <p className="font-medium">
-                {isDragActive ? 'Drop the video here' : 'Drag & drop a video, or click to select'}
+                {isDragActive ? 'Drop the file here' : 'Drag & drop a photo or video, or click to select'}
               </p>
-              <p className="text-sm text-muted-foreground">MP4, MOV, AVI or WebM (max. 50MB)</p>
+              <p className="text-sm text-muted-foreground">JPG, PNG, GIF, WebP, MP4, MOV, AVI or WebM (max. 50MB)</p>
             </div>
           </div>
         ) : (
           <div className="relative">
-            <video 
-              src={preview} 
-              controls 
-              className="w-full rounded-lg border"
-            />
+            {previewType === 'image' ? (
+              <div className="w-full rounded-lg border bg-black/5 p-2">
+                <img
+                  src={preview}
+                  alt="Upload preview"
+                  className="w-full rounded-md object-contain max-h-[28rem]"
+                />
+              </div>
+            ) : (
+              <video 
+                src={preview} 
+                controls 
+                className="w-full rounded-lg border"
+              />
+            )}
             <Button
               type="button"
               variant="destructive"
               size="icon"
               className="absolute -top-2 -right-2 rounded-full w-6 h-6"
-              onClick={removeVideo}
+              onClick={removeMedia}
             >
               <X className="h-3 w-3" />
             </Button>
@@ -149,13 +162,13 @@ const VideoUploadForm = ({ onUploadSuccess, onCancel }) => {
           >
             Cancel
           </Button>
-          <Button type="submit" disabled={!formData.video || uploading}>
+          <Button type="submit" disabled={!formData.media || uploading}>
             {uploading ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 Uploading...
               </>
-            ) : 'Upload Video'}
+            ) : (previewType === 'image' ? 'Upload Photo' : 'Upload Video')}
           </Button>
         </div>
       </form>

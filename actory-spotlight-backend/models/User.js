@@ -15,8 +15,24 @@ const VideoSchema = new mongoose.Schema({
   },
   category: {
     type: String,
-    enum: ['Monologue', 'Dance', 'Demo Reel', 'Other'],
+    enum: ['Monologue', 'Dance', 'Demo Reel', 'Photo', 'Other'],
     default: 'Other'
+  },
+  mediaType: {
+    type: String,
+    enum: ['video', 'image'],
+    default: 'video'
+  },
+  resourceType: {
+    type: String,
+    enum: ['video', 'image'],
+    default: 'video'
+  },
+  mimeType: {
+    type: String
+  },
+  cloudinaryId: {
+    type: String
   },
   url: {
     type: String,
@@ -61,12 +77,17 @@ VideoSchema.pre('validate', function (next) {
   if (!this.title || !this.title.trim()) {
     if (this.description && this.description.trim()) {
       this.title = this.description.trim().slice(0, 80);
+    } else if (this.mediaType === 'image') {
+      this.title = 'Profile Photo';
     } else {
       this.title = 'Profile Video';
     }
   }
   if (!this.category) {
-    this.category = 'Other';
+    this.category = this.mediaType === 'image' ? 'Photo' : 'Other';
+  }
+  if (!this.resourceType) {
+    this.resourceType = this.mediaType === 'image' ? 'image' : 'video';
   }
   next();
 });

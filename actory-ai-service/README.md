@@ -16,6 +16,20 @@ Python FastAPI microservice for video emotion analysis in the Actory casting pla
 pip install -r requirements.txt
 ```
 
+This installs the smaller facial-analysis-only setup.
+
+For voice emotion analysis too, install the optional heavy dependencies:
+
+```bash
+pip install -r requirements-voice.txt
+```
+
+Voice analysis is optional by default. To require it at runtime, set:
+
+```bash
+REQUIRE_VOICE_ANALYSIS=true
+```
+
 ## Model Setup
 
 Place the trained model file:

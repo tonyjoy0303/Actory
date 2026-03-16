@@ -50,6 +50,11 @@ class EmotionTimelineSegment(BaseModel):
 class AnalyzeVideoResponse(BaseModel):
     success: bool
     requiredEmotion: str
+    faceEmotion: str
+    voiceEmotion: str
+    faceConfidence: float = Field(..., ge=0, le=1)
+    voiceConfidence: float = Field(..., ge=0, le=1)
+    combinedEmotionConfidence: float = Field(..., ge=0, le=1)
     detectedEmotion: str
     emotionScores: EmotionScores
     emotionMatchScore: int = Field(..., ge=0, le=100)

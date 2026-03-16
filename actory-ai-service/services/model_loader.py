@@ -7,6 +7,9 @@ Model has internal Rescaling layer - NO manual normalization needed.
 
 import os
 import sys
+import json
+import zipfile
+import tempfile
 import numpy as np
 from tensorflow import keras
 
@@ -39,6 +42,73 @@ class EmotionModelLoader:
             print(f"📐 [MODEL INFO] Output shape: {self.model.output_shape} (7 emotions)", flush=True)
             print(f"🎭 [MODEL INFO] Emotions: {', '.join(self.EMOTION_LABELS)}", flush=True)
         except Exception as e:
+            # Compatibility fallback for models serialized with InputLayer batch_shape.
+            # Some TF/Keras combinations only accept batch_input_shape.
+            if "InputLayer" in str(e) and "batch_shape" in str(e):
+                try:
+                    print("⚠️  [MODEL] Retrying with .keras config compatibility patch...", flush=True)
+
+                    def _patch_batch_shape(obj):
+                        if isinstance(obj, dict):
+                            if 'batch_shape' in obj and 'batch_input_shape' not in obj:
+                                obj['batch_input_shape'] = obj.pop('batch_shape')
+
+                            # Some saved preprocessing layers include fields unsupported
+                            # by older TF/Keras runtimes.
+                            class_name = obj.get('class_name')
+                            layer_cfg = obj.get('config')
+                            if isinstance(class_name, str) and isinstance(layer_cfg, dict):
+                                if class_name in {
+                                    'RandomFlip',
+                                    'RandomRotation',
+                                    'RandomZoom',
+                                    'RandomTranslation',
+                                    'RandomContrast',
+                                    'RandomBrightness',
+                                }:
+                                    layer_cfg.pop('data_format', None)
+
+                            for v in obj.values():
+                                _patch_batch_shape(v)
+                        elif isinstance(obj, list):
+                            for item in obj:
+                                _patch_batch_shape(item)
+
+                    # .keras files are zip archives containing config.json
+                    with tempfile.TemporaryDirectory() as tmp_dir:
+                        patched_model_path = os.path.join(tmp_dir, 'patched_model.keras')
+                        with zipfile.ZipFile(self.model_path, 'r') as src_zip:
+                            src_zip.extractall(tmp_dir)
+
+                        config_path = os.path.join(tmp_dir, 'config.json')
+                        if os.path.exists(config_path):
+                            with open(config_path, 'r', encoding='utf-8') as f:
+                                config_data = json.load(f)
+                            _patch_batch_shape(config_data)
+                            with open(config_path, 'w', encoding='utf-8') as f:
+                                json.dump(config_data, f)
+
+                        # Repack patched archive
+                        with zipfile.ZipFile(patched_model_path, 'w', compression=zipfile.ZIP_DEFLATED) as out_zip:
+                            for root, _, files in os.walk(tmp_dir):
+                                for file_name in files:
+                                    if file_name == 'patched_model.keras':
+                                        continue
+                                    full_path = os.path.join(root, file_name)
+                                    rel_path = os.path.relpath(full_path, tmp_dir)
+                                    out_zip.write(full_path, rel_path)
+
+                        self.model = keras.models.load_model(patched_model_path)
+
+                    print(f"✅ [MODEL LOADED] Successfully loaded from {self.model_path} (compat mode)", flush=True)
+                    print(f"📐 [MODEL INFO] Input shape: {self.model.input_shape}", flush=True)
+                    print(f"📐 [MODEL INFO] Output shape: {self.model.output_shape} (7 emotions)", flush=True)
+                    print(f"🎭 [MODEL INFO] Emotions: {', '.join(self.EMOTION_LABELS)}", flush=True)
+                    return
+                except Exception as compat_error:
+                    print(f"❌ [ERROR] Compatibility load failed: {str(compat_error)}", flush=True)
+                    raise RuntimeError(f"Failed to load model: {str(compat_error)}")
+
             print(f"❌ [ERROR] Failed to load model: {str(e)}", flush=True)
             raise RuntimeError(f"Failed to load model: {str(e)}")
     

@@ -5,7 +5,12 @@
 
 .casting-card:hover {
   transform: translateY(-8px) scale(1.02);
-  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.3), 
+  box-shadow: 0 20px 30px -18px rgba(16, 32, 54, 0.38),
+              0 8px 20px -14px rgba(236, 186, 40, 0.24);
+}
+
+.dark .casting-card:hover {
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.3),
               0 10px 10px -5px rgba(0, 0, 0, 0.2);
 }
 

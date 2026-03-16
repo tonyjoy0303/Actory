@@ -20,12 +20,16 @@ const EmotionAnalysisDisplay = ({ submission, darkTheme = false }) => {
     expressionIntensity,
     faceVisibility,
     overallPerformanceScore,
-    emotionTimeline,
     confidence,
     overallScore,
     feedback,
     framesAnalyzed,
-    analyzedAt
+    analyzedAt,
+    faceEmotion,
+    voiceEmotion,
+    faceConfidence,
+    voiceConfidence,
+    combinedEmotionConfidence,
   } = submission;
 
   // Emotion colors for visual feedback
@@ -39,15 +43,15 @@ const EmotionAnalysisDisplay = ({ submission, darkTheme = false }) => {
     neutral: '#808080'
   };
 
-  // Emotion icons
+  // Emotion markers (text-only, no emoji)
   const emotionIcons = {
-    happy: '😊',
-    sad: '😢',
-    angry: '😠',
-    fear: '😨',
-    surprise: '😲',
-    disgust: '🤢',
-    neutral: '😐'
+    happy: 'H',
+    sad: 'S',
+    angry: 'A',
+    fear: 'F',
+    surprise: 'SU',
+    disgust: 'D',
+    neutral: 'N'
   };
 
   // Get score color based on value
@@ -98,7 +102,7 @@ const EmotionAnalysisDisplay = ({ submission, darkTheme = false }) => {
     } : {}}>
       {/* Header */}
       <div className="analysis-header" style={darkTheme ? {borderColor: '#475569'} : {}}>
-        <h3 style={darkTheme ? {color: '#e2e8f0'} : {}}>🤖 AI Emotion Analysis</h3>
+        <h3 style={darkTheme ? {color: '#e2e8f0'} : {}}>AI Emotion Analysis</h3>
         <span className="analysis-date" style={darkTheme ? {color: '#94a3b8'} : {}}>
           Analyzed: {formatDate(analyzedAt)}
         </span>
@@ -175,20 +179,69 @@ const EmotionAnalysisDisplay = ({ submission, darkTheme = false }) => {
         </div>
       </div>
 
-      {Array.isArray(emotionTimeline) && emotionTimeline.length > 0 && (
-        <div className="timeline-section">
-          <h4 style={darkTheme ? {color: '#e2e8f0'} : {}}>Emotion Timeline</h4>
-          <div className="timeline-list">
-            {emotionTimeline.slice(0, 6).map((segment, index) => (
-              <div key={`${segment.emotion}-${segment.start}-${index}`} className="timeline-item" style={darkTheme ? {background: '#1e293b', borderColor: '#334155'} : {}}>
-                <span className="timeline-emotion" style={darkTheme ? {color: '#e2e8f0'} : {}}>
-                  {emotionIcons[segment.emotion] || emotionIcons.neutral} {segment.emotion}
-                </span>
-                <span className="timeline-range" style={darkTheme ? {color: '#94a3b8'} : {}}>
-                  {Number(segment.start || 0).toFixed(1)}s - {Number(segment.end || 0).toFixed(1)}s
-                </span>
+      {/* Multimodal Analysis */}
+      {(faceEmotion || voiceEmotion) && (
+        <div className="multimodal-analysis" style={darkTheme ? { borderColor: '#475569', background: '#0f172a' } : {}}>
+          <h4 style={darkTheme ? { color: '#e2e8f0' } : {}}>Multimodal Analysis</h4>
+          <div className="modality-grid">
+            <div className="modality-item" style={darkTheme ? { background: '#1e293b' } : {}}>
+              <div className="modality-header">
+                <span>Face</span>
+                <span>{emotionIcons[faceEmotion] || 'N'}</span>
               </div>
-            ))}
+              <div className="modality-emotion" style={darkTheme ? { color: '#e2e8f0' } : {}}>
+                {faceEmotion || 'unknown'}
+              </div>
+              <div className="modality-confidence-bar" style={darkTheme ? { background: '#334155' } : {}}>
+                <div
+                  className="modality-confidence-fill"
+                  style={{ width: `${(faceConfidence || 0) * 100}%`, backgroundColor: '#6366f1' }}
+                />
+              </div>
+              <div className="modality-confidence-label" style={darkTheme ? { color: '#94a3b8' } : {}}>
+                {((faceConfidence || 0) * 100).toFixed(1)}% confident
+              </div>
+            </div>
+            <div className="modality-item" style={darkTheme ? { background: '#1e293b' } : {}}>
+              <div className="modality-header">
+                <span>Voice</span>
+                <span>{emotionIcons[voiceEmotion] || 'N'}</span>
+              </div>
+              <div className="modality-emotion" style={darkTheme ? { color: '#e2e8f0' } : {}}>
+                {voiceEmotion || 'neutral'}
+              </div>
+              <div className="modality-confidence-bar" style={darkTheme ? { background: '#334155' } : {}}>
+                <div
+                  className="modality-confidence-fill"
+                  style={{ width: `${(voiceConfidence || 0) * 100}%`, backgroundColor: '#10b981' }}
+                />
+              </div>
+              <div className="modality-confidence-label" style={darkTheme ? { color: '#94a3b8' } : {}}>
+                {((voiceConfidence || 0) * 100).toFixed(1)}% confident
+              </div>
+            </div>
+          </div>
+          <div className="combined-confidence" style={darkTheme ? { borderColor: '#334155' } : {}}>
+            <div className="combined-label" style={darkTheme ? { color: '#94a3b8' } : {}}>
+              Combined Confidence (60% face + 40% voice)
+            </div>
+            <div className="combined-bar-row">
+              <div className="progress-bar" style={darkTheme ? { background: '#334155' } : {}}>
+                <div
+                  className="progress-fill"
+                  style={{
+                    width: `${(combinedEmotionConfidence || 0) * 100}%`,
+                    backgroundColor: getScoreColor((combinedEmotionConfidence || 0) * 100),
+                  }}
+                />
+              </div>
+              <span
+                className="combined-value"
+                style={{ color: getScoreColor((combinedEmotionConfidence || 0) * 100) }}
+              >
+                {((combinedEmotionConfidence || 0) * 100).toFixed(1)}%
+              </span>
+            </div>
           </div>
         </div>
       )}
@@ -201,7 +254,6 @@ const EmotionAnalysisDisplay = ({ submission, darkTheme = false }) => {
             {Object.entries(emotionScores).map(([emotion, score]) => (
               <div key={emotion} className="emotion-bar-item">
                 <div className="emotion-bar-header">
-                  <span className="emotion-bar-icon">{emotionIcons[emotion]}</span>
                   <span className="emotion-bar-label" style={darkTheme ? {color: '#cbd5e1'} : {}}>{emotion}</span>
                   <span className="emotion-bar-value" style={darkTheme ? {color: '#94a3b8'} : {}}>
                     {(score * 100).toFixed(1)}%
@@ -228,7 +280,7 @@ const EmotionAnalysisDisplay = ({ submission, darkTheme = false }) => {
         borderColor: '#3b82f6'
       } : {}}>
         <div className="feedback-header">
-          <span className="feedback-icon">💬</span>
+          <span className="feedback-icon">AI</span>
           <span className="feedback-title" style={darkTheme ? {color: '#e2e8f0'} : {}}>AI Feedback</span>
         </div>
         <p className="feedback-text" style={darkTheme ? {color: '#cbd5e1'} : {}}>{feedback}</p>
@@ -264,12 +316,16 @@ EmotionAnalysisDisplay.propTypes = {
     expressionIntensity: PropTypes.number,
     faceVisibility: PropTypes.number,
     overallPerformanceScore: PropTypes.number,
-    emotionTimeline: PropTypes.array,
     confidence: PropTypes.number,
     overallScore: PropTypes.number,
     feedback: PropTypes.string,
     framesAnalyzed: PropTypes.number,
-    analyzedAt: PropTypes.string
+    analyzedAt: PropTypes.string,
+    faceEmotion: PropTypes.string,
+    voiceEmotion: PropTypes.string,
+    faceConfidence: PropTypes.number,
+    voiceConfidence: PropTypes.number,
+    combinedEmotionConfidence: PropTypes.number,
   }).isRequired,
   darkTheme: PropTypes.bool
 };
