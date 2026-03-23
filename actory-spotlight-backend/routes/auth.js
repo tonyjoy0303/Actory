@@ -24,6 +24,11 @@ const router = express.Router();
 // Multer storage configuration - using memory storage for Cloudinary
 const storage = multer.memoryStorage();
 
+const licenseUploadDir = path.join(__dirname, '..', 'uploads', 'licenses');
+if (!fs.existsSync(licenseUploadDir)) {
+  fs.mkdirSync(licenseUploadDir, { recursive: true });
+}
+
 const upload = multer({
   storage,
   limits: { fileSize: 5 * 1024 * 1024 }, // 5MB (increased for better quality)
@@ -39,8 +44,40 @@ const upload = multer({
   }
 });
 
+const registerStorage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    cb(null, licenseUploadDir);
+  },
+  filename: function (req, file, cb) {
+    const safeBaseName = path.basename(file.originalname, path.extname(file.originalname))
+      .replace(/[^a-zA-Z0-9_-]/g, '_')
+      .slice(0, 60);
+    cb(null, `license_${Date.now()}_${safeBaseName}${path.extname(file.originalname).toLowerCase()}`);
+  }
+});
+
+const registerUpload = multer({
+  storage: registerStorage,
+  limits: { fileSize: 10 * 1024 * 1024 },
+  fileFilter: function (req, file, cb) {
+    const allowedMimeTypes = [
+      'application/pdf',
+      'application/msword',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+    ];
+    const allowedExt = ['.pdf', '.doc', '.docx'];
+    const ext = path.extname(file.originalname).toLowerCase();
+
+    if (allowedMimeTypes.includes(file.mimetype) && allowedExt.includes(ext)) {
+      return cb(null, true);
+    }
+
+    cb(new Error('Only .pdf, .doc and .docx files are allowed for license upload'));
+  }
+});
+
 // Public routes
-router.post('/register', register);
+router.post('/register', registerUpload.single('licenseFile'), register);
 router.post('/login', login);
 router.post('/google', googleLogin);
 router.get('/check-email', checkEmail);

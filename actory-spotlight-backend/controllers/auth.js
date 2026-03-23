@@ -14,6 +14,8 @@ const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 // @access  Public
 exports.register = async (req, res, next) => {
   try {
+    const licenseDocument = req.file ? `/uploads/licenses/${req.file.filename}` : undefined;
+
     let {
       name,
       email,
@@ -106,7 +108,8 @@ exports.register = async (req, res, next) => {
       age,
       gender,
       experienceLevel,
-      bio
+      bio,
+      licenseDocument
     };
 
     // Auto-verify Admin users without email verification
@@ -114,7 +117,8 @@ exports.register = async (req, res, next) => {
       const adminData = {
         ...payload,
         isEmailVerified: true,
-        isVerified: true
+        isVerified: true,
+        approvalStatus: 'approved'
       };
 
       const adminUser = await User.create(adminData);
@@ -211,6 +215,20 @@ exports.login = async (req, res, next) => {
       return res.status(403).json({
         success: false,
         message: 'Please verify your email address before logging in. Check your inbox for the verification link.'
+      });
+    }
+
+    if (user.role === 'ProductionTeam' && user.approvalStatus === 'rejected') {
+      return res.status(403).json({
+        success: false,
+        message: 'Your production house registration was rejected by admin. Please contact support.'
+      });
+    }
+
+    if (user.role === 'ProductionTeam' && (!user.isVerified || user.approvalStatus === 'pending')) {
+      return res.status(403).json({
+        success: false,
+        message: 'Your production house registration is pending admin approval.'
       });
     }
 
@@ -802,6 +820,8 @@ exports.verifyEmail = async (req, res, next) => {
     }
 
     // Handle regular User verification (for all roles now)
+    const requiresAdminApproval = pendingUser.role === 'ProductionTeam';
+
     const userData = {
       name: pendingUser.name,
       email: pendingUser.email,
@@ -821,9 +841,11 @@ exports.verifyEmail = async (req, res, next) => {
       establishedYear: pendingUser.establishedYear,
       teamSize: pendingUser.teamSize,
       specializations: pendingUser.specializations,
+      licenseDocument: pendingUser.licenseDocument,
 
       isEmailVerified: true,
-      isVerified: true
+      isVerified: requiresAdminApproval ? false : true,
+      approvalStatus: requiresAdminApproval ? 'pending' : 'approved'
     };
 
     // Create the actual user
@@ -834,7 +856,9 @@ exports.verifyEmail = async (req, res, next) => {
 
     return res.status(200).json({
       success: true,
-      message: 'Email verified successfully! You can now log in to your account.'
+      message: requiresAdminApproval
+        ? 'Email verified successfully! Your registration will be completed after admin approval.'
+        : 'Email verified successfully! You can now log in to your account.'
     });
   } catch (err) {
     console.error('Email verification error:', err);

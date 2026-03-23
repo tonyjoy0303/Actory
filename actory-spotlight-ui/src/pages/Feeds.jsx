@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { Heart, MessageCircle, Share2, User, Calendar, Eye } from 'lucide-react';
+import { Heart, MessageCircle, User, Calendar, Eye } from 'lucide-react';
 import SEO from "@/components/SEO";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -10,6 +10,8 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
+import InternalShareDialog from '@/components/media/InternalShareDialog';
+import shareInternalIcon from '@/assets/share-internal.svg';
 import API from "@/lib/api";
 import { format } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
@@ -23,6 +25,8 @@ const Feeds = () => {
   const [selectedVideoForComments, setSelectedVideoForComments] = useState(null);
   const [newComment, setNewComment] = useState('');
   const [videoComments, setVideoComments] = useState({}); // Store comments per video ID
+  const [isShareDialogOpen, setIsShareDialogOpen] = useState(false);
+  const [mediaToShare, setMediaToShare] = useState(null);
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
@@ -167,22 +171,20 @@ const Feeds = () => {
     }
   };
 
-  const handleShare = async (video) => {
-    const shareUrl = `${window.location.origin}/profile/${video.actor._id}`;
-    if (navigator.share) {
-      try {
-        await navigator.share({
-          title: `${video.actor.name}'s Video`,
-          text: video.description || video.title,
-          url: shareUrl,
-        });
-      } catch (error) {
-        // User cancelled sharing
-      }
-    } else {
-      navigator.clipboard.writeText(shareUrl);
-      toast.success('Video link copied to clipboard!');
+  const handleShare = (video) => {
+    if (!currentUser?._id || !video?._id) {
+      toast.error('Please login to share media in-app');
+      return;
     }
+
+    setMediaToShare({
+      id: video._id,
+      title: video.title || video.description || 'Media post',
+      shareUrl: getMediaSrc(video),
+      thumbnailUrl: video.thumbnailUrl || getMediaSrc(video),
+      mediaType: isImagePost(video) ? 'image' : 'video',
+    });
+    setIsShareDialogOpen(true);
   };
 
   const handleComment = async (video) => {
@@ -446,9 +448,9 @@ const Feeds = () => {
                           size="sm"
                           variant="ghost"
                           onClick={() => handleShare(video)}
-                          className="h-8 w-8 p-0"
+                          className="h-8 w-8 p-0 bg-black/80 hover:bg-black text-white"
                         >
-                          <Share2 className="h-4 w-4" />
+                          <img src={shareInternalIcon} alt="Share" className="h-4 w-4 invert" />
                         </Button>
                       </div>
                       
@@ -585,9 +587,9 @@ const Feeds = () => {
                       size="sm"
                       variant="ghost"
                       onClick={() => handleShare(selectedVideo)}
-                      className="h-8 w-8 p-0"
+                      className="h-8 w-8 p-0 bg-black/80 hover:bg-black text-white"
                     >
-                      <Share2 className="h-4 w-4" />
+                      <img src={shareInternalIcon} alt="Share" className="h-4 w-4 invert" />
                     </Button>
                   </div>
 
@@ -724,6 +726,13 @@ const Feeds = () => {
           </div>
         </DialogContent>
       </Dialog>
+
+      <InternalShareDialog
+        open={isShareDialogOpen}
+        onOpenChange={setIsShareDialogOpen}
+        media={mediaToShare}
+        currentUser={currentUser}
+      />
     </div>
   );
 };

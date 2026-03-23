@@ -89,6 +89,34 @@ exports.addVideo = async (req, res, next) => {
   console.log(`🎬 [VIDEO UPLOAD] Video URL: ${req.body.videoUrl}`);
   
   try {
+    // ⏱️ VALIDATION: Check video duration (max 4 minutes = 240 seconds)
+    const MAX_VIDEO_DURATION = 240; // 4 minutes
+    const videoDuration = req.body.duration || 0;
+    
+    // Extract end time if crop data is provided
+    let finalDuration = videoDuration;
+    if (req.body.cropData && req.body.cropData.croppedDuration) {
+      finalDuration = req.body.cropData.croppedDuration;
+      console.log(`🎬 [VIDEO CROP] Using cropped duration: ${finalDuration} seconds`);
+    }
+    
+    // Validate duration
+    if (finalDuration > MAX_VIDEO_DURATION) {
+      console.warn(`⚠️ [VIDEO VALIDATION] Video duration ${finalDuration}s exceeds maximum ${MAX_VIDEO_DURATION}s`);
+      return res.status(400).json({ 
+        success: false, 
+        message: `Video duration (${Math.round(finalDuration)}s) exceeds maximum allowed duration of 4 minutes (240s). Please crop your video before submitting.`
+      });
+    }
+    
+    if (finalDuration <= 0) {
+      console.warn(`⚠️ [VIDEO VALIDATION] Invalid video duration: ${finalDuration}s`);
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Invalid video duration. Unable to determine video length.'
+      });
+    }
+
     req.body.castingCall = req.params.castingCallId;
     req.body.actor = req.user._id;
 
@@ -104,7 +132,7 @@ exports.addVideo = async (req, res, next) => {
     // Extract video metadata from the request
     const videoMetadata = {
       height: req.body.videoHeight || 720, // Default to 720p if not provided
-      duration: req.body.duration || 0,
+      duration: finalDuration, // Use the validated duration (original or cropped)
       brightness: req.body.brightness || 0.75,
       audioQuality: req.body.audioQuality || 0.8
     };
@@ -135,6 +163,16 @@ exports.addVideo = async (req, res, next) => {
       level: qualityAssessment.quality,
       score: qualityAssessment.score,
       details: qualityAssessment.details
+    };
+
+    // Set videoMetrics explicitly
+    req.body.videoMetrics = {
+      height: videoMetadata.height,
+      duration: videoMetadata.duration,
+      brightness: videoMetadata.brightness,
+      audioQuality: videoMetadata.audioQuality,
+      retakes: req.body.retakes || 1,
+      watchTime: 0
     };
 
     const video = await Video.create(req.body);

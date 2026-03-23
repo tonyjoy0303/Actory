@@ -59,6 +59,8 @@ const SubmissionsPage = () => {
   const [reanalyzingId, setReanalyzingId] = useState(null);
   const [updatingStatusId, setUpdatingStatusId] = useState(null);
   const [lastCollapsedId, setLastCollapsedId] = useState(null);
+  const [fitById, setFitById] = useState({});
+  const [fitLoading, setFitLoading] = useState(false);
   
   // Refs for each submission card to enable scroll-into-view
   const cardRefs = useRef({});
@@ -272,6 +274,113 @@ const SubmissionsPage = () => {
     return 'bg-slate-500/15 border-slate-500/40 text-slate-200';
   };
 
+  const getFitTone = (fit) => {
+    if (fit === 'Good Fit') return 'bg-emerald-500/15 border-emerald-400/30 text-emerald-200';
+    if (fit === 'Partial Fit') return 'bg-amber-500/15 border-amber-400/30 text-amber-200';
+    return 'bg-rose-500/15 border-rose-400/30 text-rose-200';
+  };
+
+  const jaccard = (a = [], b = []) => {
+    const A = new Set((a || []).map((x) => String(x).toLowerCase()));
+    const B = new Set((b || []).map((x) => String(x).toLowerCase()));
+    const inter = new Set([...A].filter((x) => B.has(x))).size;
+    const uni = new Set([...A, ...B]).size;
+    return uni === 0 ? 0 : inter / uni;
+  };
+
+  const evaluateFits = async () => {
+    if (!submissions.length) return;
+
+    const castingSkills = Array.isArray(castingData?.data?.skills) ? castingData.data.skills : [];
+    const castingGender = String(castingData?.data?.genderRequirement || 'any').toLowerCase();
+    const castingAgeRange = {
+      min: Number(castingData?.data?.ageRange?.min ?? NaN),
+      max: Number(castingData?.data?.ageRange?.max ?? NaN),
+    };
+    const castingHeightRange = {
+      min: Number(castingData?.data?.heightRange?.min ?? NaN),
+      max: Number(castingData?.data?.heightRange?.max ?? NaN),
+    };
+
+    setFitLoading(true);
+    try {
+      const results = {};
+
+      for (const s of submissions) {
+        const userSkills = Array.isArray(s.skills) ? s.skills : [];
+        const skillsJ = Number(jaccard(userSkills, castingSkills));
+        const ageNum = Number(s.age || 0);
+        const withinAge = Number.isFinite(castingAgeRange.min) && Number.isFinite(castingAgeRange.max)
+          ? (ageNum >= castingAgeRange.min && ageNum <= castingAgeRange.max)
+          : false;
+
+        const actorGender = String(s.actor?.gender || '').toLowerCase();
+        const genderOk = castingGender === 'any' || !castingGender || actorGender === castingGender || (castingGender === 'other' && !['male', 'female'].includes(actorGender));
+
+        const hVal = Number(s.height || 0);
+        const hasHMin = Number.isFinite(castingHeightRange.min);
+        const hasHMax = Number.isFinite(castingHeightRange.max);
+        let withinHeight = true;
+        if (hasHMin && hVal < castingHeightRange.min) withinHeight = false;
+        if (hasHMax && hVal > castingHeightRange.max) withinHeight = false;
+
+        if (!genderOk && castingGender !== 'any') {
+          results[s._id] = 'Poor Fit';
+          continue;
+        }
+
+        if ((hasHMin || hasHMax) && !withinHeight) {
+          results[s._id] = 'Poor Fit';
+          continue;
+        }
+
+        let genre = skillsJ;
+        if (withinAge) genre += 0.2;
+        if (genderOk) genre += 0.2;
+        if ((hasHMin || hasHMax) && withinHeight) genre += 0.15;
+        genre = Math.max(0, Math.min(1, genre));
+
+        const candidate = {
+          age: ageNum,
+          height: Number(s.height || 0),
+          skillsEncoded: skillsJ,
+          expYears: Number(s.experienceYears || s.expYears || 0),
+          callbackRate: Number(s.callbackRate || 0),
+          portfolioVideos: Number(s.portfolioCount || 0),
+          genreMatch: genre,
+        };
+
+        const trainingSet = [
+          { features: { age: 26, height: 175, skillsEncoded: 0.85, expYears: 3, callbackRate: 0.3, portfolioVideos: 3, genreMatch: 0.95 }, label: 'Good Fit' },
+          { features: { age: 30, height: 180, skillsEncoded: 0.75, expYears: 6, callbackRate: 0.5, portfolioVideos: 8, genreMatch: 0.85 }, label: 'Good Fit' },
+          { features: { age: 27, height: 175, skillsEncoded: 0.6, expYears: 3, callbackRate: 0.25, portfolioVideos: 3, genreMatch: 0.6 }, label: 'Partial Fit' },
+          { features: { age: 29, height: 176, skillsEncoded: 0.7, expYears: 4, callbackRate: 0.35, portfolioVideos: 5, genreMatch: 0.7 }, label: 'Partial Fit' },
+          { features: { age: 24, height: 170, skillsEncoded: 0.3, expYears: 1, callbackRate: 0.1, portfolioVideos: 1, genreMatch: 0.2 }, label: 'Poor Fit' },
+          { features: { age: 40, height: 168, skillsEncoded: 0.2, expYears: 1, callbackRate: 0.05, portfolioVideos: 0, genreMatch: 0.1 }, label: 'Poor Fit' },
+        ];
+
+        try {
+          const { data } = await API.post('/fit/knn', { candidate, trainingSet, k: 3 });
+          if (data?.success) {
+            let cat = data.category || 'Partial Fit';
+            if (skillsJ >= 0.8 && withinAge && genderOk) {
+              cat = 'Good Fit';
+            } else if (skillsJ < 0.3) {
+              cat = 'Poor Fit';
+            }
+            results[s._id] = cat;
+          }
+        } catch (e) {
+          results[s._id] = 'Partial Fit';
+        }
+      }
+
+      setFitById(results);
+    } finally {
+      setFitLoading(false);
+    }
+  };
+
   const formatDate = (date) => {
     return new Date(date).toLocaleDateString('en-US', {
       year: 'numeric',
@@ -344,21 +453,31 @@ const SubmissionsPage = () => {
                 </div>
               </div>
 
-              <div className="flex items-center gap-2 sm:gap-3">
+              <div className="flex flex-col items-end gap-2 sm:gap-3">
+                <div className="flex items-center gap-2 sm:gap-3">
+                  <Button
+                    onClick={() => refetch()}
+                    variant="outline"
+                    className="border-slate-600 bg-slate-900/40 text-slate-200 hover:bg-slate-800"
+                  >
+                    <RefreshCw className="mr-2 h-4 w-4" />
+                    Refresh
+                  </Button>
+                  <Button
+                    onClick={() => navigate(-1)}
+                    variant="outline"
+                    className="border-slate-600 bg-slate-900/40 text-slate-200 hover:bg-slate-800"
+                  >
+                    Back
+                  </Button>
+                </div>
                 <Button
-                  onClick={() => refetch()}
-                  variant="outline"
-                  className="border-slate-600 bg-slate-900/40 text-slate-200 hover:bg-slate-800"
+                  onClick={evaluateFits}
+                  disabled={fitLoading || !submissions.length}
+                  variant="secondary"
+                  className="min-w-[150px]"
                 >
-                  <RefreshCw className="mr-2 h-4 w-4" />
-                  Refresh
-                </Button>
-                <Button
-                  onClick={() => navigate(-1)}
-                  variant="outline"
-                  className="border-slate-600 bg-slate-900/40 text-slate-200 hover:bg-slate-800"
-                >
-                  Back
+                  {fitLoading ? 'Evaluating Fits...' : 'Evaluate Fits'}
                 </Button>
               </div>
             </div>
@@ -651,6 +770,11 @@ const SubmissionsPage = () => {
                             {submission.status && (
                               <Badge className={`border ${getStatusTone(submission.status)}`}>
                                 {submission.status}
+                              </Badge>
+                            )}
+                            {fitById[submission._id] && (
+                              <Badge className={`border ${getFitTone(fitById[submission._id])}`}>
+                                {fitById[submission._id]}
                               </Badge>
                             )}
                             <Badge className={`border ${getMatchTone(match)}`}>

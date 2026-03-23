@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
 
 export default function ProducerDashboard() {
   const [castingCalls, setCastingCalls] = useState([]);
@@ -20,6 +21,7 @@ export default function ProducerDashboard() {
   const [submissionsLoading, setSubmissionsLoading] = useState(false);
   const [updatingId, setUpdatingId] = useState(null);
   const [sortBy, setSortBy] = useState('date-desc');
+  const [topMessages, setTopMessages] = useState([]);
 
   // Sorting function
   const sortSubmissions = (submissions, sortBy) => {
@@ -84,7 +86,31 @@ export default function ProducerDashboard() {
       setUser(JSON.parse(storedUser));
     }
     fetchCastingCalls();
+    fetchTopMessages();
   }, []);
+
+  const fetchTopMessages = async () => {
+    try {
+      const { data } = await API.get('/messages/conversations');
+      const conversations = data?.data || [];
+
+      const receivedConversations = conversations
+        .filter((conv) => conv?.lastMessage?.content)
+        .slice(0, 3)
+        .map((conv) => ({
+          conversationId: conv.conversationId,
+          senderName: conv.otherUser?.name || 'Unknown',
+          content: conv.lastMessage?.content || '',
+          createdAt: conv.lastMessage?.createdAt,
+          unreadCount: conv.unreadCount || 0,
+        }));
+
+      setTopMessages(receivedConversations);
+    } catch (error) {
+      console.error('Error fetching top messages:', error);
+      setTopMessages([]);
+    }
+  };
 
   const fetchCastingCalls = async () => {
     try {
@@ -413,14 +439,30 @@ export default function ProducerDashboard() {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle className="font-display">Messaging</CardTitle>
-              <Button variant="outline" size="sm" onClick={() => navigate('/messages')}>
-                Open Messages
-              </Button>
+              <Badge variant="outline">Open</Badge>
             </CardHeader>
-            <CardContent>
+            <CardContent className="space-y-3">
               <p className="text-sm text-muted-foreground">
-                Chat with actors and other producers. Connect and communicate directly.
+                Direct communication channel with talent and production crews.
               </p>
+
+              {topMessages.map((message) => (
+                <button
+                  key={message.conversationId}
+                  type="button"
+                  onClick={() => navigate('/messages')}
+                  className="w-full text-left rounded-md border p-3 hover:bg-muted/60 transition-colors"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium truncate">New Message from {message.senderName}</p>
+                    </div>
+                    <span className="text-xs text-muted-foreground whitespace-nowrap">
+                      {message.createdAt ? new Date(message.createdAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : ''}
+                    </span>
+                  </div>
+                </button>
+              ))}
             </CardContent>
           </Card>
         </div>

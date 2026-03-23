@@ -225,6 +225,7 @@ export default function ActorDashboard() {
   const [submissionsLoading, setSubmissionsLoading] = useState(true);
   const [sortBy, setSortBy] = useState('date-desc');
   const [selectedVideo, setSelectedVideo] = useState(null);
+  const [topMessages, setTopMessages] = useState([]);
 
   // Sorting function for submissions
   const sortSubmissions = (submissions, sortBy) => {
@@ -280,7 +281,8 @@ export default function ActorDashboard() {
       // Fetch casting calls and submissions if needed
       await Promise.all([
         fetchCastingCalls(),
-        fetchSubmissions()
+        fetchSubmissions(),
+        fetchTopMessages()
       ]);
     } catch (error) {
       console.error('Error fetching profile:', error);
@@ -337,6 +339,28 @@ export default function ActorDashboard() {
       setSubmissions([]);
     } finally {
       setSubmissionsLoading(false);
+    }
+  };
+
+  const fetchTopMessages = async () => {
+    try {
+      const { data } = await API.get('/messages/conversations');
+      const conversations = data?.data || [];
+
+      const recentMessages = conversations
+        .filter((conv) => conv?.lastMessage?.content)
+        .slice(0, 3)
+        .map((conv) => ({
+          conversationId: conv.conversationId,
+          senderName: conv.otherUser?.name || 'Unknown',
+          content: conv.lastMessage?.content || '',
+          createdAt: conv.lastMessage?.createdAt,
+        }));
+
+      setTopMessages(recentMessages);
+    } catch (error) {
+      console.error('Error fetching top messages:', error);
+      setTopMessages([]);
     }
   };
 
@@ -464,6 +488,37 @@ export default function ActorDashboard() {
             Messages
           </TabsTrigger>
         </TabsList>
+
+        <Card className="border-border/70 bg-card/90">
+          <CardHeader className="px-4 pt-3 pb-2">
+            <CardTitle className="flex items-center gap-2">
+              <MessageCircle className="h-5 w-5" />
+              Messaging
+            </CardTitle>
+            <CardDescription className="text-xs">
+              Direct communication with producers and other actors.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-1 px-4 pb-3 pt-0 max-h-36 overflow-y-auto">
+            {topMessages.map((message) => (
+              <button
+                key={message.conversationId}
+                type="button"
+                onClick={() => navigate('/messages')}
+                className="w-full text-left rounded-md border px-2.5 py-1.5 hover:bg-muted/60 transition-colors"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium truncate">Message from {message.senderName}</p>
+                  </div>
+                  <span className="text-xs text-muted-foreground whitespace-nowrap">
+                    {message.createdAt ? new Date(message.createdAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : ''}
+                  </span>
+                </div>
+              </button>
+            ))}
+          </CardContent>
+        </Card>
 
         <TabsContent value="videos" className="space-y-6">
           {showUploadForm ? (

@@ -4,6 +4,9 @@ const {
   approveSwitchRequest,
   rejectSwitchRequest,
   getUsers,
+  getProductionHouseRegistrations,
+  approveProductionHouseRegistration,
+  rejectProductionHouseRegistration,
   updateUser,
   deleteUser,
   getCastingCalls,
@@ -29,6 +32,11 @@ router.route('/switch-requests/:id/reject').put(rejectSwitchRequest);
 // User management routes
 router.route('/users').get(getUsers);
 router.route('/users/:id').put(updateUser).delete(deleteUser);
+
+// Production house registration review routes
+router.route('/production-house-registrations').get(getProductionHouseRegistrations);
+router.route('/production-house-registrations/:id/approve').put(approveProductionHouseRegistration);
+router.route('/production-house-registrations/:id/reject').put(rejectProductionHouseRegistration);
 
 // Casting call management routes
 router.route('/castingcalls').get(getCastingCalls);

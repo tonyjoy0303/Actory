@@ -230,6 +230,7 @@ export default function Header() {
             {canSeeProjects && <NavLink to="/my-projects" className={linkCls} end={true}>My Projects</NavLink>}
             {_optionalChain([user, 'optionalAccess', _ => _.role]) === 'Actor' && <NavLink to="/dashboard/actor" className={linkCls} end={true}>Dashboard</NavLink>}
             {(_optionalChain([user, 'optionalAccess', _2 => _2.role]) === 'Producer' || _optionalChain([user, 'optionalAccess', _3 => _3.role]) === 'ProductionTeam') && <NavLink to="/dashboard/producer" className={linkCls} end={true}>Dashboard</NavLink>}
+            {_optionalChain([user, 'optionalAccess', _4 => _4.role]) === 'Admin' && <NavLink to="/dashboard/admin" className={linkCls} end={true}>Dashboard</NavLink>}
 
             {user && (
               <div className="relative">
@@ -309,7 +310,19 @@ export default function Header() {
                         </div>
                         <div className="hidden md:block absolute inset-y-0 left-1/2 w-px bg-border" />
                       </div>
-                      <div className="px-6 pb-6 text-center text-xs text-muted-foreground">Are you a talent agency? <span className="underline cursor-pointer" onClick={() => { setRegisterOpen(false); navigate('/auth/register/production-team'); }}>Click here.</span></div>
+                      <div className="px-6 pb-6 text-center">
+                        <p className="text-xs text-muted-foreground">Are you a talent agency?</p>
+                        <button
+                          type="button"
+                          className="mt-2 inline-flex items-center rounded-full border border-primary/40 px-4 py-1.5 text-xs font-semibold text-primary hover:bg-primary/10 transition-colors"
+                          onClick={() => {
+                            setRegisterOpen(false);
+                            navigate('/auth/register/production-team');
+                          }}
+                        >
+                          Register your agency
+                        </button>
+                      </div>
                     </DialogContent>
                   </Dialog>
                 </React.Fragment>
@@ -554,26 +567,42 @@ export default function Header() {
                     )}
                   </button>
 
+                  {user.role === 'Admin' && (
+                    <button
+                      onClick={() => {
+                        navigate('/dashboard/admin');
+                        setSidebarOpen(false);
+                      }}
+                      className="w-full px-4 py-3 text-left hover:bg-accent transition-colors flex items-center gap-3"
+                    >
+                      <span>Dashboard</span>
+                    </button>
+                  )}
+
                   {(user.role === 'Producer' || user.role === 'ProductionTeam' || user.role === 'ProductionHouse') && (
                     <>
-                      <button
-                        onClick={() => {
-                          navigate('/projects');
-                          setSidebarOpen(false);
-                        }}
-                        className="w-full px-4 py-3 text-left hover:bg-accent transition-colors flex items-center gap-3"
-                      >
-                        <span>Create Project</span>
-                      </button>
-                      <button
-                        onClick={() => {
-                          navigate('/teams');
-                          setSidebarOpen(false);
-                        }}
-                        className="w-full px-4 py-3 text-left hover:bg-accent transition-colors flex items-center gap-3"
-                      >
-                        <span>Team Collaboration</span>
-                      </button>
+                      {(user.role === 'ProductionTeam' || user.role === 'ProductionHouse') && (
+                        <button
+                          onClick={() => {
+                            navigate('/projects');
+                            setSidebarOpen(false);
+                          }}
+                          className="w-full px-4 py-3 text-left hover:bg-accent transition-colors flex items-center gap-3"
+                        >
+                          <span>Create Project</span>
+                        </button>
+                      )}
+                      {(user.role === 'ProductionTeam' || user.role === 'ProductionHouse') && (
+                        <button
+                          onClick={() => {
+                            navigate('/teams');
+                            setSidebarOpen(false);
+                          }}
+                          className="w-full px-4 py-3 text-left hover:bg-accent transition-colors flex items-center gap-3"
+                        >
+                          <span>Team Collaboration</span>
+                        </button>
+                      )}
                     </>
                   )}
 

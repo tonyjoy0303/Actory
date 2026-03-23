@@ -159,6 +159,7 @@ const UserSchema = new mongoose.Schema({
 
   // Producer-specific
   companyName: { type: String },
+  licenseDocument: { type: String },
   website: { type: String },
   establishedYear: { type: Number },
   teamSize: {
@@ -169,6 +170,20 @@ const UserSchema = new mongoose.Schema({
 
   // Verification status
   isVerified: { type: Boolean, default: false },
+  approvalStatus: {
+    type: String,
+    enum: ['pending', 'approved', 'rejected'],
+    default: 'approved'
+  },
+  approvalReviewedAt: { type: Date },
+  approvalReviewedBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User'
+  },
+  approvalRemarks: {
+    type: String,
+    maxlength: 500
+  },
 
   resetPasswordToken: String,
   resetPasswordExpire: Date,

@@ -43,6 +43,7 @@ const PendingUserSchema = new mongoose.Schema({
   profileImage: { type: String },
   // Producer-specific
   companyName: { type: String },
+  licenseDocument: { type: String },
   website: { type: String },
   establishedYear: { type: Number },
   teamSize: {

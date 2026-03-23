@@ -1,17 +1,31 @@
-import React from 'react'
-const _jsxFileName = ""; function _optionalChain(ops) { let lastAccessLHS = undefined; let value = ops[0]; let i = 1; while (i < ops.length) { const op = ops[i]; const fn = ops[i + 1]; i += 2; if ((op === 'optionalAccess' || op === 'optionalCall') && value == null) { return undefined; } if (op === 'access' || op === 'optionalAccess') { lastAccessLHS = value; value = fn(value); } else if (op === 'call' || op === 'optionalCall') { value = fn((...args) => value.call(lastAccessLHS, ...args)); lastAccessLHS = undefined; } } return value; }import { useEffect, useRef, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
 import axios from 'axios';
 import { toast } from 'sonner';
+import { Plus, Scissors, X } from 'lucide-react';
+
 import API from '@/lib/api';
-import SEO from "@/components/SEO";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import SEO from '@/components/SEO';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Progress } from '@/components/ui/progress';
-import { Plus, X } from 'lucide-react';
+import VideoTimelineSelector from '@/components/VideoTimelineSelector';
+import { trimVideoSegment } from '@/utils/videoTrimmer';
 
-// Define types
+const MAX_VIDEO_DURATION = 240;
+
+function computeAge(dobValue) {
+  if (!dobValue) return NaN;
+  const dob = new Date(dobValue);
+  const today = new Date();
+  let age = today.getFullYear() - dob.getFullYear();
+  const monthDiff = today.getMonth() - dob.getMonth();
+  if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < dob.getDate())) {
+    age -= 1;
+  }
+  return age;
+}
 
 export default function AuditionSubmit() {
   const { castingCallId } = useParams();
@@ -20,8 +34,8 @@ export default function AuditionSubmit() {
   const [castingCall, setCastingCall] = useState(null);
   const [file, setFile] = useState(null);
   const [title, setTitle] = useState('');
-  const [height, setHeight] = useState(''); // cm
-  const [weight, setWeight] = useState(''); // kg
+  const [height, setHeight] = useState('');
+  const [weight, setWeight] = useState('');
   const [age, setAge] = useState('');
   const [skills, setSkills] = useState([]);
   const [skillInput, setSkillInput] = useState('');
@@ -30,31 +44,38 @@ export default function AuditionSubmit() {
   const [dateOfBirth, setDateOfBirth] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
   const [email, setEmail] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [analyzingAI, setAnalyzingAI] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState(0);
+
   const [portfolioFile, setPortfolioFile] = useState(null);
-  const [portfolioUploadProgress, setPortfolioUploadProgress] = useState(0);
   const [idProofFile, setIdProofFile] = useState(null);
-  const [idProofUploadProgress, setIdProofUploadProgress] = useState(0);
   const [webcamPhoto, setWebcamPhoto] = useState(null);
   const [webcamPhotoPreview, setWebcamPhotoPreview] = useState('');
   const [cameraActive, setCameraActive] = useState(false);
-  const videoRef = useRef(null);
+
+  const [loading, setLoading] = useState(false);
+  const [analyzingAI, setAnalyzingAI] = useState(false);
+  const [trimming, setTrimming] = useState(false);
+  const [trimProgress, setTrimProgress] = useState(0);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [portfolioUploadProgress, setPortfolioUploadProgress] = useState(0);
+  const [idProofUploadProgress, setIdProofUploadProgress] = useState(0);
+
+  const [videoSelection, setVideoSelection] = useState({
+    totalDuration: 0,
+    startTime: 0,
+    endTime: 0,
+    selectedDuration: 0,
+    exceedsLimit: false,
+  });
+
   const webcamVideoRef = useRef(null);
   const webcamStreamRef = useRef(null);
+  const selectedPreviewRef = useRef(null);
 
-  // Skills handling functions
-  const handleAddSkill = (e) => {
-    e.preventDefault();
-    if (skillInput.trim() && !skills.includes(skillInput.trim())) {
-      setSkills([...skills, skillInput.trim()]);
-      setSkillInput('');
-    }
-  };
-
-  const handleRemoveSkill = (skillToRemove) => {
-    setSkills(skills.filter(skill => skill !== skillToRemove));
+  const formatTime = (seconds) => {
+    const safe = Math.max(0, Math.floor(Number(seconds) || 0));
+    const m = Math.floor(safe / 60);
+    const s = safe % 60;
+    return `${m}:${String(s).padStart(2, '0')}`;
   };
 
   useEffect(() => {
@@ -62,75 +83,73 @@ export default function AuditionSubmit() {
       try {
         const { data } = await API.get(`/casting/${castingCallId}`);
         setCastingCall(data.data);
-      } catch (error) {
+      } catch {
         toast.error('Failed to load casting call details.');
         navigate('/dashboard/actor');
       }
     };
+
     if (castingCallId) {
       fetchCastingCall();
     }
   }, [castingCallId, navigate]);
 
-  const onDrop = (e) => {
-    e.preventDefault();
-    const f = _optionalChain([e, 'access', _ => _.dataTransfer, 'access', _2 => _2.files, 'optionalAccess', _3 => _3[0]]);
-    if (f && f.type.startsWith('video/')) {
-      setFile(f);
-    } else {
-      toast.error('Please drop a valid video file.');
-    }
-  };
-
-  const onSelect = (e) => {
-    const f = _optionalChain([e, 'access', _4 => _4.target, 'access', _5 => _5.files, 'optionalAccess', _6 => _6[0]]);
-    if (f && f.type.startsWith('video/')) {
-      setFile(f);
-    } else {
-      toast.error('Please select a valid video file.');
-    }
-  };
-
-  const onSelectPortfolio = (e) => {
-    const f = _optionalChain([e, 'access', _ => _.target, 'access', _2 => _2.files, 'optionalAccess', _3 => _3[0]]);
-    const maxBytes = 500 * 1024; // 500 KB
-    if (f && f.type === 'application/pdf') {
-      if (f.size <= maxBytes) {
-        setPortfolioFile(f);
-      } else {
-        setPortfolioFile(null);
-        toast.error('Portfolio PDF must be 500 KB or smaller.');
+  useEffect(() => {
+    return () => {
+      if (webcamStreamRef.current) {
+        webcamStreamRef.current.getTracks().forEach((track) => track.stop());
       }
-    } else {
-      setPortfolioFile(null);
-      toast.error('Please select a valid PDF file for your portfolio.');
+      if (webcamPhotoPreview) {
+        URL.revokeObjectURL(webcamPhotoPreview);
+      }
+    };
+  }, [webcamPhotoPreview]);
+
+  const src = useMemo(() => (file ? URL.createObjectURL(file) : ''), [file]);
+  useEffect(() => {
+    return () => {
+      if (src) URL.revokeObjectURL(src);
+    };
+  }, [src]);
+
+  useEffect(() => {
+    if (!selectedPreviewRef.current || !src) return;
+    const player = selectedPreviewRef.current;
+    const start = Number(videoSelection.startTime || 0);
+    if (Number.isFinite(start)) {
+      player.currentTime = start;
+    }
+  }, [src, videoSelection.startTime, videoSelection.endTime]);
+
+  const handleSelectedPreviewLoadedMetadata = () => {
+    if (!selectedPreviewRef.current) return;
+    const start = Number(videoSelection.startTime || 0);
+    selectedPreviewRef.current.currentTime = start;
+  };
+
+  const handleSelectedPreviewPlay = () => {
+    if (!selectedPreviewRef.current) return;
+    const player = selectedPreviewRef.current;
+    const start = Number(videoSelection.startTime || 0);
+    const end = Number(videoSelection.endTime || 0);
+    if (player.currentTime < start || player.currentTime > end) {
+      player.currentTime = start;
     }
   };
 
-  const onSelectIdProof = (e) => {
-    const f = _optionalChain([e, 'access', _ => _.target, 'access', _2 => _2.files, 'optionalAccess', _3 => _3[0]]);
-    const maxBytes = 2 * 1024 * 1024; // 2 MB
-    if (!f) {
-      setIdProofFile(null);
-      return;
+  const handleSelectedPreviewTimeUpdate = () => {
+    if (!selectedPreviewRef.current) return;
+    const player = selectedPreviewRef.current;
+    const end = Number(videoSelection.endTime || 0);
+    if (end > 0 && player.currentTime >= end) {
+      player.pause();
+      player.currentTime = end;
     }
-    const allowed = f.type.startsWith('image/') || f.type === 'application/pdf';
-    if (!allowed) {
-      setIdProofFile(null);
-      toast.error('ID proof must be an image or PDF.');
-      return;
-    }
-    if (f.size > maxBytes) {
-      setIdProofFile(null);
-      toast.error('ID proof must be 2 MB or smaller.');
-      return;
-    }
-    setIdProofFile(f);
   };
 
   const stopCamera = () => {
     if (webcamStreamRef.current) {
-      webcamStreamRef.current.getTracks().forEach(track => track.stop());
+      webcamStreamRef.current.getTracks().forEach((track) => track.stop());
       webcamStreamRef.current = null;
     }
     setCameraActive(false);
@@ -141,96 +160,157 @@ export default function AuditionSubmit() {
       setCameraActive(true);
       const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } });
       webcamStreamRef.current = stream;
-      
-      // Wait for next frame to ensure video element is rendered
-      await new Promise(resolve => setTimeout(resolve, 100));
-      
       if (webcamVideoRef.current) {
         webcamVideoRef.current.srcObject = stream;
-        try {
-          await webcamVideoRef.current.play();
-        } catch (playErr) {
-          console.warn('Video autoplay blocked, waiting for user interaction:', playErr);
-        }
+        await webcamVideoRef.current.play();
       }
-    } catch (err) {
-      console.error('Camera error:', err);
+    } catch {
       setCameraActive(false);
-      if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
-        toast.error('Camera access denied. Please allow camera permissions in your browser.');
-      } else if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
-        toast.error('No camera found on your device.');
-      } else {
-        toast.error('Unable to access camera. Please check your camera settings.');
-      }
+      toast.error('Unable to access camera. Please check permissions.');
     }
   };
 
   const capturePhoto = () => {
     const videoEl = webcamVideoRef.current;
     if (!videoEl) return;
+
     const canvas = document.createElement('canvas');
     canvas.width = videoEl.videoWidth || 640;
     canvas.height = videoEl.videoHeight || 480;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
-    // Mirror the image horizontally
+
     ctx.translate(canvas.width, 0);
     ctx.scale(-1, 1);
     ctx.drawImage(videoEl, 0, 0, canvas.width, canvas.height);
+
     canvas.toBlob((blob) => {
       if (!blob) return;
+      if (webcamPhotoPreview) {
+        URL.revokeObjectURL(webcamPhotoPreview);
+      }
+      const preview = URL.createObjectURL(blob);
       setWebcamPhoto(blob);
-      setWebcamPhotoPreview(URL.createObjectURL(blob));
+      setWebcamPhotoPreview(preview);
       stopCamera();
     }, 'image/jpeg', 0.9);
   };
 
-  useEffect(() => {
-    return () => stopCamera();
-  }, []);
+  const handleAddSkill = (e) => {
+    e.preventDefault();
+    const cleaned = skillInput.trim();
+    if (cleaned && !skills.includes(cleaned)) {
+      setSkills((prev) => [...prev, cleaned]);
+      setSkillInput('');
+    }
+  };
 
-  function computeAge(d) {
-    try {
-      if (!d) return NaN;
-      const dob = new Date(d);
-      const today = new Date();
-      let age = today.getFullYear() - dob.getFullYear();
-      const m = today.getMonth() - dob.getMonth();
-      if (m < 0 || (m === 0 && today.getDate() < dob.getDate())) age--;
-      return age;
-    } catch { return NaN; }
-  }
+  const handleRemoveSkill = (skillToRemove) => {
+    setSkills((prev) => prev.filter((s) => s !== skillToRemove));
+  };
+
+  const onDrop = (e) => {
+    e.preventDefault();
+    const selected = e.dataTransfer?.files?.[0];
+    if (!selected || !selected.type.startsWith('video/')) {
+      toast.error('Please drop a valid video file.');
+      return;
+    }
+    setFile(selected);
+    setVideoSelection({
+      totalDuration: 0,
+      startTime: 0,
+      endTime: 0,
+      selectedDuration: 0,
+      exceedsLimit: false,
+    });
+  };
+
+  const onSelect = (e) => {
+    const selected = e.target.files?.[0];
+    if (!selected || !selected.type.startsWith('video/')) {
+      toast.error('Please select a valid video file.');
+      return;
+    }
+    setFile(selected);
+    setVideoSelection({
+      totalDuration: 0,
+      startTime: 0,
+      endTime: 0,
+      selectedDuration: 0,
+      exceedsLimit: false,
+    });
+  };
+
+  const onSelectPortfolio = (e) => {
+    const selected = e.target.files?.[0];
+    const maxBytes = 500 * 1024;
+    if (!selected || selected.type !== 'application/pdf') {
+      setPortfolioFile(null);
+      toast.error('Please select a valid PDF file for your portfolio.');
+      return;
+    }
+    if (selected.size > maxBytes) {
+      setPortfolioFile(null);
+      toast.error('Portfolio PDF must be 500 KB or smaller.');
+      return;
+    }
+    setPortfolioFile(selected);
+  };
+
+  const onSelectIdProof = (e) => {
+    const selected = e.target.files?.[0];
+    const maxBytes = 2 * 1024 * 1024;
+    if (!selected) {
+      setIdProofFile(null);
+      return;
+    }
+    const allowed = selected.type.startsWith('image/') || selected.type === 'application/pdf';
+    if (!allowed) {
+      setIdProofFile(null);
+      toast.error('ID proof must be an image or PDF.');
+      return;
+    }
+    if (selected.size > maxBytes) {
+      setIdProofFile(null);
+      toast.error('ID proof must be 2 MB or smaller.');
+      return;
+    }
+    setIdProofFile(selected);
+  };
 
   const handleSubmit = async () => {
-    // Basic validation
     const h = Number(height);
     const w = Number(weight);
     const a = Number(age);
 
-    if (!file || !portfolioFile || !idProofFile || !webcamPhoto || !title || !height || !weight || !age || skills.length === 0 || 
-        !permanentAddress || !livingCity || !dateOfBirth || !phoneNumber) {
-      toast.error('Please fill all fields, select a video, upload your portfolio PDF, provide ID proof, capture a webcam photo, and add at least one skill.');
+    if (!file || !portfolioFile || !idProofFile || !webcamPhoto || !title || !height || !weight || !age || skills.length === 0 || !permanentAddress || !livingCity || !dateOfBirth || !phoneNumber) {
+      toast.error('Please fill all fields, select a video, upload portfolio, provide ID proof, capture webcam photo, and add at least one skill.');
       return;
     }
-    if (portfolioFile && portfolioFile.size > 500 * 1024) {
-      toast.error('Portfolio PDF must be 500 KB or smaller.');
+
+    if (!videoSelection.selectedDuration || videoSelection.selectedDuration > MAX_VIDEO_DURATION) {
+      toast.error('Please select a valid video duration up to 4 minutes.');
       return;
     }
+
     if (Number.isNaN(h) || Number.isNaN(w) || Number.isNaN(a) || h <= 0 || w <= 0 || a <= 0) {
       toast.error('Please enter valid numeric values for height, weight, and age.');
       return;
     }
+
     const todayStr = new Date().toISOString().split('T')[0];
     if (!dateOfBirth || dateOfBirth > todayStr) {
       toast.error('Please enter a valid date of birth (not in the future).');
       return;
     }
+
     const derivedAge = computeAge(dateOfBirth);
     if (!Number.isFinite(derivedAge) || derivedAge <= 0 || derivedAge > 120) {
       toast.error('Please enter a valid date of birth.');
       return;
     }
+
     if (a !== derivedAge) {
       setAge(String(derivedAge));
       toast.error('Age does not match date of birth. It was auto-corrected.');
@@ -239,108 +319,103 @@ export default function AuditionSubmit() {
 
     setLoading(true);
 
-    const formData = new FormData();
-    formData.append('file', file);
-    formData.append('upload_preset', import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET);
-
-    const portfolioForm = new FormData();
-    portfolioForm.append('file', portfolioFile);
-    const portfolioPreset = import.meta.env.VITE_CLOUDINARY_PORTFOLIO_PRESET || import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET;
-    if (!portfolioPreset) {
-      toast.error('Missing Cloudinary unsigned upload preset for portfolio (VITE_CLOUDINARY_PORTFOLIO_PRESET).');
-      setLoading(false);
-      return;
-    }
-    portfolioForm.append('upload_preset', portfolioPreset);
-    portfolioForm.append('folder', 'portfolio');
-
-    const idProofForm = new FormData();
-    idProofForm.append('file', idProofFile);
-    const idProofPreset = import.meta.env.VITE_CLOUDINARY_IDPROOF_PRESET || portfolioPreset;
-    if (!idProofPreset) {
-      toast.error('Missing Cloudinary unsigned upload preset for ID proof (VITE_CLOUDINARY_IDPROOF_PRESET).');
-      setLoading(false);
-      return;
-    }
-    idProofForm.append('upload_preset', idProofPreset);
-    idProofForm.append('folder', 'id-proof');
-
-    const webcamForm = new FormData();
-    const webcamFile = new File([webcamPhoto], 'webcam.jpg', { type: 'image/jpeg' });
-    webcamForm.append('file', webcamFile);
-    const webcamPreset = import.meta.env.VITE_CLOUDINARY_WEBCAM_PRESET || import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET;
-    if (!webcamPreset) {
-      toast.error('Missing Cloudinary unsigned upload preset for webcam photo (VITE_CLOUDINARY_WEBCAM_PRESET).');
-      setLoading(false);
-      return;
-    }
-    webcamForm.append('upload_preset', webcamPreset);
-    webcamForm.append('folder', 'webcam');
-
     try {
-      // 1. Upload to Cloudinary
-      const cloudinaryRes = await axios.post(
+      let videoFileToUpload = file;
+      const needsTrim = videoSelection.startTime > 0 || videoSelection.endTime < videoSelection.totalDuration;
+
+      if (needsTrim) {
+        setTrimming(true);
+        setTrimProgress(0);
+        toast.info('Trimming selected video segment...');
+        videoFileToUpload = await trimVideoSegment(
+          file,
+          videoSelection.startTime,
+          videoSelection.endTime,
+          (progress) => setTrimProgress(progress)
+        );
+        setTrimming(false);
+        toast.success('Video segment trimmed. Starting upload...');
+      }
+
+      const videoForm = new FormData();
+      videoForm.append('file', videoFileToUpload);
+      videoForm.append('upload_preset', import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET);
+
+      const portfolioPreset = import.meta.env.VITE_CLOUDINARY_PORTFOLIO_PRESET || import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET;
+      const idProofPreset = import.meta.env.VITE_CLOUDINARY_IDPROOF_PRESET || portfolioPreset;
+      const webcamPreset = import.meta.env.VITE_CLOUDINARY_WEBCAM_PRESET || import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET;
+
+      if (!portfolioPreset || !idProofPreset || !webcamPreset) {
+        throw new Error('Missing Cloudinary upload presets.');
+      }
+
+      const portfolioForm = new FormData();
+      portfolioForm.append('file', portfolioFile);
+      portfolioForm.append('upload_preset', portfolioPreset);
+      portfolioForm.append('folder', 'portfolio');
+
+      const idProofForm = new FormData();
+      idProofForm.append('file', idProofFile);
+      idProofForm.append('upload_preset', idProofPreset);
+      idProofForm.append('folder', 'id-proof');
+
+      const webcamForm = new FormData();
+      webcamForm.append('file', new File([webcamPhoto], 'webcam.jpg', { type: 'image/jpeg' }));
+      webcamForm.append('upload_preset', webcamPreset);
+      webcamForm.append('folder', 'webcam');
+
+      const cloudinaryVideoRes = await axios.post(
         `https://api.cloudinary.com/v1_1/${import.meta.env.VITE_CLOUDINARY_CLOUD_NAME}/video/upload`,
-        formData,
+        videoForm,
         {
           headers: { 'Content-Type': 'multipart/form-data' },
-          onUploadProgress: (progressEvent) => {
-            const percent = Math.round((progressEvent.loaded * 100) / (progressEvent.total || 1));
+          onUploadProgress: (evt) => {
+            const percent = Math.round((evt.loaded * 100) / (evt.total || 1));
             setUploadProgress(percent);
           },
         }
       );
 
-      const { secure_url, public_id } = cloudinaryRes.data;
-
-      // Upload portfolio PDF via image endpoint (works with unsigned presets)
       const portfolioRes = await axios.post(
         `https://api.cloudinary.com/v1_1/${import.meta.env.VITE_CLOUDINARY_CLOUD_NAME}/image/upload`,
         portfolioForm,
         {
           headers: { 'Content-Type': 'multipart/form-data' },
-          onUploadProgress: (progressEvent) => {
-            const percent = Math.round((progressEvent.loaded * 100) / (progressEvent.total || 1));
+          onUploadProgress: (evt) => {
+            const percent = Math.round((evt.loaded * 100) / (evt.total || 1));
             setPortfolioUploadProgress(percent);
           },
         }
       );
-      const portfolioUrl = _optionalChain([portfolioRes, 'access', _ => _.data, 'optionalAccess', _2 => _2.secure_url]);
 
-      // Upload ID proof (raw endpoint supports PDF and images)
       const idProofRes = await axios.post(
         `https://api.cloudinary.com/v1_1/${import.meta.env.VITE_CLOUDINARY_CLOUD_NAME}/raw/upload`,
         idProofForm,
         {
           headers: { 'Content-Type': 'multipart/form-data' },
-          onUploadProgress: (progressEvent) => {
-            const percent = Math.round((progressEvent.loaded * 100) / (progressEvent.total || 1));
+          onUploadProgress: (evt) => {
+            const percent = Math.round((evt.loaded * 100) / (evt.total || 1));
             setIdProofUploadProgress(percent);
           },
         }
       );
-      const idProofUrl = _optionalChain([idProofRes, 'access', _ => _.data, 'optionalAccess', _2 => _2.secure_url]);
 
-      // Upload webcam photo
       const webcamRes = await axios.post(
         `https://api.cloudinary.com/v1_1/${import.meta.env.VITE_CLOUDINARY_CLOUD_NAME}/image/upload`,
         webcamForm,
-        {
-          headers: { 'Content-Type': 'multipart/form-data' },
-        }
+        { headers: { 'Content-Type': 'multipart/form-data' } }
       );
-      const webcamPhotoUrl = _optionalChain([webcamRes, 'access', _ => _.data, 'optionalAccess', _2 => _2.secure_url]);
 
-      // 2. Submit to our backend (with AI analysis)
       setUploadProgress(100);
       setAnalyzingAI(true);
-      toast.info('Upload complete! Analyzing your video performance... This may take a few minutes.');
-      
-      const response = await API.post(`/casting/${castingCallId}/videos`,
-        { 
+      toast.info('Upload complete! Analyzing your video performance...');
+
+      await API.post(
+        `/casting/${castingCallId}/videos`,
+        {
           title,
-          videoUrl: secure_url,
-          cloudinaryId: public_id,
+          videoUrl: cloudinaryVideoRes.data.secure_url,
+          cloudinaryId: cloudinaryVideoRes.data.public_id,
           castingCall: castingCallId,
           height: h,
           weight: w,
@@ -351,231 +426,266 @@ export default function AuditionSubmit() {
           dateOfBirth,
           phoneNumber,
           email,
-          portfolioUrl,
-          idProofUrl,
-          webcamPhotoUrl,
-          // Add video metadata for quality assessment
-          videoHeight: videoRef.current?.videoHeight || 720,
-          duration: videoRef.current?.duration || 0,
-          brightness: 0.75, // Default initial values
-          audioQuality: 0.8, // Default initial values
-          retakes: 1
+          portfolioUrl: portfolioRes.data?.secure_url,
+          idProofUrl: idProofRes.data?.secure_url,
+          webcamPhotoUrl: webcamRes.data?.secure_url,
+          videoHeight: 720,
+          duration: videoSelection.selectedDuration,
+          brightness: 0.75,
+          audioQuality: 0.8,
+          retakes: 1,
+          cropData: {
+            startTime: videoSelection.startTime,
+            endTime: videoSelection.endTime,
+            croppedDuration: videoSelection.selectedDuration,
+            originalDuration: videoSelection.totalDuration,
+          },
         },
-        {
-          timeout: 360000 // 6 minutes to allow for video download and AI emotion analysis
-        }
+        { timeout: 360000 }
       );
 
-      // Show quality assessment feedback
-      const quality = response.data.data.qualityAssessment;
-      if (quality) {
-        const levelColors = {
-          High: 'text-green-500',
-          Medium: 'text-yellow-500',
-          Low: 'text-red-500'
-        };
-        
-        toast.success(
-          <div>
-            <p>Audition submitted successfully!</p>
-            <p className={`mt-1 ${levelColors[quality.level]}`}>
-              Quality Assessment: {quality.level} ({Math.round(quality.score * 100)}%)
-            </p>
-          </div>
-        );
-      } else {
-        toast.success('Audition submitted successfully!');
-      }
-      
+      toast.success('Audition submitted successfully!');
       navigate('/dashboard/actor');
-
     } catch (error) {
-      // Surface Cloudinary error details when available to aid troubleshooting
-      const msg = _optionalChain([error, 'optionalAccess', _7 => _7.response, 'optionalAccess', _8 => _8.data, 'optionalAccess', _9 => _9.error])?.message
-        || _optionalChain([error, 'optionalAccess', _10 => _10.response, 'optionalAccess', _11 => _11.data, 'optionalAccess', _12 => _12.message])
-        || 'Submission failed. Please try again.';
-      console.error('Upload error:', _optionalChain([error, 'optionalAccess', _13 => _13.response, 'optionalAccess', _14 => _14.data]) || error);
-      toast.error(msg);
+      const message =
+        error?.response?.data?.error?.message ||
+        error?.response?.data?.message ||
+        error?.message ||
+        'Submission failed. Please try again.';
+      toast.error(message);
     } finally {
       setLoading(false);
       setAnalyzingAI(false);
+      setTrimming(false);
     }
   };
 
-  const src = file ? URL.createObjectURL(file) : undefined;
-
   return (
-    React.createElement(React.Fragment, null
-      , React.createElement(SEO, { title: "Audition Submission" , description: "Upload your audition video with a simple drag-and-drop interface."        , __self: this, __source: {fileName: _jsxFileName, lineNumber: 141}} )
-      , React.createElement('section', { className: "container py-8 max-w-3xl"  , __self: this, __source: {fileName: _jsxFileName, lineNumber: 142}}
-        , React.createElement(Card, {__self: this, __source: {fileName: _jsxFileName, lineNumber: 143}}
-          , React.createElement(CardHeader, {__self: this, __source: {fileName: _jsxFileName, lineNumber: 144}}
-            , React.createElement(CardTitle, { className: "font-display", __self: this, __source: {fileName: _jsxFileName, lineNumber: 145}}, "Submit Your Audition for: "    , (_optionalChain([castingCall, 'optionalAccess', _10 => _10.roleTitle]) || _optionalChain([castingCall, 'optionalAccess', _11 => _11.roleName])) || '...')
-            , React.createElement('p', { className: "text-muted-foreground text-sm pt-2"  , __self: this, __source: {fileName: _jsxFileName, lineNumber: 146}}, _optionalChain([castingCall, 'optionalAccess', _11 => _11.description]))
-            , castingCall && (
-              React.createElement('div', { className: "mt-3 grid gap-2 text-sm text-muted-foreground"    , __self: this, __source: {fileName: _jsxFileName, lineNumber: 148}}
-                , castingCall.location && (
-                  React.createElement('div', {__self: this, __source: {fileName: _jsxFileName, lineNumber: 150}}, React.createElement('span', { className: "font-medium text-foreground" , __self: this, __source: {fileName: _jsxFileName, lineNumber: 150}}, "Location:"), " " , castingCall.location)
-                )
-                , castingCall.ageRange && (
-                  React.createElement('div', {__self: this, __source: {fileName: _jsxFileName, lineNumber: 153}}, 
-                    React.createElement('span', { className: "font-medium text-foreground" , __self: this, __source: {fileName: _jsxFileName, lineNumber: 153}}, "Age Range:" ), " " , castingCall.ageRange.min, " - ", castingCall.ageRange.max, " years"
-                  )
-                )
-                , (castingCall.auditionDate || castingCall.shootingStartDate || castingCall.shootingEndDate) && (
-                  React.createElement('div', { className: "grid grid-cols-1 sm:grid-cols-3 gap-2"   , __self: this, __source: {fileName: _jsxFileName, lineNumber: 156}}
-                    , castingCall.auditionDate && (
-                      React.createElement('div', {__self: this, __source: {fileName: _jsxFileName, lineNumber: 158}}, React.createElement('span', { className: "font-medium text-foreground" , __self: this, __source: {fileName: _jsxFileName, lineNumber: 158}}, "Audition:"), " " , new Date(castingCall.auditionDate).toLocaleDateString())
-                    )
-                    , castingCall.shootingStartDate && (
-                      React.createElement('div', {__self: this, __source: {fileName: _jsxFileName, lineNumber: 161}}, React.createElement('span', { className: "font-medium text-foreground" , __self: this, __source: {fileName: _jsxFileName, lineNumber: 161}}, "Shoot Start:" ), " " , new Date(castingCall.shootingStartDate).toLocaleDateString())
-                    )
-                    , castingCall.shootingEndDate && (
-                      React.createElement('div', {__self: this, __source: {fileName: _jsxFileName, lineNumber: 164}}, React.createElement('span', { className: "font-medium text-foreground" , __self: this, __source: {fileName: _jsxFileName, lineNumber: 164}}, "Shoot End:" ), " " , new Date(castingCall.shootingEndDate).toLocaleDateString())
-                    )
-                  )
-                )
-                , _optionalChain([castingCall, 'access', _12 => _12.skills, 'optionalAccess', _13 => _13.length]) ? (
-                  React.createElement('div', { className: "flex flex-wrap gap-2"  , __self: this, __source: {fileName: _jsxFileName, lineNumber: 169}}
-                    , castingCall.skills.map((s) => (
-                      React.createElement('span', { key: s, className: "px-2 py-1 rounded-full bg-secondary text-xs"    , __self: this, __source: {fileName: _jsxFileName, lineNumber: 171}}, s)
-                    ))
-                  )
-                ) : null
-                , React.createElement('div', {__self: this, __source: {fileName: _jsxFileName, lineNumber: 175}}
-                  , React.createElement('span', { className: "font-medium text-foreground" , __self: this, __source: {fileName: _jsxFileName, lineNumber: 176}}, "Producer:"), " " , typeof castingCall.producer === 'object' ? _optionalChain([castingCall, 'access', _14 => _14.producer, 'optionalAccess', _15 => _15.name]) : '—'
-                  , typeof castingCall.producer === 'object' && _optionalChain([castingCall, 'access', _16 => _16.producer, 'optionalAccess', _17 => _17.email]) ? ` • ${castingCall.producer.email}` : ''
-                )
-              )
-            )
-          )
-          , React.createElement(CardContent, {__self: this, __source: {fileName: _jsxFileName, lineNumber: 182}}
-            , React.createElement('div', {
-              className: "border-dashed border-2 rounded-lg p-10 text-center bg-card hover:shadow-[var(--shadow-elegant)] transition-shadow"       ,
-              onDragOver: (e) => e.preventDefault(),
-              onDrop: onDrop, __self: this, __source: {fileName: _jsxFileName, lineNumber: 183}}
+    <>
+      <SEO title="Audition Submission" description="Upload your audition video and submit only your best segment." />
+      <section className="container py-8 max-w-3xl">
+        <Card>
+          <CardHeader>
+            <CardTitle className="font-display">
+              Submit Your Audition for: {castingCall?.roleTitle || castingCall?.roleName || '...'}
+            </CardTitle>
+            <p className="text-muted-foreground text-sm pt-2">{castingCall?.description}</p>
+          </CardHeader>
 
-              , React.createElement('p', { className: "text-muted-foreground", __self: this, __source: {fileName: _jsxFileName, lineNumber: 188}}, "Drag & drop your video here, or click to select a file"           )
-              , React.createElement('div', { className: "mt-4", __self: this, __source: {fileName: _jsxFileName, lineNumber: 189}}
-                , React.createElement(Input, { id: "file-upload", type: "file", accept: "video/*", onChange: onSelect, className: "sr-only", __self: this, __source: {fileName: _jsxFileName, lineNumber: 190}} )
-                , React.createElement(Button, { asChild: true, variant: "secondary", __self: this, __source: {fileName: _jsxFileName, lineNumber: 191}}
-                  , React.createElement('label', { htmlFor: "file-upload", __self: this, __source: {fileName: _jsxFileName, lineNumber: 192}}, "Choose File" )
-                )
-              )
-            )
+          <CardContent>
+            <div
+              className="border-dashed border-2 rounded-lg p-10 text-center bg-card hover:shadow-[var(--shadow-elegant)] transition-shadow"
+              onDragOver={(e) => e.preventDefault()}
+              onDrop={onDrop}
+            >
+              <p className="text-muted-foreground">Drag & drop your video here, or click to select a file</p>
+              <p className="text-xs text-amber-600 dark:text-amber-500 mt-2">Only 4 minutes maximum. If your video is longer, select any segment up to 4 minutes using the timeline below.</p>
+              <div className="mt-4">
+                <Input id="file-upload" type="file" accept="video/*" onChange={onSelect} className="sr-only" />
+                <Button asChild variant="secondary">
+                  <label htmlFor="file-upload">Choose File</label>
+                </Button>
+              </div>
+            </div>
 
-            , React.createElement('div', { className: "mt-6 grid gap-4"  , __self: this, __source: {fileName: _jsxFileName, lineNumber: 197}}
-              , React.createElement(Input, { 
-                placeholder: "Give your audition a title (e.g., 'Dramatic Monologue')"       ,
-                value: title,
-                onChange: (e) => setTitle(e.target.value),
-                disabled: loading, __self: this, __source: {fileName: _jsxFileName, lineNumber: 198}}
-              )
+            {file && (
+              <div className="mt-6 space-y-4">
+                <div className="rounded-md border p-3 text-sm bg-muted/30 flex items-center gap-2">
+                  <Scissors className="h-4 w-4" />
+                  Timeline selection is mandatory. Uploaded submission will include only the selected range.
+                </div>
+                <VideoTimelineSelector
+                  file={file}
+                  maxDuration={MAX_VIDEO_DURATION}
+                  onSelectionChange={setVideoSelection}
+                />
+              </div>
+            )}
 
-              /* Additional required fields */
-              , React.createElement('div', { className: "grid grid-cols-1 sm:grid-cols-2 gap-4"   , __self: this, __source: {fileName: _jsxFileName, lineNumber: 206}}
-                , React.createElement('div', {__self: this, __source: {fileName: _jsxFileName, lineNumber: 207}}
-                  , React.createElement('label', { className: "block text-sm mb-1"  , __self: this, __source: {fileName: _jsxFileName, lineNumber: 208}}, "Height (cm)" )
-                  , React.createElement(Input, { type: "number", inputMode: "numeric", min: 50, max: 300, step: 1, placeholder: "e.g., 175" , value: height, onChange: (e) => setHeight(e.target.value), disabled: loading, __self: this, __source: {fileName: _jsxFileName, lineNumber: 209}} )
-                )
-                , React.createElement('div', {__self: this, __source: {fileName: _jsxFileName, lineNumber: 211}}
-                  , React.createElement('label', { className: "block text-sm mb-1"  , __self: this, __source: {fileName: _jsxFileName, lineNumber: 212}}, "Weight (kg)" )
-                  , React.createElement(Input, { type: "number", inputMode: "numeric", min: 10, max: 500, step: 1, placeholder: "e.g., 70" , value: weight, onChange: (e) => setWeight(e.target.value), disabled: loading, __self: this, __source: {fileName: _jsxFileName, lineNumber: 213}} )
-                )
-                , React.createElement('div', {__self: this, __source: {fileName: _jsxFileName, lineNumber: 215}}
-                  , React.createElement('label', { className: "block text-sm mb-1"  , __self: this, __source: {fileName: _jsxFileName, lineNumber: 216}}, "Age")
-                  , React.createElement(Input, { type: "number", inputMode: "numeric", min: 1, max: 120, step: 1, placeholder: "e.g., 26" , value: age, onChange: (e) => setAge(e.target.value), disabled: loading, __self: this, __source: {fileName: _jsxFileName, lineNumber: 217}} )
-                )
-              )
+            <div className="mt-6 grid gap-4">
+              <Input
+                placeholder="Give your audition a title (e.g., Dramatic Monologue)"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                disabled={loading}
+              />
 
-              /* Personal Information Fields */
-              , React.createElement('div', { className: "grid grid-cols-1 sm:grid-cols-2 gap-4"   , __self: this, __source: {fileName: _jsxFileName, lineNumber: 220}}
-                , React.createElement('div', {__self: this, __source: {fileName: _jsxFileName, lineNumber: 221}}
-                  , React.createElement('label', { className: "block text-sm mb-1"  , __self: this, __source: {fileName: _jsxFileName, lineNumber: 222}}, "Permanent Address *")
-                  , React.createElement(Input, { type: "text", placeholder: "Enter your permanent address" , value: permanentAddress, onChange: (e) => setPermanentAddress(e.target.value), disabled: loading, __self: this, __source: {fileName: _jsxFileName, lineNumber: 223}} )
-                )
-                , React.createElement('div', {__self: this, __source: {fileName: _jsxFileName, lineNumber: 225}}
-                  , React.createElement('label', { className: "block text-sm mb-1"  , __self: this, __source: {fileName: _jsxFileName, lineNumber: 226}}, "Living City *")
-                  , React.createElement(Input, { type: "text", placeholder: "Enter your current city" , value: livingCity, onChange: (e) => setLivingCity(e.target.value), disabled: loading, __self: this, __source: {fileName: _jsxFileName, lineNumber: 227}} )
-                )
-                , React.createElement('div', {__self: this, __source: {fileName: _jsxFileName, lineNumber: 229}}
-                  , React.createElement('label', { className: "block text-sm mb-1"  , __self: this, __source: {fileName: _jsxFileName, lineNumber: 230}}, "Date of Birth *")
-                  , React.createElement(Input, { type: "date", value: dateOfBirth, max: new Date().toISOString().split('T')[0], onChange: (e) => { setDateOfBirth(e.target.value); const ag = computeAge(e.target.value); if (Number.isFinite(ag)) setAge(String(ag)); }, disabled: loading, __self: this, __source: {fileName: _jsxFileName, lineNumber: 231}} )
-                )
-                , React.createElement('div', {__self: this, __source: {fileName: _jsxFileName, lineNumber: 233}}
-                  , React.createElement('label', { className: "block text-sm mb-1"  , __self: this, __source: {fileName: _jsxFileName, lineNumber: 234}}, "Phone Number *")
-                  , React.createElement(Input, { type: "tel", placeholder: "Enter your phone number" , value: phoneNumber, onChange: (e) => setPhoneNumber(e.target.value), disabled: loading, __self: this, __source: {fileName: _jsxFileName, lineNumber: 235}} )
-                )
-                , React.createElement('div', { className: "sm:col-span-2" , __self: this, __source: {fileName: _jsxFileName, lineNumber: 237}}
-                  , React.createElement('label', { className: "block text-sm mb-1"  , __self: this, __source: {fileName: _jsxFileName, lineNumber: 238}}, "Email Address (Optional)")
-                  , React.createElement(Input, { type: "email", placeholder: "Enter your email address (optional)" , value: email, onChange: (e) => setEmail(e.target.value), disabled: loading, __self: this, __source: {fileName: _jsxFileName, lineNumber: 239}} )
-                )
-              )
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-sm mb-1">Height (cm)</label>
+                  <Input type="number" min={50} max={300} step={1} value={height} onChange={(e) => setHeight(e.target.value)} disabled={loading} />
+                </div>
+                <div>
+                  <label className="block text-sm mb-1">Weight (kg)</label>
+                  <Input type="number" min={10} max={500} step={1} value={weight} onChange={(e) => setWeight(e.target.value)} disabled={loading} />
+                </div>
+                <div>
+                  <label className="block text-sm mb-1">Age</label>
+                  <Input type="number" min={1} max={120} step={1} value={age} onChange={(e) => setAge(e.target.value)} disabled={loading} />
+                </div>
+              </div>
 
-              /* Skills Section */
-              , React.createElement('div', { className: "grid grid-cols-1"   , __self: this, __source: {fileName: _jsxFileName, lineNumber: 241}}
-                  , React.createElement('div', { className: "md:col-span-2" , __self: this, __source: {fileName: _jsxFileName, lineNumber: 222}}
-                    , React.createElement('label', { className: "block text-sm mb-1"  , __self: this, __source: {fileName: _jsxFileName, lineNumber: 223}}, "Skills *")
-                    , React.createElement('div', { className: "flex gap-2" , __self: this, __source: {fileName: _jsxFileName, lineNumber: 224}}
-                      , React.createElement(Input, { placeholder: "Add a skill (e.g., Dancing, Martial Arts)" , value: skillInput, onChange: (e) => setSkillInput(e.target.value), onKeyDown: (e) => e.key === 'Enter' && handleAddSkill(e), disabled: loading, __self: this, __source: {fileName: _jsxFileName, lineNumber: 225}} )
-                      , React.createElement(Button, { type: "button", variant: "outline", size: "icon", onClick: handleAddSkill, disabled: loading, __self: this, __source: {fileName: _jsxFileName, lineNumber: 226}}
-                        , React.createElement(Plus, { className: "h-4 w-4" , __self: this, __source: {fileName: _jsxFileName, lineNumber: 227}} )
-                      )
-                    )
-                    , React.createElement('div', { className: "flex flex-wrap gap-2 mt-2" , __self: this, __source: {fileName: _jsxFileName, lineNumber: 228}}
-                      , skills.map((skill) => (
-                        React.createElement('div', { key: skill, className: "flex items-center gap-1 bg-secondary px-2 py-1 rounded-md text-sm"  , __self: this, __source: {fileName: _jsxFileName, lineNumber: 230}}
-                          , skill
-                          , React.createElement('button', { type: "button", onClick: () => handleRemoveSkill(skill), className: "text-muted-foreground hover:text-foreground" , __self: this, __source: {fileName: _jsxFileName, lineNumber: 231}}
-                            , React.createElement(X, { className: "h-3 w-3" , __self: this, __source: {fileName: _jsxFileName, lineNumber: 232}} )
-                          )
-                        )
-                      ))
-                    )
-                  )
-                  , React.createElement('div', {__self: this, __source: {fileName: _jsxFileName, lineNumber: 235}}
-                    , React.createElement('label', { className: "block text-sm mb-1"  , __self: this, __source: {fileName: _jsxFileName, lineNumber: 236}}, "Portfolio (PDF)")
-                    , React.createElement(Input, { type: "file", accept: "application/pdf", onChange: onSelectPortfolio, disabled: loading, __self: this, __source: {fileName: _jsxFileName, lineNumber: 237}} )
-                    , portfolioFile ? React.createElement('p', { className: "text-xs text-muted-foreground mt-1" , __self: this, __source: {fileName: _jsxFileName, lineNumber: 238}}, _optionalChain([portfolioFile, 'access', _ => _.name])) : null
-                  )
-                  , React.createElement('div', {__self: this, __source: {fileName: _jsxFileName, lineNumber: 239}}
-                    , React.createElement('label', { className: "block text-sm mb-1"  , __self: this, __source: {fileName: _jsxFileName, lineNumber: 240}}, "Government ID Proof *")
-                    , React.createElement(Input, { type: "file", accept: "application/pdf,image/*", onChange: onSelectIdProof, disabled: loading, __self: this, __source: {fileName: _jsxFileName, lineNumber: 241}} )
-                    , idProofFile ? React.createElement('p', { className: "text-xs text-muted-foreground mt-1" , __self: this, __source: {fileName: _jsxFileName, lineNumber: 242}}, _optionalChain([idProofFile, 'access', _ => _.name])) : null
-                  )
-                  , React.createElement('div', { className: "space-y-2"  , __self: this, __source: {fileName: _jsxFileName, lineNumber: 243}}
-                    , React.createElement('label', { className: "block text-sm mb-1"  , __self: this, __source: {fileName: _jsxFileName, lineNumber: 244}}, "Webcam Photo *")
-                    , webcamPhotoPreview && React.createElement('img', { src: webcamPhotoPreview, alt: "Webcam capture", className: "w-full max-w-sm rounded-md border", style: { transform: 'scaleX(-1)' }, __self: this, __source: {fileName: _jsxFileName, lineNumber: 245}} )
-                    , (!webcamPhotoPreview && cameraActive) && React.createElement('video', { ref: webcamVideoRef, className: "w-full max-w-sm rounded-md border bg-black", style: { transform: 'scaleX(-1)' }, autoPlay: true, playsInline: true, muted: true, __self: this, __source: {fileName: _jsxFileName, lineNumber: 246}} )
-                    , React.createElement('div', { className: "flex gap-2"  , __self: this, __source: {fileName: _jsxFileName, lineNumber: 247}}
-                      , (!cameraActive && !webcamPhotoPreview) && React.createElement(Button, { type: "button", variant: "secondary", onClick: startCamera, disabled: loading, __self: this, __source: {fileName: _jsxFileName, lineNumber: 248}}, "Start Camera")
-                      , cameraActive && React.createElement(Button, { type: "button", variant: "secondary", onClick: capturePhoto, disabled: loading, __self: this, __source: {fileName: _jsxFileName, lineNumber: 249}}, "Capture Photo")
-                      , cameraActive && React.createElement(Button, { type: "button", variant: "outline", onClick: stopCamera, disabled: loading, __self: this, __source: {fileName: _jsxFileName, lineNumber: 250}}, "Cancel")
-                      , webcamPhotoPreview && React.createElement(Button, { type: "button", variant: "outline", onClick: () => { setWebcamPhoto(null); setWebcamPhotoPreview(''); startCamera(); }, disabled: loading, __self: this, __source: {fileName: _jsxFileName, lineNumber: 251}}, "Retake")
-                    )
-                    , React.createElement('p', { className: "text-xs text-muted-foreground"  , __self: this, __source: {fileName: _jsxFileName, lineNumber: 252}}, "Use your device camera to capture a clear photo.")
-                  )
-              )
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm mb-1">Permanent Address *</label>
+                  <Input value={permanentAddress} onChange={(e) => setPermanentAddress(e.target.value)} disabled={loading} />
+                </div>
+                <div>
+                  <label className="block text-sm mb-1">Living City *</label>
+                  <Input value={livingCity} onChange={(e) => setLivingCity(e.target.value)} disabled={loading} />
+                </div>
+                <div>
+                  <label className="block text-sm mb-1">Date of Birth *</label>
+                  <Input
+                    type="date"
+                    value={dateOfBirth}
+                    max={new Date().toISOString().split('T')[0]}
+                    onChange={(e) => {
+                      setDateOfBirth(e.target.value);
+                      const calculated = computeAge(e.target.value);
+                      if (Number.isFinite(calculated)) setAge(String(calculated));
+                    }}
+                    disabled={loading}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm mb-1">Phone Number *</label>
+                  <Input type="tel" value={phoneNumber} onChange={(e) => setPhoneNumber(e.target.value)} disabled={loading} />
+                </div>
+                <div className="sm:col-span-2">
+                  <label className="block text-sm mb-1">Email Address (Optional)</label>
+                  <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} disabled={loading} />
+                </div>
+              </div>
 
-              , src && (
-                React.createElement('video', { ref: videoRef, controls: true, className: "w-full rounded-md shadow"  , __self: this, __source: {fileName: _jsxFileName, lineNumber: 226}}
-                  , React.createElement('source', { src: src, __self: this, __source: {fileName: _jsxFileName, lineNumber: 227}} )
-                )
-              )
-              , loading && React.createElement('div', { className: "space-y-2", __self: this, __source: {fileName: _jsxFileName, lineNumber: 230}}
-                , React.createElement(Progress, { value: uploadProgress, className: "w-full", __self: this, __source: {fileName: _jsxFileName, lineNumber: 231}} )
-                , portfolioFile && React.createElement(Progress, { value: portfolioUploadProgress, className: "w-full", __self: this, __source: {fileName: _jsxFileName, lineNumber: 232}} )
-                , idProofFile && React.createElement(Progress, { value: idProofUploadProgress, className: "w-full", __self: this, __source: {fileName: _jsxFileName, lineNumber: 233}} )
-              )
-              , React.createElement('div', { className: "mt-2 flex justify-end"  , __self: this, __source: {fileName: _jsxFileName, lineNumber: 231}}
-                , React.createElement(Button, { variant: "hero", className: "hover-scale", onClick: handleSubmit, disabled: loading || !file || !portfolioFile || !idProofFile || !webcamPhoto, __self: this, __source: {fileName: _jsxFileName, lineNumber: 232}}
-                  , loading ? (analyzingAI ? '🤖 Analyzing video performance... Please wait' : `Uploading... ${uploadProgress}%`) : 'Submit Audition'
-                )
-              )
-            )
-          )
-        )
-      )
-    )
+              <div>
+                <label className="block text-sm mb-1">Skills *</label>
+                <div className="flex gap-2">
+                  <Input
+                    placeholder="Add a skill (e.g., Dancing, Martial Arts)"
+                    value={skillInput}
+                    onChange={(e) => setSkillInput(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && handleAddSkill(e)}
+                    disabled={loading}
+                  />
+                  <Button type="button" variant="outline" size="icon" onClick={handleAddSkill} disabled={loading}>
+                    <Plus className="h-4 w-4" />
+                  </Button>
+                </div>
+                <div className="flex flex-wrap gap-2 mt-2">
+                  {skills.map((skill) => (
+                    <div key={skill} className="flex items-center gap-1 bg-secondary px-2 py-1 rounded-md text-sm">
+                      {skill}
+                      <button type="button" onClick={() => handleRemoveSkill(skill)} className="text-muted-foreground hover:text-foreground">
+                        <X className="h-3 w-3" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm mb-1">Portfolio (PDF)</label>
+                <Input type="file" accept="application/pdf" onChange={onSelectPortfolio} disabled={loading} />
+                {portfolioFile ? <p className="text-xs text-muted-foreground mt-1">{portfolioFile.name}</p> : null}
+              </div>
+
+              <div>
+                <label className="block text-sm mb-1">Government ID Proof *</label>
+                <Input type="file" accept="application/pdf,image/*" onChange={onSelectIdProof} disabled={loading} />
+                {idProofFile ? <p className="text-xs text-muted-foreground mt-1">{idProofFile.name}</p> : null}
+              </div>
+
+              <div className="space-y-2">
+                <label className="block text-sm mb-1">Webcam Photo *</label>
+                {webcamPhotoPreview && (
+                  <img src={webcamPhotoPreview} alt="Webcam capture" className="w-full max-w-sm rounded-md border" style={{ transform: 'scaleX(-1)' }} />
+                )}
+                {!webcamPhotoPreview && cameraActive && (
+                  <video ref={webcamVideoRef} className="w-full max-w-sm rounded-md border bg-black" style={{ transform: 'scaleX(-1)' }} autoPlay playsInline muted />
+                )}
+                <div className="flex gap-2">
+                  {!cameraActive && !webcamPhotoPreview && (
+                    <Button type="button" variant="secondary" onClick={startCamera} disabled={loading}>Start Camera</Button>
+                  )}
+                  {cameraActive && (
+                    <Button type="button" variant="secondary" onClick={capturePhoto} disabled={loading}>Capture Photo</Button>
+                  )}
+                  {cameraActive && (
+                    <Button type="button" variant="outline" onClick={stopCamera} disabled={loading}>Cancel</Button>
+                  )}
+                  {webcamPhotoPreview && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => {
+                        setWebcamPhoto(null);
+                        if (webcamPhotoPreview) {
+                          URL.revokeObjectURL(webcamPhotoPreview);
+                        }
+                        setWebcamPhotoPreview('');
+                        startCamera();
+                      }}
+                      disabled={loading}
+                    >
+                      Retake
+                    </Button>
+                  )}
+                </div>
+                <p className="text-xs text-muted-foreground">Use your device camera to capture a clear photo.</p>
+              </div>
+
+              {src ? (
+                <div className="space-y-2">
+                  <div className="text-xs text-muted-foreground">
+                    Selected segment preview (this is what will be uploaded):
+                    {' '}
+                    {formatTime(videoSelection.startTime)} - {formatTime(videoSelection.endTime)}
+                    {' '}
+                    ({formatTime(videoSelection.selectedDuration)})
+                  </div>
+                  <video
+                    ref={selectedPreviewRef}
+                    controls
+                    className="w-full rounded-md shadow max-h-72 bg-black"
+                    onLoadedMetadata={handleSelectedPreviewLoadedMetadata}
+                    onPlay={handleSelectedPreviewPlay}
+                    onTimeUpdate={handleSelectedPreviewTimeUpdate}
+                  >
+                    <source src={src} />
+                  </video>
+                </div>
+              ) : null}
+
+              {(loading || trimming) && (
+                <div className="space-y-2">
+                  {trimming && <Progress value={trimProgress} className="w-full" />}
+                  <Progress value={uploadProgress} className="w-full" />
+                  {portfolioFile ? <Progress value={portfolioUploadProgress} className="w-full" /> : null}
+                  {idProofFile ? <Progress value={idProofUploadProgress} className="w-full" /> : null}
+                </div>
+              )}
+
+              <div className="mt-2 flex justify-end">
+                <Button
+                  variant="hero"
+                  className="hover-scale"
+                  onClick={handleSubmit}
+                  disabled={loading || trimming || !file || !portfolioFile || !idProofFile || !webcamPhoto || !videoSelection.selectedDuration}
+                >
+                  {trimming
+                    ? `Trimming video... ${trimProgress}%`
+                    : loading
+                    ? analyzingAI
+                      ? 'Analyzing video performance... Please wait'
+                      : `Uploading... ${uploadProgress}%`
+                    : 'Submit Audition'}
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </section>
+    </>
   );
 }

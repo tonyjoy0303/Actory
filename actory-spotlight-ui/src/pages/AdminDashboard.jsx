@@ -64,11 +64,20 @@ export default function AdminDashboard() {
   const [users, setUsers] = useState([]);
   const [castingCalls, setCastingCalls] = useState([]);
   const [videos, setVideos] = useState([]);
+  const [productionRegistrations, setProductionRegistrations] = useState([]);
 
   const [loading, setLoading] = useState(true);
   const [loadingUsers, setLoadingUsers] = useState(false);
   const [loadingCasting, setLoadingCasting] = useState(false);
   const [loadingVideos, setLoadingVideos] = useState(false);
+  const [loadingProductionRegistrations, setLoadingProductionRegistrations] = useState(false);
+
+  const assetBaseUrl = (import.meta.env.VITE_API_URL || 'http://localhost:5000').replace(/\/$/, '');
+  const getAssetUrl = (assetPath) => {
+    if (!assetPath) return '#';
+    if (assetPath.startsWith('http://') || assetPath.startsWith('https://')) return assetPath;
+    return `${assetBaseUrl}${assetPath}`;
+  };
 
   // Dialog state for casting call details
   const [detailsOpen, setDetailsOpen] = useState(false);
@@ -135,12 +144,26 @@ export default function AdminDashboard() {
     }
   };
 
+  const fetchProductionRegistrations = async () => {
+    setLoadingProductionRegistrations(true);
+    try {
+      const { data } = await API.get('/admin/production-house-registrations?status=all');
+      setProductionRegistrations(data.data || []);
+    } catch (error) {
+      console.error('Error fetching production house registrations:', error);
+      toast.error(_optionalChain([error, 'access', _10 => _10.response, 'optionalAccess', _11 => _11.data, 'optionalAccess', _12 => _12.message]) || 'Failed to fetch production house registrations');
+    } finally {
+      setLoadingProductionRegistrations(false);
+    }
+  };
+
   useEffect(() => {
     // Load everything initially
     fetchSwitchRequests();
     fetchUsers();
     fetchCastingCalls();
     fetchVideos();
+    fetchProductionRegistrations();
   }, []);
 
   const handleRequestUpdate = async (id, action) => {
@@ -154,13 +177,25 @@ export default function AdminDashboard() {
     }
   };
 
+  const handleProductionRegistrationAction = async (id, action) => {
+    try {
+      await API.put(`/admin/production-house-registrations/${id}/${action}`);
+      toast.success(`Production house ${action}d successfully`);
+      fetchProductionRegistrations();
+      fetchUsers();
+    } catch (err) {
+      const errorMessage = _optionalChain([err, 'access', _13 => _13.response, 'optionalAccess', _14 => _14.data, 'optionalAccess', _15 => _15.message]) || `Failed to ${action} production house`;
+      toast.error(errorMessage);
+    }
+  };
+
   const handleUserRoleChange = async (id, role) => {
     try {
       await API.put(`/admin/users/${id}`, { role });
       toast.success('User updated');
       fetchUsers();
     } catch (err) {
-      toast.error(_optionalChain([err, 'access', _13 => _13.response, 'optionalAccess', _14 => _14.data, 'optionalAccess', _15 => _15.message]) || 'Failed to update user');
+      toast.error(_optionalChain([err, 'access', _16 => _16.response, 'optionalAccess', _17 => _17.data, 'optionalAccess', _18 => _18.message]) || 'Failed to update user');
     }
   };
 
@@ -178,7 +213,7 @@ export default function AdminDashboard() {
       }
       toast.success('Deleted successfully');
     } catch (err) {
-      toast.error(_optionalChain([err, 'access', _16 => _16.response, 'optionalAccess', _17 => _17.data, 'optionalAccess', _18 => _18.message]) || 'Delete failed');
+      toast.error(_optionalChain([err, 'access', _19 => _19.response, 'optionalAccess', _20 => _20.data, 'optionalAccess', _21 => _21.message]) || 'Delete failed');
     }
   };
 
@@ -200,6 +235,7 @@ export default function AdminDashboard() {
         , React.createElement(Tabs, { defaultValue: "switch-requests", __self: this, __source: {fileName: _jsxFileName, lineNumber: 193}}
           , React.createElement(TabsList, {__self: this, __source: {fileName: _jsxFileName, lineNumber: 194}}
             , React.createElement(TabsTrigger, { value: "switch-requests", __self: this, __source: {fileName: _jsxFileName, lineNumber: 195}}, "Role Switch Requests"  )
+            , React.createElement(TabsTrigger, { value: "production-approvals", __self: this, __source: {fileName: _jsxFileName, lineNumber: 196}}, "Production House Approvals")
             , React.createElement(TabsTrigger, { value: "users", __self: this, __source: {fileName: _jsxFileName, lineNumber: 196}}, "Users")
             , React.createElement(TabsTrigger, { value: "casting-calls", __self: this, __source: {fileName: _jsxFileName, lineNumber: 197}}, "Casting Calls" )
             , React.createElement(TabsTrigger, { value: "videos", __self: this, __source: {fileName: _jsxFileName, lineNumber: 198}}, "Videos")
@@ -235,6 +271,67 @@ export default function AdminDashboard() {
                           )
                         )
                       ))
+                    )
+                  )
+                )
+              )
+            )
+          )
+
+          , React.createElement(TabsContent, { value: "production-approvals", __self: this, __source: {fileName: _jsxFileName, lineNumber: 236}}
+            , React.createElement(Card, {__self: this, __source: {fileName: _jsxFileName, lineNumber: 237}}
+              , React.createElement(CardHeader, { className: "flex flex-row items-center justify-between", __self: this, __source: {fileName: _jsxFileName, lineNumber: 238}}
+                , React.createElement(CardTitle, {__self: this, __source: {fileName: _jsxFileName, lineNumber: 239}}, "Production House Registrations")
+                , React.createElement(Button, { size: "sm", onClick: fetchProductionRegistrations, disabled: loadingProductionRegistrations, __self: this, __source: {fileName: _jsxFileName, lineNumber: 240}}, "Refresh")
+              )
+              , React.createElement(CardContent, {__self: this, __source: {fileName: _jsxFileName, lineNumber: 242}}
+                , loadingProductionRegistrations ? React.createElement('p', {__self: this, __source: {fileName: _jsxFileName, lineNumber: 243}}, "Loading...") : (
+                  React.createElement(Table, {__self: this, __source: {fileName: _jsxFileName, lineNumber: 244}}
+                    , React.createElement(TableHeader, {__self: this, __source: {fileName: _jsxFileName, lineNumber: 245}}
+                      , React.createElement(TableRow, {__self: this, __source: {fileName: _jsxFileName, lineNumber: 246}}
+                        , React.createElement(TableHead, {__self: this, __source: {fileName: _jsxFileName, lineNumber: 247}}, "Name")
+                        , React.createElement(TableHead, {__self: this, __source: {fileName: _jsxFileName, lineNumber: 248}}, "Email")
+                        , React.createElement(TableHead, {__self: this, __source: {fileName: _jsxFileName, lineNumber: 249}}, "Company")
+                        , React.createElement(TableHead, {__self: this, __source: {fileName: _jsxFileName, lineNumber: 250}}, "Phone")
+                        , React.createElement(TableHead, {__self: this, __source: {fileName: _jsxFileName, lineNumber: 251}}, "Location")
+                        , React.createElement(TableHead, {__self: this, __source: {fileName: _jsxFileName, lineNumber: 252}}, "License")
+                        , React.createElement(TableHead, {__self: this, __source: {fileName: _jsxFileName, lineNumber: 253}}, "Status")
+                        , React.createElement(TableHead, {__self: this, __source: {fileName: _jsxFileName, lineNumber: 254}}, "Submitted")
+                        , React.createElement(TableHead, {__self: this, __source: {fileName: _jsxFileName, lineNumber: 255}}, "Actions")
+                      )
+                    )
+                    , React.createElement(TableBody, {__self: this, __source: {fileName: _jsxFileName, lineNumber: 258}}
+                      , productionRegistrations.map(reg => {
+                        const status = reg.approvalStatus || (reg.isVerified ? 'approved' : 'pending');
+                        return React.createElement(TableRow, { key: reg._id, __self: this, __source: {fileName: _jsxFileName, lineNumber: 261}}
+                          , React.createElement(TableCell, {__self: this, __source: {fileName: _jsxFileName, lineNumber: 262}}, reg.name || '—')
+                          , React.createElement(TableCell, {__self: this, __source: {fileName: _jsxFileName, lineNumber: 263}}, reg.email || '—')
+                          , React.createElement(TableCell, {__self: this, __source: {fileName: _jsxFileName, lineNumber: 264}}, reg.companyName || '—')
+                          , React.createElement(TableCell, {__self: this, __source: {fileName: _jsxFileName, lineNumber: 265}}, reg.phone || '—')
+                          , React.createElement(TableCell, {__self: this, __source: {fileName: _jsxFileName, lineNumber: 266}}, reg.location || '—')
+                          , React.createElement(TableCell, {__self: this, __source: {fileName: _jsxFileName, lineNumber: 267}}
+                            , reg.licenseDocument ? (
+                              React.createElement('a', { href: getAssetUrl(reg.licenseDocument), target: "_blank", rel: "noreferrer", className: "underline text-primary", __self: this, __source: {fileName: _jsxFileName, lineNumber: 268}}, "View License")
+                            ) : '—'
+                          )
+                          , React.createElement(TableCell, { className: "capitalize", __self: this, __source: {fileName: _jsxFileName, lineNumber: 271}}, status)
+                          , React.createElement(TableCell, {__self: this, __source: {fileName: _jsxFileName, lineNumber: 272}}, reg.createdAt ? new Date(reg.createdAt).toLocaleDateString() : '—')
+                          , React.createElement(TableCell, { className: "space-x-2", __self: this, __source: {fileName: _jsxFileName, lineNumber: 273}}
+                            , React.createElement(Button, {
+                              size: "sm",
+                              variant: "success",
+                              onClick: () => handleProductionRegistrationAction(reg._id, 'approve'),
+                              disabled: status === 'approved', __self: this, __source: {fileName: _jsxFileName, lineNumber: 274}
+                            }, "Approve")
+                            , React.createElement(Button, {
+                              size: "sm",
+                              variant: "destructive",
+                              onClick: () => handleProductionRegistrationAction(reg._id, 'reject'),
+                              disabled: status === 'rejected', __self: this, __source: {fileName: _jsxFileName, lineNumber: 281}
+                            }, "Reject")
+                          )
+                        );
+                      })
                     )
                   )
                 )

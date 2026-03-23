@@ -92,6 +92,101 @@ exports.getUsers = async (req, res, next) => {
   }
 };
 
+// @desc    Get production house registrations for review
+// @route   GET /api/v1/admin/production-house-registrations
+// @access  Private (Admin)
+exports.getProductionHouseRegistrations = async (req, res, next) => {
+  try {
+    const { status = 'pending' } = req.query;
+    const query = { role: 'ProductionTeam' };
+
+    if (status === 'pending') {
+      query.$or = [
+        { approvalStatus: 'pending' },
+        { approvalStatus: { $exists: false }, isVerified: false }
+      ];
+    } else if (status === 'approved') {
+      query.$or = [
+        { approvalStatus: 'approved' },
+        { approvalStatus: { $exists: false }, isVerified: true }
+      ];
+    } else if (status === 'rejected') {
+      query.approvalStatus = 'rejected';
+    }
+
+    const registrations = await User.find(query)
+      .select('name email phone location companyName licenseDocument createdAt isEmailVerified isVerified approvalStatus approvalReviewedAt approvalReviewedBy approvalRemarks')
+      .populate('approvalReviewedBy', 'name email')
+      .sort({ createdAt: -1 });
+
+    res.status(200).json({
+      success: true,
+      count: registrations.length,
+      data: registrations
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, message: 'Server Error' });
+  }
+};
+
+// @desc    Approve production house registration
+// @route   PUT /api/v1/admin/production-house-registrations/:id/approve
+// @access  Private (Admin)
+exports.approveProductionHouseRegistration = async (req, res, next) => {
+  try {
+    const registration = await User.findOne({
+      _id: req.params.id,
+      role: 'ProductionTeam'
+    });
+
+    if (!registration) {
+      return res.status(404).json({ success: false, message: 'Production house registration not found' });
+    }
+
+    if (!registration.isEmailVerified) {
+      return res.status(400).json({ success: false, message: 'Email verification is not completed yet' });
+    }
+
+    registration.isVerified = true;
+    registration.approvalStatus = 'approved';
+    registration.approvalReviewedAt = new Date();
+    registration.approvalReviewedBy = req.user._id;
+    registration.approvalRemarks = typeof req.body?.remarks === 'string' ? req.body.remarks : '';
+    await registration.save();
+
+    res.status(200).json({ success: true, data: registration, message: 'Production house approved successfully' });
+  } catch (err) {
+    res.status(500).json({ success: false, message: 'Server Error' });
+  }
+};
+
+// @desc    Reject production house registration
+// @route   PUT /api/v1/admin/production-house-registrations/:id/reject
+// @access  Private (Admin)
+exports.rejectProductionHouseRegistration = async (req, res, next) => {
+  try {
+    const registration = await User.findOne({
+      _id: req.params.id,
+      role: 'ProductionTeam'
+    });
+
+    if (!registration) {
+      return res.status(404).json({ success: false, message: 'Production house registration not found' });
+    }
+
+    registration.isVerified = false;
+    registration.approvalStatus = 'rejected';
+    registration.approvalReviewedAt = new Date();
+    registration.approvalReviewedBy = req.user._id;
+    registration.approvalRemarks = typeof req.body?.remarks === 'string' ? req.body.remarks : '';
+    await registration.save();
+
+    res.status(200).json({ success: true, data: registration, message: 'Production house rejected successfully' });
+  } catch (err) {
+    res.status(500).json({ success: false, message: 'Server Error' });
+  }
+};
+
 // @desc    Update user details
 // @route   PUT /api/v1/admin/users/:id
 // @access  Private (Admin)

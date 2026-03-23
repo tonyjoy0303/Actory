@@ -1,12 +1,14 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Trash2, Eye, Heart, MessageCircle, Share2 } from 'lucide-react';
+import { Trash2, Eye, Heart, MessageCircle } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Textarea } from '@/components/ui/textarea';
 import API from '@/lib/api';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
+import InternalShareDialog from '@/components/media/InternalShareDialog';
+import shareInternalIcon from '@/assets/share-internal.svg';
 
 // Inline autoplay previews + full-size modal on click
 const VideoList = ({ videos = [], user, onVideoDeleted, ownerName, ownerAvatar, profileOwnerId }) => {
@@ -15,17 +17,23 @@ const VideoList = ({ videos = [], user, onVideoDeleted, ownerName, ownerAvatar, 
   const [deletingVideoId, setDeletingVideoId] = useState(null);
   const [items, setItems] = useState(videos || []);
   const [currentUserId, setCurrentUserId] = useState(null);
+  const [currentUser, setCurrentUser] = useState(null);
   const [isCommentModalOpen, setIsCommentModalOpen] = useState(false);
   const [selectedItemForComments, setSelectedItemForComments] = useState(null);
   const [newComment, setNewComment] = useState('');
   const [mediaComments, setMediaComments] = useState({});
+  const [isShareDialogOpen, setIsShareDialogOpen] = useState(false);
+  const [mediaToShare, setMediaToShare] = useState(null);
   const videoRef = useRef(null);
 
   // Load current user id and keep items in sync with props
   useEffect(() => {
     try {
       const u = JSON.parse(localStorage.getItem('user') || '{}');
-      if (u && (u._id || u.id)) setCurrentUserId(String(u._id || u.id));
+      if (u && (u._id || u.id)) {
+        setCurrentUserId(String(u._id || u.id));
+        setCurrentUser(u);
+      }
     } catch {}
   }, []);
 
@@ -76,14 +84,24 @@ const VideoList = ({ videos = [], user, onVideoDeleted, ownerName, ownerAvatar, 
     setOpen(true);
   };
 
-  const handleShare = (src) => {
-    if (!src) return;
-    if (navigator.share) {
-      navigator.share({ title: 'Actory Media', url: src }).catch(() => {});
-    } else {
-      navigator.clipboard.writeText(src);
-      toast.success('Media link copied');
+  const handleShare = (item) => {
+    const src = getMediaSrc(item);
+
+    if (!currentUser?._id) {
+      toast.error('Please login to share media in-app');
+      return;
     }
+
+    if (!item?._id || !src) return;
+
+    setMediaToShare({
+      id: item._id,
+      title: item.title || item.description || 'Media post',
+      shareUrl: src,
+      thumbnailUrl: item.thumbnailUrl || src,
+      mediaType: isImageItem(item) ? 'image' : 'video',
+    });
+    setIsShareDialogOpen(true);
   };
 
   const handleToggleLike = async (videoId) => {
@@ -328,8 +346,8 @@ const VideoList = ({ videos = [], user, onVideoDeleted, ownerName, ownerAvatar, 
                     </Button>
                     <span className="text-xs text-muted-foreground">{video.comments || 0}</span>
                   </div>
-                  <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => handleShare(src)}>
-                    <Share2 className="h-5 w-5" />
+                  <Button size="icon" variant="ghost" className="h-8 w-8 bg-black/80 hover:bg-black text-white" onClick={() => handleShare(video)}>
+                    <img src={shareInternalIcon} alt="Share" className="h-5 w-5 invert" />
                   </Button>
                   <div className="ml-auto">
                     {showDeleteButton && (
@@ -399,8 +417,8 @@ const VideoList = ({ videos = [], user, onVideoDeleted, ownerName, ownerAvatar, 
                       <span className="text-xs text-muted-foreground">{activeItem.comments || 0}</span>
                     </div>
 
-                    <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => handleShare(activeItem.src)}>
-                      <Share2 className="h-5 w-5" />
+                    <Button size="icon" variant="ghost" className="h-8 w-8 bg-black/80 hover:bg-black text-white" onClick={() => handleShare(activeItem)}>
+                      <img src={shareInternalIcon} alt="Share" className="h-5 w-5 invert" />
                     </Button>
                   </div>
 
@@ -481,6 +499,13 @@ const VideoList = ({ videos = [], user, onVideoDeleted, ownerName, ownerAvatar, 
           </div>
         </DialogContent>
       </Dialog>
+
+      <InternalShareDialog
+        open={isShareDialogOpen}
+        onOpenChange={setIsShareDialogOpen}
+        media={mediaToShare}
+        currentUser={currentUser}
+      />
     </>
   );
 };

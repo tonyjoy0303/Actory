@@ -152,9 +152,22 @@ function CastingDetailsContent() {
               {/* Producer Information */}
               {casting.producer && (
                 <div className="mt-3 p-3 bg-primary/5 border border-primary/20 rounded-lg">
-                  <p className="text-sm font-medium text-primary">
-                    Created by: {casting.producer.name || 'Unknown'} ({casting.producer.email || 'N/A'})
-                  </p>
+                  <div className="flex items-center gap-2 text-sm font-medium text-primary">
+                    <span>Created by:</span>
+                    <Button
+                      type="button"
+                      variant="link"
+                      className="h-auto p-0 text-primary"
+                      onClick={() => {
+                        if (casting.producer?._id) {
+                          navigate(`/profile/${casting.producer._id}`);
+                        }
+                      }}
+                      disabled={!casting.producer?._id}
+                    >
+                      {casting.producer.name || 'Unknown'}
+                    </Button>
+                  </div>
                 </div>
               )}
             </div>

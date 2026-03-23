@@ -81,83 +81,92 @@ export default function ContributedProjects() {
 
   return (
     <div className="container py-8 space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">My Projects</h1>
-          <p className="text-muted-foreground text-sm">Projects you created or collaborate on.</p>
-        </div>
-        <Button variant="outline" onClick={() => navigate('/projects')}>
-          Create / Manage Projects
-        </Button>
+      <div>
+        <h1 className="text-2xl font-bold">My Projects</h1>
+        <p className="text-muted-foreground text-sm">Projects you created or collaborate on.</p>
       </div>
 
-      {contributed.length === 0 ? (
+      {contributed.length === 0 && (
         <div className="text-sm text-muted-foreground">
-          You have no contributed projects yet.
-        </div>
-      ) : (
-        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {contributed.map((project) => (
-            <Card key={project._id} className="h-full flex flex-col">
-              <CardHeader>
-                <CardTitle className="text-lg line-clamp-2">{project.name}</CardTitle>
-                <div className="flex flex-wrap gap-2 text-sm text-muted-foreground mt-2">
-                  {project.genre && <Badge variant="outline">{project.genre}</Badge>}
-                  {project.language && <Badge variant="outline">{project.language}</Badge>}
-                  {project.status && <Badge>{project.status}</Badge>}
-                </div>
-              </CardHeader>
-              <CardContent className="flex-1 space-y-3 text-sm text-muted-foreground">
-                {project.description && (
-                  <p className="line-clamp-3">{project.description}</p>
-                )}
-                <div className="space-y-1">
-                  {project.startDate && (
-                    <div>
-                      <span className="font-medium text-foreground">Start:</span>{' '}
-                      {format(new Date(project.startDate), 'MMM d, yyyy')}
-                    </div>
-                  )}
-                  {project.endDate && (
-                    <div>
-                      <span className="font-medium text-foreground">End:</span>{' '}
-                      {format(new Date(project.endDate), 'MMM d, yyyy')}
-                    </div>
-                  )}
-                </div>
-                <div className="space-y-1">
-                  <div>
-                    <span className="font-medium text-foreground">Created by:</span>{' '}
-                    {project.createdBy?.name || 'Unknown'}
-                  </div>
-                  <div>
-                    <span className="font-medium text-foreground">Collaborators:</span>{' '}
-                    {(project.collaborators || []).length || 0}
-                  </div>
-                </div>
-                <div className="pt-2">
-                  <div className="flex gap-2">
-                    <Button variant="secondary" onClick={() => navigate(`/projects/${project._id}`)}>
-                      Manage
-                    </Button>
-                    <Button
-                      variant="destructive"
-                      onClick={() => {
-                        if (deleteProject.isPending) return;
-                        if (window.confirm('Delete this project? This will also remove its castings.')) {
-                          deleteProject.mutate(project._id);
-                        }
-                      }}
-                    >
-                      Delete
-                    </Button>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+          You have no contributed projects yet. Create your first project below.
         </div>
       )}
+
+      <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {contributed.map((project) => (
+          <Card key={project._id} className="h-full flex flex-col">
+            <CardHeader>
+              <CardTitle className="text-lg line-clamp-2">{project.name}</CardTitle>
+              <div className="flex flex-wrap gap-2 text-sm text-muted-foreground mt-2">
+                {project.genre && <Badge variant="outline">{project.genre}</Badge>}
+                {project.language && <Badge variant="outline">{project.language}</Badge>}
+                {project.status && <Badge>{project.status}</Badge>}
+              </div>
+            </CardHeader>
+            <CardContent className="flex-1 space-y-3 text-sm text-muted-foreground">
+              {project.description && (
+                <p className="line-clamp-3">{project.description}</p>
+              )}
+              <div className="space-y-1">
+                {project.startDate && (
+                  <div>
+                    <span className="font-medium text-foreground">Start:</span>{' '}
+                    {format(new Date(project.startDate), 'MMM d, yyyy')}
+                  </div>
+                )}
+                {project.endDate && (
+                  <div>
+                    <span className="font-medium text-foreground">End:</span>{' '}
+                    {format(new Date(project.endDate), 'MMM d, yyyy')}
+                  </div>
+                )}
+              </div>
+              <div className="space-y-1">
+                <div>
+                  <span className="font-medium text-foreground">Created by:</span>{' '}
+                  {project.createdBy?.name || 'Unknown'}
+                </div>
+                <div>
+                  <span className="font-medium text-foreground">Collaborators:</span>{' '}
+                  {(project.collaborators || []).length || 0}
+                </div>
+              </div>
+              <div className="pt-2">
+                <div className="flex gap-2">
+                  <Button variant="secondary" onClick={() => navigate(`/projects/${project._id}`)}>
+                    Manage
+                  </Button>
+                  <Button
+                    variant="destructive"
+                    onClick={() => {
+                      if (deleteProject.isPending) return;
+                      if (window.confirm('Delete this project? This will also remove its castings.')) {
+                        deleteProject.mutate(project._id);
+                      }
+                    }}
+                  >
+                    Delete
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+
+        <button
+          type="button"
+          onClick={() => navigate('/projects')}
+          className="h-full min-h-[280px] rounded-lg border border-dashed border-border bg-card/40 hover:bg-card/70 transition-colors flex flex-col items-center justify-center text-center px-6"
+        >
+          <span className="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-full bg-muted text-2xl font-semibold text-foreground">
+            +
+          </span>
+          <span className="text-lg font-semibold text-foreground">New Film Project</span>
+          <span className="mt-1 text-xs uppercase tracking-wide text-muted-foreground">
+            Start a new production entry
+          </span>
+        </button>
+      </div>
     </div>
   );
 }

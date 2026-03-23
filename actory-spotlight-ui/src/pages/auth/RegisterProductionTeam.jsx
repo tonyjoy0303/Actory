@@ -35,11 +35,57 @@ export default function RegisterProductionTeam() {
   const [loading, setLoading] = useState(false);
   const [sendOtpLoading, setSendOtpLoading] = useState(false);
   const [verificationLoading, setVerificationLoading] = useState(false);
+  const [approvalPendingScreen, setApprovalPendingScreen] = useState(false);
   const [otpSent, setOtpSent] = useState(false);
   const [otp, setOtp] = useState('');
+  const [licenseFile, setLicenseFile] = useState(null);
   const [error, setError] = useState('');
   const [userId, setUserId] = useState(null);
   const [token, setToken] = useState(null);
+
+  const allowedLicenseMimeTypes = [
+    'application/pdf',
+    'application/msword',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+  ];
+
+  const isValidLicenseFile = (file) => {
+    if (!file) return false;
+    const ext = file.name.split('.').pop()?.toLowerCase();
+    const hasValidExt = ['pdf', 'doc', 'docx'].includes(ext);
+    const hasValidMime = allowedLicenseMimeTypes.includes(file.type);
+    return hasValidExt && hasValidMime;
+  };
+
+  const handleLicenseChange = (e) => {
+    const file = e.target.files?.[0] || null;
+
+    if (!file) {
+      setLicenseFile(null);
+      return;
+    }
+
+    if (!isValidLicenseFile(file)) {
+      const msg = 'License must be a PDF, DOC, or DOCX file';
+      setError(msg);
+      toast.error(msg);
+      e.target.value = '';
+      setLicenseFile(null);
+      return;
+    }
+
+    if (file.size > 10 * 1024 * 1024) {
+      const msg = 'License file size must be 10MB or less';
+      setError(msg);
+      toast.error(msg);
+      e.target.value = '';
+      setLicenseFile(null);
+      return;
+    }
+
+    setError('');
+    setLicenseFile(file);
+  };
 
   // Step 1: Send verification code (register pending user)
   const handleSendVerification = async (e) => {
@@ -96,16 +142,36 @@ export default function RegisterProductionTeam() {
       return;
     }
 
+    if (!licenseFile) {
+      const msg = 'Production license document is required';
+      setError(msg);
+      toast.error(msg);
+      return;
+    }
+
+    if (!isValidLicenseFile(licenseFile)) {
+      const msg = 'License must be a PDF, DOC, or DOCX file';
+      setError(msg);
+      toast.error(msg);
+      return;
+    }
+
     setSendOtpLoading(true);
     try {
-      const { data } = await API.post('/auth/register', {
-        name: accountForm.name,
-        email: accountForm.email,
-        password: accountForm.password,
-        role: 'ProductionTeam',
-        companyName: accountForm.productionHouse,
-        phone: accountForm.phone,
-        location: accountForm.location
+      const formData = new FormData();
+      formData.append('name', accountForm.name);
+      formData.append('email', accountForm.email);
+      formData.append('password', accountForm.password);
+      formData.append('role', 'ProductionTeam');
+      formData.append('companyName', accountForm.productionHouse);
+      formData.append('phone', accountForm.phone);
+      formData.append('location', accountForm.location);
+      formData.append('licenseFile', licenseFile);
+
+      const { data } = await API.post('/auth/register', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data'
+        }
       });
 
       if (data.success) {
@@ -123,7 +189,7 @@ export default function RegisterProductionTeam() {
     }
   };
 
-  // Step 1b: Verify OTP and log in
+  // Step 1b: Verify OTP and wait for admin approval
   const handleVerifyOtp = async () => {
     setError('');
 
@@ -136,29 +202,14 @@ export default function RegisterProductionTeam() {
 
     setVerificationLoading(true);
     try {
-      await API.post('/auth/verify-email', { email: accountForm.email, otp });
-      toast.success('Email verified successfully!');
+      const { data } = await API.post('/auth/verify-email', { email: accountForm.email, otp });
+      setOtp('');
+      setApprovalPendingScreen(true);
+      toast.success(data?.message || 'Email verified. Your registration is now pending admin approval.');
 
-      // Auto login to continue flow
-      const { data: loginData } = await API.post('/auth/login', {
-        email: accountForm.email,
-        password: accountForm.password
-      });
-
-      if (loginData.success && loginData.user && loginData.token) {
-        setUserId(loginData.user._id);
-        setToken(loginData.token);
-
-        localStorage.setItem('token', loginData.token);
-        localStorage.setItem('user', JSON.stringify(loginData.user));
-        window.dispatchEvent(new Event('authChange'));
-
-        setStep('team');
-        setOtp('');
-      } else {
-        toast.info('Email verified. Please log in to continue.');
+      setTimeout(() => {
         navigate('/auth/login');
-      }
+      }, 5000);
     } catch (err) {
       const errorMessage = err.response?.data?.message || 'OTP verification failed';
       setError(errorMessage);
@@ -214,8 +265,17 @@ export default function RegisterProductionTeam() {
         React.createElement('div', { className: "absolute inset-0 bg-background/70 backdrop-blur", __self: this, __source: { fileName: _jsxFileName, lineNumber: 118 } }),
 
         React.createElement('div', { className: "relative w-full max-w-md p-8 rounded-xl border bg-card shadow-xl", __self: this, __source: { fileName: _jsxFileName, lineNumber: 120 } },
+          approvalPendingScreen && React.createElement(React.Fragment, null,
+            React.createElement('div', { className: "py-8 text-center space-y-4", __self: this, __source: { fileName: _jsxFileName, lineNumber: 121 } },
+              React.createElement('div', { className: "mx-auto h-10 w-10 rounded-full border-4 border-primary/25 border-t-primary animate-spin", __self: this, __source: { fileName: _jsxFileName, lineNumber: 122 } }),
+              React.createElement('h1', { className: "font-display text-2xl", __self: this, __source: { fileName: _jsxFileName, lineNumber: 123 } }, "Registration Under Review"),
+              React.createElement('p', { className: "text-sm text-muted-foreground", __self: this, __source: { fileName: _jsxFileName, lineNumber: 124 } }, "Your email is verified. Production house registration will be completed only after admin approval."),
+              React.createElement('p', { className: "text-xs text-muted-foreground", __self: this, __source: { fileName: _jsxFileName, lineNumber: 125 } }, "Redirecting to login...")
+            )
+          ),
+
           // Step 1: Account Registration
-          step === 'account' && React.createElement(React.Fragment, null,
+          !approvalPendingScreen && step === 'account' && React.createElement(React.Fragment, null,
             React.createElement('h1', { className: "font-display text-3xl text-center", __self: this, __source: { fileName: _jsxFileName, lineNumber: 123 } }, "Create Your Account"),
             React.createElement('p', { className: "text-center text-muted-foreground mt-1", __self: this, __source: { fileName: _jsxFileName, lineNumber: 124 } }, "Register as a Production Team"),
 
@@ -239,6 +299,19 @@ export default function RegisterProductionTeam() {
                 name: "new-production-house",
                 __self: this, __source: { fileName: _jsxFileName, lineNumber: 131 }
               }
+              ),
+              React.createElement('div', { className: "space-y-2", __self: this, __source: { fileName: _jsxFileName, lineNumber: 132 } },
+                React.createElement('label', { className: "text-sm font-medium", __self: this, __source: { fileName: _jsxFileName, lineNumber: 133 } }, "Production License (PDF/DOC/DOCX)"),
+                React.createElement('input', {
+                  type: "file",
+                  accept: ".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                  onChange: handleLicenseChange,
+                  disabled: sendOtpLoading || verificationLoading,
+                  className: "block w-full cursor-pointer rounded-md border border-input bg-background px-3 py-2 text-sm file:mr-3 file:rounded-md file:border-0 file:bg-secondary file:px-3 file:py-1.5 file:text-sm file:font-medium",
+                  name: "production-license",
+                  __self: this, __source: { fileName: _jsxFileName, lineNumber: 134 }
+                }),
+                licenseFile && React.createElement('p', { className: "text-xs text-muted-foreground", __self: this, __source: { fileName: _jsxFileName, lineNumber: 135 } }, `Selected: ${licenseFile.name}`)
               ),
               React.createElement(Input, {
                 placeholder: "Phone",
@@ -336,7 +409,7 @@ export default function RegisterProductionTeam() {
           ),
 
           // Step 2: Team Creation
-          step === 'team' && React.createElement(React.Fragment, null,
+          !approvalPendingScreen && step === 'team' && React.createElement(React.Fragment, null,
             React.createElement('h1', { className: "font-display text-3xl text-center", __self: this, __source: { fileName: _jsxFileName, lineNumber: 173 } }, "Create Your Team"),
             React.createElement('p', { className: "text-center text-muted-foreground mt-1 text-sm", __self: this, __source: { fileName: _jsxFileName, lineNumber: 174 } }, "Set up your production team to start managing projects and collaborating"),
 

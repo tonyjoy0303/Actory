@@ -22,6 +22,38 @@ export default function Messages() {
   const [isSending, setIsSending] = useState(false);
   const endRef = useRef(null);
   const navigate = useNavigate();
+  const SHARE_PREFIX = '[[ACTORY_SHARE]]';
+
+  const parseSharedMediaPayload = (content) => {
+    if (typeof content !== 'string' || !content.startsWith(SHARE_PREFIX)) return null;
+    const raw = content.slice(SHARE_PREFIX.length);
+    try {
+      const parsed = JSON.parse(raw);
+      if (!parsed || typeof parsed !== 'object') return null;
+      const mediaType = parsed.mediaType || '';
+      const lowerUrl = String(parsed.url || '').toLowerCase();
+      const lowerThumb = String(parsed.thumbnailUrl || '').toLowerCase();
+      const imageExtPattern = /(\.png|\.jpg|\.jpeg|\.gif|\.webp|\.avif|\.bmp|\.svg)(\?|$)/;
+      const inferredType = mediaType || (
+        imageExtPattern.test(lowerUrl) || imageExtPattern.test(lowerThumb) ? 'image' : 'video'
+      );
+
+      return {
+        title: parsed.title || 'Shared media',
+        url: parsed.url || '',
+        thumbnailUrl: parsed.thumbnailUrl || parsed.url || '',
+        mediaType: inferredType,
+      };
+    } catch {
+      return null;
+    }
+  };
+
+  const getConversationPreview = (content) => {
+    const shared = parseSharedMediaPayload(content);
+    if (!shared) return content;
+    return `Shared media: ${shared.title}`;
+  };
 
   // Fetch conversations
   const { data: conversations, isLoading: conversationsLoading, refetch: refetchConversations } = useQuery({
@@ -149,7 +181,7 @@ export default function Messages() {
                           , React.createElement('p', { className: "font-medium text-sm truncate" , __self: this, __source: {fileName: _jsxFileName, lineNumber: 44}}, conv.otherUser.name)
                           , React.createElement('span', { className: "text-xs text-muted-foreground" , __self: this, __source: {fileName: _jsxFileName, lineNumber: 45}}, format(new Date(conv.lastMessage.createdAt), 'MMM d'))
                         )
-                        , React.createElement('p', { className: "text-xs text-muted-foreground truncate" , __self: this, __source: {fileName: _jsxFileName, lineNumber: 48}}, conv.lastMessage.content)
+                        , React.createElement('p', { className: "text-xs text-muted-foreground truncate" , __self: this, __source: {fileName: _jsxFileName, lineNumber: 48}}, getConversationPreview(conv.lastMessage.content))
                         , React.createElement('div', { className: "flex items-center gap-2 mt-1" , __self: this, __source: {fileName: _jsxFileName, lineNumber: 49}}
                           , conv.unreadCount > 0 && (
                             React.createElement(Badge, { variant: "destructive", className: "text-xs px-1 py-0" , __self: this, __source: {fileName: _jsxFileName, lineNumber: 51}}, conv.unreadCount)
@@ -199,6 +231,7 @@ export default function Messages() {
                 ) : messages && messages.length > 0 ? (
                   messages.map((message) => {
                     const isFromMe = message.sender._id === JSON.parse(localStorage.getItem('user') || '{}')._id;
+                    const sharedPayload = parseSharedMediaPayload(message.content);
                     return React.createElement('div', {
                       key: message._id,
                       className: `flex items-start gap-2 ${isFromMe ? 'flex-row-reverse' : 'flex-row'}`,
@@ -219,7 +252,39 @@ export default function Messages() {
                           className: `max-w-[75%] p-3 rounded-lg relative group ${isFromMe ? 'bg-primary text-primary-foreground' : 'bg-muted'}`,
                           __self: this,
                           __source: {fileName: _jsxFileName, lineNumber: 100}}
-                        , React.createElement('p', { className: "text-sm" , __self: this, __source: {fileName: _jsxFileName, lineNumber: 101}}, message.content)
+                        , (sharedPayload ? (
+                          React.createElement('div', { className: `rounded-md border p-2 ${isFromMe ? 'bg-primary-foreground/10 border-primary-foreground/30' : 'bg-background border-border'}`, __self: this, __source: {fileName: _jsxFileName, lineNumber: 101}}
+                            , sharedPayload.thumbnailUrl ? (
+                              sharedPayload.mediaType === 'image'
+                                ? React.createElement('img', {
+                                    src: sharedPayload.thumbnailUrl,
+                                    alt: sharedPayload.title,
+                                    className: "w-full h-36 object-cover rounded-md mb-2",
+                                    __self: this,
+                                    __source: {fileName: _jsxFileName, lineNumber: 101}})
+                                : React.createElement('video', {
+                                    src: sharedPayload.url || sharedPayload.thumbnailUrl,
+                                    poster: sharedPayload.thumbnailUrl || undefined,
+                                    className: "w-full h-36 object-cover rounded-md mb-2 bg-black",
+                                    muted: true,
+                                    playsInline: true,
+                                    preload: "metadata",
+                                    __self: this,
+                                    __source: {fileName: _jsxFileName, lineNumber: 101}})
+                            ) : null
+                            , React.createElement('p', { className: "text-xs opacity-80 mb-1", __self: this, __source: {fileName: _jsxFileName, lineNumber: 102}}, "Shared media")
+                            , React.createElement('p', { className: "text-sm font-medium mb-2 line-clamp-2", __self: this, __source: {fileName: _jsxFileName, lineNumber: 103}}, sharedPayload.title)
+                            , sharedPayload.url ? React.createElement('a', {
+                                href: sharedPayload.url,
+                                target: "_blank",
+                                rel: "noopener noreferrer",
+                                className: `text-xs underline ${isFromMe ? 'text-primary-foreground' : 'text-primary'}`,
+                                __self: this,
+                                __source: {fileName: _jsxFileName, lineNumber: 104}}, "Open media") : null
+                          )
+                        ) : (
+                          React.createElement('p', { className: "text-sm" , __self: this, __source: {fileName: _jsxFileName, lineNumber: 101}}, message.content)
+                        ))
                         , React.createElement('div', { className: "flex items-center justify-between mt-1" , __self: this, __source: {fileName: _jsxFileName, lineNumber: 102}}
                           , React.createElement('p', { className: "text-xs opacity-70" , __self: this, __source: {fileName: _jsxFileName, lineNumber: 103}}, format(new Date(message.createdAt), 'MMM d, h:mm a'))
                           , isFromMe && (
