@@ -213,6 +213,28 @@ const SubmissionsPage = () => {
     };
   }, [displayedSubmissions]);
 
+  const dominantEmotionStats = useMemo(() => {
+    const fallbackRequired = submissions.find((submission) => submission.requiredEmotion)?.requiredEmotion;
+    const requiredEmotion = String(castingData?.data?.requiredEmotion || fallbackRequired || 'neutral').toLowerCase();
+
+    if (!displayedSubmissions || displayedSubmissions.length === 0) {
+      return {
+        emotion: requiredEmotion,
+        count: 0,
+        percentage: 0,
+      };
+    }
+
+    const count = displayedSubmissions.filter((submission) => {
+      const submissionRequired = String(submission.requiredEmotion || requiredEmotion).toLowerCase();
+      return submissionRequired === requiredEmotion;
+    }).length;
+
+    const percentage = Math.round((count / displayedSubmissions.length) * 100);
+
+    return { emotion: requiredEmotion, count, percentage };
+  }, [displayedSubmissions, submissions, castingData]);
+
   const resetApplicationFilters = () => {
     setFilterAgeMin('');
     setFilterAgeMax('');
@@ -449,7 +471,10 @@ const SubmissionsPage = () => {
                 <div className="flex flex-wrap items-center gap-4 text-sm text-slate-300">
                   <span className="inline-flex items-center gap-2"><Users className="h-4 w-4" /> {stats.total} candidates</span>
                   <span className="inline-flex items-center gap-2"><ClipboardCheck className="h-4 w-4" /> {stats.analyzed} analyzed</span>
-                  <span className="inline-flex items-center gap-2"><Gauge className="h-4 w-4" /> Avg {stats.avgScore}</span>
+                  <span className="inline-flex items-center gap-2">
+                    <Gauge className="h-4 w-4" />
+                    Dominant {dominantEmotionStats.emotion} ({dominantEmotionStats.count})
+                  </span>
                 </div>
               </div>
 
@@ -506,10 +531,10 @@ const SubmissionsPage = () => {
           <Card className="border-slate-800 bg-slate-900/80">
             <CardContent className="p-5">
               <div className="flex items-center justify-between">
-                <p className="text-sm text-slate-400">Average Score</p>
+                <p className="text-sm text-slate-400">Dominant Emotion</p>
                 <TrendingUp className="h-4 w-4 text-amber-300" />
               </div>
-              <p className="mt-3 text-3xl font-semibold text-amber-300">{stats.avgScore}</p>
+              <p className="mt-2 text-xl font-semibold capitalize text-amber-300">{dominantEmotionStats.emotion}</p>
             </CardContent>
           </Card>
           <Card className="border-slate-800 bg-slate-900/80">
@@ -786,7 +811,7 @@ const SubmissionsPage = () => {
                         <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
                           <div className="rounded-lg border border-slate-800 bg-slate-950/80 p-3">
                             <p className="text-xs uppercase tracking-wider text-slate-500">Required</p>
-                            <p className="mt-1 text-sm capitalize text-slate-200">{submission.requiredEmotion || 'neutral'}</p>
+                            <p className="mt-1 text-sm capitalize text-slate-200">{submission.requiredEmotion || castingData?.data?.requiredEmotion || 'neutral'}</p>
                           </div>
                           <div className="rounded-lg border border-slate-800 bg-slate-950/80 p-3">
                             <p className="text-xs uppercase tracking-wider text-slate-500">Detected</p>
