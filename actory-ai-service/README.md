@@ -43,6 +43,55 @@ The model has internal Rescaling layer - no manual normalization needed.
 uvicorn main:app --host 0.0.0.0 --port 8000 --reload
 ```
 
+## Deploy on Render (Voice + Face)
+
+To run both face and voice emotion analysis reliably on Render, deploy this service as a Docker web service.
+
+### Why Docker?
+
+- Voice analysis requires FFmpeg and additional system libraries.
+- Docker ensures consistent runtime for TensorFlow, Torch, librosa, and SpeechBrain.
+
+### Option A: Render Blueprint (recommended)
+
+This repository root includes a `render.yaml` entry for `actory-ai-service`.
+
+1. Push your latest changes to GitHub.
+2. In Render, choose **New +** -> **Blueprint**.
+3. Select this repository and apply the blueprint.
+4. Render will build `actory-ai-service/Dockerfile` and expose `/api/health`.
+
+Set these environment values for the AI service:
+
+- `REQUIRE_VOICE_ANALYSIS=false` (recommended fallback mode: use face-only if voice fails)
+- `LOG_LEVEL=INFO`
+
+Set this on your backend service:
+
+- `AI_SERVICE_URL=https://actory-ai-service.onrender.com`
+
+### Option B: Manual Render Web Service
+
+1. Create a new Web Service in Render.
+2. Set:
+  - **Environment**: Docker
+  - **Root Directory**: `actory-ai-service`
+  - **Dockerfile Path**: `./Dockerfile`
+  - **Health Check Path**: `/api/health`
+  - **Python Version**: pinned by Docker (`FROM python:3.10-slim`)
+3. Add env vars:
+  - `REQUIRE_VOICE_ANALYSIS=false`
+  - `LOG_LEVEL=INFO`
+
+### Verify
+
+- `GET /api/health` returns healthy status.
+- `POST /api/analyze-video` returns both `faceEmotion` and `voiceEmotion` fields.
+
+If voice initialization fails in fallback mode, the service continues with face-only analysis. Set `REQUIRE_VOICE_ANALYSIS=true` only when you want strict failure instead.
+
+For a concise checklist, see `RENDER_VOICE_FACE_DEPLOYMENT.md`.
+
 ## API Endpoints
 
 ### POST /analyze-video

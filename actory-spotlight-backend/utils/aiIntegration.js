@@ -172,7 +172,7 @@ const testAIIntegration = async (videoUrl = 'https://test-videos.co.uk/vids/bigb
   
   try {
     // First check if AI service is reachable
-    const healthCheck = await axios.get(`${AI_SERVICE_URL}/health`, { timeout: 5000 });
+    const healthCheck = await axios.get(`${AI_SERVICE_URL}/api/health`, { timeout: 5000 });
     console.log('[AI TEST] ✓ AI service is reachable');
     console.log(`[AI TEST] Health status: ${JSON.stringify(healthCheck.data)}`);
   } catch (error) {
